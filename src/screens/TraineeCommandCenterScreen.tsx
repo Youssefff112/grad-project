@@ -3,19 +3,23 @@ import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { useUser } from '../context/UserContext';
 import { BottomNav } from '../components/BottomNav';
 import { Button } from '../components/Button';
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('home');
   const { isDark, accent } = useTheme();
+  const { fullName } = useUser();
+  const firstName = fullName?.split(' ')[0] || 'Trainee';
+
   return (
-    <SafeAreaView style={tw`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
-      <View style={[tw`flex-row items-center p-4 pb-2 justify-between ${isDark ? 'bg-background-dark' : 'bg-background-light'} z-10`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
+      <View style={[tw`flex-row items-center p-4 pb-2 justify-between z-10`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>
           <MaterialIcons name="person" size={28} color={accent} />
         </TouchableOpacity>
-        <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} text-lg font-bold leading-tight tracking-tight flex-1 text-center`}>
+        <Text style={[tw`text-lg font-bold leading-tight tracking-tight flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
           Command Center
         </Text>
         <View style={tw`flex w-12 items-center justify-end`}>
@@ -27,64 +31,70 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView style={tw`flex-1 pb-24`} contentContainerStyle={tw`pb-24`}>
+        {/* Greeting */}
+        <View style={tw`px-4 pt-6 pb-2`}>
+          <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Welcome back,</Text>
+          <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{firstName}</Text>
+        </View>
+
         {/* Daily Dial Section */}
-        <View style={tw`px-4 pt-6`}>
+        <View style={tw`px-4 pt-2`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
-            <Text style={tw`text-slate-900 dark:text-slate-100 text-2xl font-bold leading-tight tracking-tight`}>
+            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
               Daily Dial
             </Text>
-            <Text style={tw`text-primary text-sm font-semibold`}>Today</Text>
+            <Text style={[tw`text-sm font-semibold`, { color: accent }]}>Today</Text>
           </View>
 
           <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
             {/* Calories Card */}
-            <View style={tw`w-[48%] flex-col gap-2 rounded-xl p-4 bg-white dark:bg-slate-800 border border-primary/10 shadow-sm`}>
+            <View style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
               <View style={tw`flex-row items-center gap-2`}>
-                <MaterialIcons name="local-fire-department" size={20} color={tw.color('primary')} />
-                <Text style={tw`text-slate-600 dark:text-slate-400 text-sm font-medium`}>Calories</Text>
+                <MaterialIcons name="local-fire-department" size={20} color={accent} />
+                <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#475569' }]}>Calories</Text>
               </View>
-              <Text style={tw`text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight`}>
-                1,850 <Text style={tw`text-xs font-normal text-slate-400`}>/ 2,400</Text>
+              <Text style={[tw`text-xl font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                1,850 <Text style={[tw`text-xs font-normal`, { color: '#94a3b8' }]}>/ 2,400</Text>
               </Text>
-              <View style={tw`w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1`}>
-                <View style={tw`bg-primary h-full rounded-full w-[77%]`} />
+              <View style={[tw`w-full h-1.5 rounded-full overflow-hidden mt-1`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                <View style={[tw`h-full rounded-full`, { backgroundColor: accent, width: '77%' }]} />
               </View>
               <Text style={tw`text-red-500 text-xs font-semibold`}>-550 kcal left</Text>
             </View>
 
             {/* Water Card */}
-            <View style={tw`w-[48%] flex-col gap-2 rounded-xl p-4 bg-white dark:bg-slate-800 border border-primary/10 shadow-sm`}>
+            <View style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
               <View style={tw`flex-row items-center gap-2`}>
                 <MaterialIcons name="water-drop" size={20} color="#3b82f6" />
-                <Text style={tw`text-slate-600 dark:text-slate-400 text-sm font-medium`}>Water</Text>
+                <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#475569' }]}>Water</Text>
               </View>
-              <Text style={tw`text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight`}>
-                1.2L <Text style={tw`text-xs font-normal text-slate-400`}>/ 3.0L</Text>
+              <Text style={[tw`text-xl font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                1.2L <Text style={[tw`text-xs font-normal`, { color: '#94a3b8' }]}>/ 3.0L</Text>
               </Text>
-              <View style={tw`w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1`}>
+              <View style={[tw`w-full h-1.5 rounded-full overflow-hidden mt-1`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
                 <View style={tw`bg-blue-500 h-full rounded-full w-[40%]`} />
               </View>
-              <Text style={tw`text-green-600 dark:text-green-400 text-xs font-semibold`}>+0.4L since 1h</Text>
+              <Text style={tw`text-green-500 text-xs font-semibold`}>+0.4L since 1h</Text>
             </View>
 
             {/* Readiness Score */}
-            <View style={tw`w-full flex-col gap-2 rounded-xl p-5 bg-primary/10 border border-primary/20 shadow-sm mt-3`}>
+            <View style={[tw`w-full flex-col gap-2 rounded-xl p-5 shadow-sm mt-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
               <View style={tw`flex-row items-center justify-between`}>
                 <View style={tw`flex-row items-center gap-2`}>
-                  <MaterialIcons name="bolt" size={24} color={tw.color('primary')} />
-                  <Text style={tw`text-slate-900 dark:text-slate-100 text-base font-bold`}>Readiness Score</Text>
+                  <MaterialIcons name="bolt" size={24} color={accent} />
+                  <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Readiness Score</Text>
                 </View>
-                <Text style={tw`text-primary text-2xl font-black`}>85%</Text>
+                <Text style={[tw`text-2xl font-black`, { color: accent }]}>85%</Text>
               </View>
-              <Text style={tw`text-slate-600 dark:text-slate-400 text-sm leading-relaxed mt-1`}>
+              <Text style={[tw`text-sm leading-relaxed mt-1`, { color: isDark ? '#94a3b8' : '#475569' }]}>
                 Your recovery is optimal. High intensity training is recommended today.
               </Text>
               <View style={tw`flex-row gap-2 mt-2`}>
-                <View style={tw`px-3 py-1 bg-primary/20 rounded-full`}>
-                  <Text style={tw`text-primary text-xs font-bold uppercase tracking-wider`}>Optimal</Text>
+                <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent + '28' }]}>
+                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: accent }]}>Optimal</Text>
                 </View>
-                <View style={tw`px-3 py-1 bg-slate-200 dark:bg-slate-700 rounded-full`}>
-                  <Text style={tw`text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider`}>High Energy</Text>
+                <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
+                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: isDark ? '#cbd5e1' : '#475569' }]}>High Energy</Text>
                 </View>
               </View>
             </View>
@@ -94,16 +104,16 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         {/* Workout Anchor Section */}
         <View style={tw`px-4 mt-8`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
-            <Text style={tw`text-slate-900 dark:text-slate-100 text-2xl font-bold leading-tight tracking-tight`}>
+            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
               Workout Anchor
             </Text>
             <TouchableOpacity>
-              <Text style={tw`text-primary text-sm font-bold`}>View Plan</Text>
+              <Text style={[tw`text-sm font-bold`, { color: accent }]}>View Plan</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
-            style={tw`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md h-56 w-full`}
+            style={[tw`relative overflow-hidden rounded-2xl shadow-md h-56 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
             onPress={() => navigation.navigate('Calibration')}
           >
             <ImageBackground
@@ -114,49 +124,37 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               <View style={tw`absolute inset-0 bg-black/50`} />
               <View style={tw`p-5 z-10`}>
                 <View style={tw`flex-row items-center gap-2 mb-1`}>
-                  <View style={tw`bg-primary px-2 py-0.5 rounded`}>
+                  <View style={[tw`px-2 py-0.5 rounded`, { backgroundColor: accent }]}>
                     <Text style={tw`text-white text-[10px] font-bold uppercase`}>Focus</Text>
                   </View>
-                  <Text style={tw`text-slate-300 text-xs`}>Leg Day • 75 mins</Text>
+                  <Text style={tw`text-slate-300 text-xs`}>Leg Day - 75 mins</Text>
                 </View>
                 <Text style={tw`text-white text-2xl font-bold mb-3`}>Hypertrophy: Lower Body</Text>
                 <View style={tw`flex-row items-center justify-between mt-2`}>
-                  <Button
-                    title="Start Session"
-                    size="sm"
-                    onPress={() => navigation.navigate('Calibration')}
-                    containerStyle={tw`rounded-xl px-6`}
-                  />
+                  <Button title="Start Session" size="sm" onPress={() => navigation.navigate('Calibration')} containerStyle={tw`rounded-xl px-6`} />
                 </View>
               </View>
             </ImageBackground>
           </TouchableOpacity>
 
           <View style={tw`mt-4 flex-col gap-3`}>
-            <View style={tw`flex-row items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700`}>
-              <View style={tw`flex-row items-center gap-3`}>
-                <View style={tw`p-2 bg-primary/10 rounded-lg`}>
-                  <MaterialIcons name="fitness-center" size={24} color={tw.color('primary')} />
+            {[
+              { name: 'Barbell Squats', sets: '4 sets x 10 reps' },
+              { name: 'Leg Extensions', sets: '3 sets x 15 reps' },
+            ].map((exercise) => (
+              <View key={exercise.name} style={[tw`flex-row items-center justify-between p-4 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                <View style={tw`flex-row items-center gap-3`}>
+                  <View style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '14' }]}>
+                    <MaterialIcons name="fitness-center" size={24} color={accent} />
+                  </View>
+                  <View>
+                    <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{exercise.name}</Text>
+                    <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>{exercise.sets}</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={tw`text-sm font-bold text-slate-900 dark:text-slate-100`}>Barbell Squats</Text>
-                  <Text style={tw`text-xs text-slate-500`}>4 sets x 10 reps</Text>
-                </View>
+                <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
               </View>
-              <MaterialIcons name="chevron-right" size={24} color={tw.color('slate-400')} />
-            </View>
-            <View style={tw`flex-row items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700`}>
-              <View style={tw`flex-row items-center gap-3`}>
-                <View style={tw`p-2 bg-primary/10 rounded-lg`}>
-                  <MaterialIcons name="fitness-center" size={24} color={tw.color('primary')} />
-                </View>
-                <View>
-                  <Text style={tw`text-sm font-bold text-slate-900 dark:text-slate-100`}>Leg Extensions</Text>
-                  <Text style={tw`text-xs text-slate-500`}>3 sets x 15 reps</Text>
-                </View>
-              </View>
-              <MaterialIcons name="chevron-right" size={24} color={tw.color('slate-400')} />
-            </View>
+            ))}
           </View>
         </View>
       </ScrollView>

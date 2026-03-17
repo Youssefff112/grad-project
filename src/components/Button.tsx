@@ -22,22 +22,23 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const { isDark, accent } = useTheme();
-  const baseContainerTw = `flex-row items-center justify-center rounded-xl active:scale-95 transition-all`;
+  const baseContainerTw = `flex-row items-center justify-center rounded-xl`;
 
   let variantStyle: ViewStyle = {};
-  let variantTextTw = '';
+  let variantTextColor = '';
 
   switch (variant) {
     case 'primary':
       variantStyle = { backgroundColor: accent, shadowColor: accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 };
-      variantTextTw = 'text-white font-bold';
+      variantTextColor = '#ffffff';
       break;
     case 'secondary':
-      variantTextTw = 'text-slate-900 dark:text-white font-bold';
+      variantStyle = { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' };
+      variantTextColor = isDark ? '#ffffff' : '#1e293b';
       break;
     case 'outline':
       variantStyle = { borderWidth: 1, borderColor: accent + '80', backgroundColor: 'transparent' };
-      variantTextTw = 'font-bold';
+      variantTextColor = accent;
       break;
   }
 
@@ -61,14 +62,10 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[
-        tw`${baseContainerTw} ${variant === 'secondary' ? 'bg-slate-100 dark:bg-slate-800' : ''} ${sizeContainerTw}`,
-        variantStyle,
-        containerStyle,
-      ]}
+      style={[tw`${baseContainerTw} ${sizeContainerTw}`, variantStyle, containerStyle]}
       {...props}
     >
-      <Text style={[tw`${variantTextTw} ${sizeTextTw}`, variant === 'outline' && { color: accent }, textStyle]}>
+      <Text style={[tw`font-bold ${sizeTextTw}`, { color: variantTextColor }, textStyle]}>
         {title}
       </Text>
       {icon && icon}

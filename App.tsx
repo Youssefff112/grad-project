@@ -2,6 +2,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { UserProvider } from './src/context/UserContext';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { AccountCreationScreen } from './src/screens/AccountCreationScreen';
 import { BiometricsScreen } from './src/screens/BiometricsScreen';
@@ -13,7 +14,11 @@ import { ActiveSetScreen } from './src/screens/ActiveSetScreen';
 import { VisionAnalysisLabScreen } from './src/screens/VisionAnalysisLabScreen';
 import { MealsScreen } from './src/screens/MealsScreen';
 import { MessagesScreen } from './src/screens/MessagesScreen';
+import { ChatScreen } from './src/screens/ChatScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { EditProfileScreen } from './src/screens/EditProfileScreen';
+import { NotificationsSettingsScreen } from './src/screens/NotificationsSettingsScreen';
+import { MeasurementsSettingsScreen } from './src/screens/MeasurementsSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -41,7 +46,11 @@ function AppNavigator() {
       <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
       <Stack.Screen name="Meals" component={MealsScreen} />
       <Stack.Screen name="Messages" component={MessagesScreen} />
+      <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
+      <Stack.Screen name="MeasurementsSettings" component={MeasurementsSettingsScreen} />
     </Stack.Navigator>
   );
 }
@@ -49,9 +58,11 @@ function AppNavigator() {
 export default function App() {
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <AppNavigator />
-      </NavigationContainer>
+      <UserProvider>
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      </UserProvider>
     </ThemeProvider>
   );
 }

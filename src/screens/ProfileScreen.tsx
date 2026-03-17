@@ -1,18 +1,53 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { useUser } from '../context/UserContext';
 import { BottomNav } from '../components/BottomNav';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
+  const { fullName, email } = useUser();
+  const displayName = fullName || 'Trainee';
 
   const STATS = [
     { label: 'Workouts', value: '47', icon: 'fitness-center' as const },
     { label: 'Streak', value: '12d', icon: 'local-fire-department' as const },
     { label: 'PR\'s Hit', value: '8', icon: 'emoji-events' as const },
   ];
+
+  const handleMenuPress = (id: string) => {
+    switch (id) {
+      case 'dark-mode':
+        toggleTheme();
+        break;
+      case 'edit-profile':
+        navigation.navigate('EditProfile');
+        break;
+      case 'notifications':
+        navigation.navigate('NotificationsSettings');
+        break;
+      case 'units':
+        navigation.navigate('MeasurementsSettings');
+        break;
+      case 'privacy':
+        Alert.alert('Privacy & Security', 'End-to-end encryption is enabled. Your data is stored securely and never shared with third parties.', [{ text: 'OK' }]);
+        break;
+      case 'subscription':
+        Alert.alert('Subscription', 'You are on the Apex AI Pro plan.\n\nRenews: April 17, 2026\nPrice: $19.99/month', [{ text: 'Manage' }, { text: 'OK' }]);
+        break;
+      case 'help':
+        Alert.alert('Help Center', 'Need assistance?\n\nEmail: support@apexai.com\nResponse time: < 24 hours', [{ text: 'OK' }]);
+        break;
+      case 'feedback':
+        Alert.alert('Send Feedback', 'We\'d love to hear from you! Your feedback helps us improve Apex AI.', [{ text: 'Cancel' }, { text: 'Send Email', onPress: () => {} }]);
+        break;
+      case 'about':
+        Alert.alert('About Apex AI', 'Version 1.0.0\n\nElite coaching powered by real-time computer vision and AI analysis.\n\nBuilt with precision for athletes.', [{ text: 'OK' }]);
+        break;
+    }
+  };
 
   const MENU_SECTIONS = [
     {
@@ -42,18 +77,13 @@ export const ProfileScreen = ({ navigation }: any) => {
   ];
 
   return (
-    <SafeAreaView style={tw`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       {/* Header */}
-      <View
-        style={[
-          tw`flex-row items-center p-4 justify-between`,
-          { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-        ]}
-      >
+      <View style={[tw`flex-row items-center p-4 justify-between`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-12 items-center justify-center`}>
           <MaterialIcons name="arrow-back" size={24} color={accent} />
         </TouchableOpacity>
-        <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} text-lg font-bold tracking-tight flex-1 text-center`}>
+        <Text style={[tw`text-lg font-bold tracking-tight flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
           Profile
         </Text>
         <View style={tw`w-12`} />
@@ -65,8 +95,8 @@ export const ProfileScreen = ({ navigation }: any) => {
           <View style={[tw`w-24 h-24 rounded-full items-center justify-center mb-4`, { backgroundColor: accent + '20', borderWidth: 2, borderColor: accent }]}>
             <MaterialIcons name="person" size={48} color={accent} />
           </View>
-          <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} text-2xl font-bold`}>Trainee</Text>
-          <Text style={tw`${isDark ? 'text-slate-400' : 'text-slate-500'} text-sm mt-1`}>Apex AI Member</Text>
+          <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{displayName}</Text>
+          <Text style={[tw`text-sm mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>{email || 'Apex AI Member'}</Text>
         </View>
 
         {/* Stats Row */}
@@ -74,20 +104,11 @@ export const ProfileScreen = ({ navigation }: any) => {
           {STATS.map((stat) => (
             <View
               key={stat.label}
-              style={[
-                tw`flex-1 items-center py-4 rounded-2xl`,
-                {
-                  backgroundColor: isDark ? '#111128' : '#ffffff',
-                  borderWidth: 1,
-                  borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                },
-              ]}
+              style={[tw`flex-1 items-center py-4 rounded-2xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
             >
               <MaterialIcons name={stat.icon} size={22} color={accent} />
               <Text style={[tw`text-xl font-black mt-1`, { color: accent }]}>{stat.value}</Text>
-              <Text style={tw`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                {stat.label}
-              </Text>
+              <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{stat.label}</Text>
             </View>
           ))}
         </View>
@@ -95,52 +116,26 @@ export const ProfileScreen = ({ navigation }: any) => {
         {/* Menu Sections */}
         {MENU_SECTIONS.map((section) => (
           <View key={section.title} style={tw`px-4 mb-5`}>
-            <Text style={tw`text-xs font-bold uppercase tracking-widest mb-2 px-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {section.title}
-            </Text>
-            <View
-              style={[
-                tw`rounded-2xl overflow-hidden`,
-                {
-                  backgroundColor: isDark ? '#111128' : '#ffffff',
-                  borderWidth: 1,
-                  borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                },
-              ]}
-            >
+            <Text style={[tw`text-xs font-bold uppercase tracking-widest mb-2 px-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{section.title}</Text>
+            <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
               {section.items.map((item, i) => (
                 <TouchableOpacity
                   key={item.id}
-                  onPress={item.id === 'dark-mode' ? toggleTheme : undefined}
+                  onPress={() => handleMenuPress(item.id)}
                   style={[
                     tw`flex-row items-center justify-between px-4 py-3.5`,
-                    i < section.items.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                    },
+                    i < section.items.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
                   ]}
                 >
                   <View style={tw`flex-row items-center gap-3`}>
                     <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: accent + '14' }]}>
                       <MaterialIcons name={item.icon as any} size={18} color={accent} />
                     </View>
-                    <Text style={tw`${isDark ? 'text-slate-200' : 'text-slate-800'} text-sm font-semibold`}>
-                      {item.label}
-                    </Text>
+                    <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#e2e8f0' : '#334155' }]}>{item.label}</Text>
                   </View>
                   {item.isToggle ? (
-                    <View
-                      style={[
-                        tw`w-12 h-7 rounded-full justify-center px-0.5`,
-                        { backgroundColor: isDark ? accent : '#cbd5e1' },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          tw`w-6 h-6 rounded-full bg-white shadow`,
-                          { alignSelf: isDark ? 'flex-end' : 'flex-start' },
-                        ]}
-                      />
+                    <View style={[tw`w-12 h-7 rounded-full justify-center px-0.5`, { backgroundColor: isDark ? accent : '#cbd5e1' }]}>
+                      <View style={[tw`w-6 h-6 rounded-full bg-white shadow`, { alignSelf: isDark ? 'flex-end' : 'flex-start' }]} />
                     </View>
                   ) : (
                     <MaterialIcons name="chevron-right" size={22} color={isDark ? '#475569' : '#94a3b8'} />
@@ -154,10 +149,8 @@ export const ProfileScreen = ({ navigation }: any) => {
         {/* Sign Out */}
         <View style={tw`px-4 mb-8`}>
           <TouchableOpacity
-            style={[
-              tw`flex-row items-center justify-center gap-2 py-4 rounded-2xl`,
-              { backgroundColor: '#ef444420', borderWidth: 1, borderColor: '#ef444430' },
-            ]}
+            onPress={() => Alert.alert('Sign Out', 'Are you sure you want to sign out?', [{ text: 'Cancel' }, { text: 'Sign Out', style: 'destructive', onPress: () => navigation.navigate('Splash') }])}
+            style={[tw`flex-row items-center justify-center gap-2 py-4 rounded-2xl`, { backgroundColor: '#ef444420', borderWidth: 1, borderColor: '#ef444430' }]}
           >
             <MaterialIcons name="logout" size={20} color="#ef4444" />
             <Text style={tw`text-red-500 font-bold text-sm`}>Sign Out</Text>

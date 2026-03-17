@@ -1,180 +1,129 @@
-import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, ImageBackground } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, SafeAreaView, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Svg, Line, Circle, Text as SvgText, Path } from 'react-native-svg';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
 
 export const VisionAnalysisLabScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const accentBg = accent + (isDark ? '20' : '16');
-  const accentBorder = accent + (isDark ? '38' : '2a');
+  const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       {/* Header */}
-      <View
-        style={[
-          tw`flex-row items-center p-4 justify-between z-50 bg-white dark:bg-surface-dark`,
-          { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-        ]}
-      >
+      <View style={[tw`flex-row items-center p-4 justify-between z-10`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
         <View style={tw`flex-row items-center gap-3`}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <MaterialIcons name="arrow-back" size={24} color={accent} />
           </TouchableOpacity>
-          <Text style={tw`text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight`}>
-            Vision Analysis Lab
+          <Text style={[tw`text-lg font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            Workouts
           </Text>
         </View>
-        <View style={tw`flex-row items-center gap-4`}>
-          <TouchableOpacity
-            style={[
-              tw`flex items-center justify-center rounded-lg h-10 w-10`,
-              { backgroundColor: accentBg, borderWidth: 1, borderColor: accentBorder },
-            ]}
-          >
-            <MaterialIcons name="auto-fix-high" size={20} color={accent} />
-          </TouchableOpacity>
-          <View style={tw`h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden`}>
-            <ImageBackground
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDZt4RhP1izfo6EyEQVIqw7OmFslzP0EdbS_GNIb3jG8OfCjGRqn8aZqZV09jzEI30bzL6QyDxmcBG_M5XbIB7H9pkPpYui9XqbydHXxnDtRooMs8xUaZIS1bNAQdySOmerdG1VkqENWM7qub719BuaSYpe56BPPlyDxuuEu80ddz7532S44-H2kwtnjTQK5H6x70mKhRWxXEqtVZFwbQmh1rFZOMBfaWiNaGZCyXRGS71_TuufgNciyxsc00I01LiC-CCuZ6QMqyA' }}
-              style={tw`w-full h-full`}
-            />
-          </View>
-        </View>
+        <TouchableOpacity style={[tw`flex items-center justify-center rounded-lg h-10 w-10`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]}>
+          <MaterialIcons name="history" size={22} color={accent} />
+        </TouchableOpacity>
       </View>
 
-      {/* Navigation Tabs */}
-      <View
-        style={[
-          tw`px-4 flex-row gap-8 bg-white dark:bg-surface-dark`,
-          { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)' },
-        ]}
-      >
+      {/* Tab Switcher */}
+      <View style={[tw`flex-row px-4 gap-2 py-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
         {[
-          { id: 'gallery', label: 'Video Gallery' },
-          { id: 'active', label: 'Active Lab' },
-          { id: 'annotations', label: 'Annotations' },
+          { id: 'live' as const, label: 'Live Session', icon: 'videocam' },
+          { id: 'history' as const, label: 'Past Sessions', icon: 'history' },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
+            onPress={() => setActiveTab(tab.id)}
             style={[
-              tw`pb-3 pt-4`,
-              { borderBottomWidth: 2, borderBottomColor: tab.id === 'active' ? accent : 'transparent' },
+              tw`flex-1 flex-row items-center justify-center gap-2 py-3 rounded-xl`,
+              {
+                backgroundColor: activeTab === tab.id ? accent : isDark ? '#1e293b' : '#f1f5f9',
+              },
             ]}
           >
-            <Text
-              style={[
-                tw`text-sm font-semibold tracking-wide`,
-                { color: tab.id === 'active' ? accent : isDark ? '#94a3b8' : '#64748b' },
-              ]}
-            >
+            <MaterialIcons name={tab.icon as any} size={18} color={activeTab === tab.id ? '#ffffff' : isDark ? '#94a3b8' : '#64748b'} />
+            <Text style={[tw`text-sm font-bold`, { color: activeTab === tab.id ? '#ffffff' : isDark ? '#94a3b8' : '#64748b' }]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <ScrollView style={tw`flex-1`}>
-        <View style={tw`p-4 flex-col gap-4`}>
-          {/* Annotation Video Player */}
-          <View
-            style={[
-              tw`bg-black rounded-xl overflow-hidden shadow-xl`,
-              { height: 210, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)' },
-            ]}
-          >
-            <ImageBackground
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDT2PV4pyLFYU95Zff22je4A6ArbrfP8ukgmALiHsAAxEFnHtAKWML8qVxQggQPNxGUzdsQNcpUTFJCs8GQK2d1XuVpRKf6Za-A1oKfzPjAZFuowx7IKR6N5fsSbGy9EUyLckfZGNl4AXBVq0CBzEDXvliFWwH8t8yvTps3NSrhGDwbxpbvcq83JsxejdEXb_bO5DPnAasvV07Kd6gSGeFpnBGIiGv7jINuCzrT5KJ1434_0Gusf95Js6izM5Ah5B2w0F-zhge9Beo' }}
-              style={tw`w-full h-full`}
-              imageStyle={tw`opacity-60`}
-            >
-              <Svg viewBox="0 0 100 100" style={tw`absolute inset-0 w-full h-full`}>
-                <Line x1="45" y1="40" x2="35" y2="75" stroke={accent} strokeWidth="0.8" strokeDasharray="2" />
-                <Circle cx="45" cy="40" r="1.5" fill={accent} />
-                <Circle cx="35" cy="75" r="1.5" fill={accent} />
-                <SvgText x="48" y="58" fill={accent} fontSize="3" fontWeight="bold">142° Spine</SvgText>
-                <Path d="M 40 70 Q 30 65 35 55" stroke={accent} strokeWidth="0.5" strokeOpacity="0.5" fill="none" />
-              </Svg>
-
-              <View style={tw`absolute inset-x-0 bottom-0 p-4 bg-black/60`}>
-                <View style={tw`flex-row items-center gap-4 mb-2`}>
-                  <Text style={tw`text-white text-xs`}>00:12.24</Text>
-                  <View style={tw`flex-1 h-1.5 bg-white/20 rounded-full`}>
-                    <View style={[tw`h-full w-1/3 rounded-full`, { backgroundColor: accent }]} />
-                  </View>
-                  <Text style={tw`text-white text-xs`}>02:45.00</Text>
-                </View>
-                <View style={tw`flex-row justify-between items-center`}>
-                  <View style={tw`flex-row gap-4`}>
-                    <MaterialIcons name="skip-previous" size={20} color="white" />
-                    <MaterialIcons name="fast-rewind" size={20} color="white" />
-                    <MaterialIcons name="fast-forward" size={20} color="white" />
-                    <MaterialIcons name="skip-next" size={20} color="white" />
-                  </View>
-                  <View style={tw`flex-row gap-4 items-center`}>
-                    <Text style={tw`text-[10px] text-white/60 font-bold uppercase tracking-widest`}>4K • 60FPS</Text>
-                    <MaterialIcons name="fullscreen" size={20} color="white" />
-                  </View>
-                </View>
+      {activeTab === 'live' ? (
+        <View style={tw`flex-1`}>
+          {/* Camera Viewport - Empty for CV */}
+          <View style={[tw`flex-1 mx-4 mt-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' }]}>
+            <View style={tw`items-center gap-4`}>
+              <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                <MaterialIcons name="videocam" size={40} color={accent} />
               </View>
-            </ImageBackground>
-          </View>
-
-          {/* Annotation Toolset */}
-          <View
-            style={[
-              tw`flex-row flex-wrap gap-2 p-3 rounded-xl bg-white dark:bg-surface-dark`,
-              { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-            ]}
-          >
-            <TouchableOpacity
-              style={[
-                tw`p-2 rounded`,
-                { backgroundColor: accentBg, borderWidth: 1, borderColor: accentBorder },
-              ]}
-            >
-              <MaterialIcons name="edit" size={20} color={accent} />
-            </TouchableOpacity>
-            <TouchableOpacity style={tw`p-2 rounded bg-slate-100 dark:bg-slate-800`}>
-              <MaterialIcons name="square-foot" size={20} color={isDark ? '#94a3b8' : '#64748b'} />
-            </TouchableOpacity>
-            <TouchableOpacity style={tw`p-2 rounded bg-slate-100 dark:bg-slate-800`}>
-              <MaterialIcons name="polyline" size={20} color={isDark ? '#94a3b8' : '#64748b'} />
-            </TouchableOpacity>
-            <TouchableOpacity style={tw`p-2 rounded bg-slate-100 dark:bg-slate-800`}>
-              <MaterialIcons name="circle" size={20} color={isDark ? '#94a3b8' : '#64748b'} />
-            </TouchableOpacity>
-            <View style={tw`flex-1`} />
-            <TouchableOpacity style={tw`p-2 rounded bg-slate-100 dark:bg-slate-800`}>
-              <MaterialIcons name="delete" size={20} color={isDark ? '#94a3b8' : '#64748b'} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[tw`px-4 py-2 rounded`, { backgroundColor: accent }]}>
-              <Text style={tw`text-white font-bold text-sm`}>Save Analysis</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* AI Insight Card */}
-          <View
-            style={[
-              tw`p-4 rounded-xl`,
-              { backgroundColor: accentBg, borderWidth: 1, borderColor: accentBorder },
-            ]}
-          >
-            <View style={tw`flex-row items-center gap-2 mb-2`}>
-              <MaterialIcons name="psychology" size={20} color={accent} />
-              <Text style={[tw`text-xs font-bold uppercase tracking-widest`, { color: accent }]}>
-                AI Coach Insight
+              <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Camera Feed</Text>
+              <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                Computer vision will render here during your workout session
               </Text>
+              <View style={tw`flex-row items-center gap-2 mt-2`}>
+                <View style={tw`w-2 h-2 rounded-full bg-green-500`} />
+                <Text style={[tw`text-xs font-bold uppercase tracking-widest`, { color: '#4ade80' }]}>CV Engine Ready</Text>
+              </View>
             </View>
-            <Text style={tw`text-xs text-slate-700 dark:text-slate-200 leading-relaxed`}>
-              Client consistently loses lumbar stiffness at the transition. Recommend decreasing load by 10% to focus on bracing mechanics.
-            </Text>
+          </View>
+
+          {/* Controls */}
+          <View style={tw`px-4 py-4 gap-3`}>
+            {/* Quick Stats Row */}
+            <View style={tw`flex-row gap-3`}>
+              {[
+                { icon: 'timer', label: 'Duration', value: '00:00' },
+                { icon: 'fitness-center', label: 'Exercise', value: 'Ready' },
+                { icon: 'straighten', label: 'Form Score', value: '--' },
+              ].map((stat) => (
+                <View key={stat.label} style={[tw`flex-1 items-center py-3 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                  <MaterialIcons name={stat.icon as any} size={18} color={accent} />
+                  <Text style={[tw`text-sm font-black mt-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{stat.value}</Text>
+                  <Text style={[tw`text-[9px] font-bold uppercase tracking-wider`, { color: '#94a3b8' }]}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Start Button */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Calibration')}
+              style={[tw`flex-row items-center justify-center gap-3 py-4 rounded-2xl`, { backgroundColor: accent }]}
+            >
+              <MaterialIcons name="play-arrow" size={28} color="white" />
+              <Text style={tw`text-white text-lg font-black uppercase tracking-widest`}>Start Workout</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      ) : (
+        <View style={tw`flex-1 px-4 pt-4 gap-3 pb-24`}>
+          {/* Past Sessions */}
+          {[
+            { date: 'Yesterday', type: 'Push Day', duration: '1h 12m', score: '94%', exercises: 6 },
+            { date: 'Mar 15', type: 'Pull Day', duration: '58m', score: '89%', exercises: 5 },
+            { date: 'Mar 14', type: 'Leg Day', duration: '1h 05m', score: '91%', exercises: 7 },
+            { date: 'Mar 12', type: 'Push Day', duration: '1h 08m', score: '87%', exercises: 6 },
+          ].map((session, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                <MaterialIcons name="fitness-center" size={24} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{session.type}</Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{session.date} - {session.duration} - {session.exercises} exercises</Text>
+              </View>
+              <View style={tw`items-end`}>
+                <Text style={[tw`text-lg font-black`, { color: accent }]}>{session.score}</Text>
+                <Text style={[tw`text-[9px] font-bold uppercase`, { color: '#94a3b8' }]}>Form</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <BottomNav
         activeId="workouts"
