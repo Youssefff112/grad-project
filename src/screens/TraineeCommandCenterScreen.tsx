@@ -160,7 +160,9 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
       <BottomNav
         activeId="home"
-        onSelect={(id) => {}}
+        onSelect={(id) => {
+          if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
+        }}
         items={[
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
