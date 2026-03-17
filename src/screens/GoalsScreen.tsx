@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, useColorScheme } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
+import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
 
@@ -43,8 +44,7 @@ const GOALS = [
 
 export const GoalsScreen = ({ navigation }: any) => {
   const [selectedGoal, setSelectedGoal] = useState<string>('');
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { isDark, accent } = useTheme();
 
   return (
     <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
@@ -84,7 +84,7 @@ export const GoalsScreen = ({ navigation }: any) => {
                     tw`rounded-2xl overflow-hidden`,
                     {
                       borderWidth: 2,
-                      borderColor: isSelected ? '#ff6a00' : isDark ? '#ffffff18' : '#00000014',
+                      borderColor: isSelected ? accent : isDark ? '#ffffff18' : '#00000014',
                     },
                   ]}
                 >
@@ -97,14 +97,14 @@ export const GoalsScreen = ({ navigation }: any) => {
                         style={[
                           tw`w-12 h-12 rounded-xl items-center justify-center`,
                           {
-                            backgroundColor: isSelected ? '#ff6a00' : isDark ? '#ffffff18' : '#ff6a0018',
+                          backgroundColor: isSelected ? accent : isDark ? '#ffffff18' : accent + '18',
                           },
                         ]}
                       >
                         <MaterialIcons
                           name={goal.icon}
                           size={24}
-                          color={isSelected ? '#ffffff' : '#ff6a00'}
+                          color={isSelected ? '#ffffff' : accent}
                         />
                       </View>
                       {isSelected && (
@@ -118,7 +118,7 @@ export const GoalsScreen = ({ navigation }: any) => {
                       <Text
                         style={[
                           tw`text-base font-black uppercase tracking-wide`,
-                          { color: isSelected ? '#ff6a00' : isDark ? '#e2e8f0' : '#1e293b' },
+                          { color: isSelected ? accent : isDark ? '#e2e8f0' : '#1e293b' },
                         ]}
                       >
                         {goal.label}

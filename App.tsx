@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useColorScheme } from 'react-native';
 
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { AccountCreationScreen } from './src/screens/AccountCreationScreen';
 import { BiometricsScreen } from './src/screens/BiometricsScreen';
@@ -11,33 +11,47 @@ import { TraineeCommandCenterScreen } from './src/screens/TraineeCommandCenterSc
 import { CalibrationScreen } from './src/screens/CalibrationScreen';
 import { ActiveSetScreen } from './src/screens/ActiveSetScreen';
 import { VisionAnalysisLabScreen } from './src/screens/VisionAnalysisLabScreen';
+import { MealsScreen } from './src/screens/MealsScreen';
+import { MessagesScreen } from './src/screens/MessagesScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
-export default function App() {
-  const colorScheme = useColorScheme();
+function AppNavigator() {
+  const { isDark } = useTheme();
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: colorScheme === 'dark' ? '#0a0a12' : '#f8f7f5',
-          },
-        }}
-      >
-        <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
-        <Stack.Screen name="Biometrics" component={BiometricsScreen} />
-        <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
-        <Stack.Screen name="Goals" component={GoalsScreen} />
-        <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
-        <Stack.Screen name="Calibration" component={CalibrationScreen} />
-        <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
-        <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator
+      initialRouteName="Splash"
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {
+          backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
+        },
+      }}
+    >
+      <Stack.Screen name="Splash" component={SplashScreen} />
+      <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
+      <Stack.Screen name="Biometrics" component={BiometricsScreen} />
+      <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
+      <Stack.Screen name="Goals" component={GoalsScreen} />
+      <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
+      <Stack.Screen name="Calibration" component={CalibrationScreen} />
+      <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
+      <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
+      <Stack.Screen name="Meals" component={MealsScreen} />
+      <Stack.Screen name="Messages" component={MessagesScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+    </Stack.Navigator>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }

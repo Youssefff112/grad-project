@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, TouchableOpacityProps, ViewStyle, TextStyle } from 'react-native';
 import tw from '../tw';
+import { useTheme } from '../context/ThemeContext';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -20,23 +21,23 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   ...props
 }) => {
+  const { isDark, accent } = useTheme();
   const baseContainerTw = `flex-row items-center justify-center rounded-xl active:scale-95 transition-all`;
 
-  let variantContainerTw = '';
+  let variantStyle: ViewStyle = {};
   let variantTextTw = '';
 
   switch (variant) {
     case 'primary':
-      variantContainerTw = 'bg-primary shadow-lg shadow-primary/30';
+      variantStyle = { backgroundColor: accent, shadowColor: accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 };
       variantTextTw = 'text-white font-bold';
       break;
     case 'secondary':
-      variantContainerTw = 'bg-slate-100 dark:bg-slate-800';
       variantTextTw = 'text-slate-900 dark:text-white font-bold';
       break;
     case 'outline':
-      variantContainerTw = 'border border-primary/50 bg-transparent';
-      variantTextTw = 'text-primary font-bold';
+      variantStyle = { borderWidth: 1, borderColor: accent + '80', backgroundColor: 'transparent' };
+      variantTextTw = 'font-bold';
       break;
   }
 
@@ -60,10 +61,14 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[tw`${baseContainerTw} ${variantContainerTw} ${sizeContainerTw}`, containerStyle]}
+      style={[
+        tw`${baseContainerTw} ${variant === 'secondary' ? 'bg-slate-100 dark:bg-slate-800' : ''} ${sizeContainerTw}`,
+        variantStyle,
+        containerStyle,
+      ]}
       {...props}
     >
-      <Text style={[tw`${variantTextTw} ${sizeTextTw}`, textStyle]}>
+      <Text style={[tw`${variantTextTw} ${sizeTextTw}`, variant === 'outline' && { color: accent }, textStyle]}>
         {title}
       </Text>
       {icon && icon}

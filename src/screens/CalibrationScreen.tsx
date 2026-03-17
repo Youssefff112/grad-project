@@ -3,21 +3,24 @@ import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground } from 'rea
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle, Line, Path } from 'react-native-svg';
 import tw from '../tw';
+import { useTheme } from '../context/ThemeContext';
 
 export const CalibrationScreen = ({ navigation }: any) => {
+  const { isDark, accent } = useTheme();
+
   return (
-    <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
+    <SafeAreaView style={tw`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
       {/* Top App Bar */}
-      <View style={tw`flex-row items-center p-4 justify-between z-10 bg-background-light dark:bg-background-dark`}>
+      <View style={tw`flex-row items-center p-4 justify-between z-10 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-12 shrink-0 items-center justify-center`}>
-          <MaterialIcons name="arrow-back" size={24} color={tw.color('slate-900')} style={tw`dark:text-slate-100`} />
+          <MaterialIcons name="arrow-back" size={24} color={isDark ? '#f1f5f9' : '#1e293b'} />
         </TouchableOpacity>
-        <Text style={tw`text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight flex-1 text-center`}>
+        <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} text-lg font-bold leading-tight tracking-tight flex-1 text-center`}>
           Apex Vision
         </Text>
         <View style={tw`flex w-12 items-center justify-end`}>
           <TouchableOpacity style={tw`flex items-center justify-center p-2`}>
-            <MaterialIcons name="help-outline" size={24} color={tw.color('slate-900')} style={tw`dark:text-slate-100`} />
+            <MaterialIcons name="help-outline" size={24} color={isDark ? '#f1f5f9' : '#1e293b'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -25,7 +28,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
       {/* Main Viewport Area (Simulated Camera Feed) */}
       <View style={tw`relative flex-1 flex-col items-center justify-center p-4`}>
         {/* Simulated Camera Container */}
-        <View style={tw`relative w-full h-full max-w-md bg-slate-200 dark:bg-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center`}>
+        <View style={tw`relative w-full h-full max-w-md ${isDark ? 'bg-slate-800' : 'bg-slate-200'} rounded-xl overflow-hidden shadow-inner flex items-center justify-center`}>
 
           {/* Background Image Placeholder (Camera Feed) */}
           <ImageBackground
@@ -37,7 +40,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
 
             {/* Calibration Overlay (Skeletal Template) */}
             <View style={tw`relative z-10 w-full h-full flex items-center justify-center`}>
-              <Svg viewBox="0 0 100 200" style={tw`w-2/3 h-3/4 text-primary`}>
+              <Svg viewBox="0 0 100 200" style={[tw`w-2/3 h-3/4`, { color: accent }]}>
                 {/* Head */}
                 <Circle cx="50" cy="25" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
                 {/* Spine */}
@@ -63,34 +66,34 @@ export const CalibrationScreen = ({ navigation }: any) => {
             </View>
 
             {/* Guidance indicators */}
-            <View style={tw`absolute inset-0 border-4 border-dashed border-primary/30 m-4 rounded-xl`} pointerEvents="none" />
+            <View style={[tw`absolute inset-0 border-4 border-dashed m-4 rounded-xl`, { borderColor: accent + '4D' }]} pointerEvents="none" />
           </ImageBackground>
         </View>
 
         {/* Interaction Buttons */}
         <View style={tw`flex-row items-center justify-center gap-6 p-6 w-full max-w-md absolute bottom-0`}>
-          <TouchableOpacity style={tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border border-primary/20`}>
-            <MaterialIcons name="image" size={24} color={tw.color('primary')} />
+          <TouchableOpacity style={[tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border`, { borderColor: accent + '33' }]}>
+            <MaterialIcons name="image" size={24} color={accent} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={tw`flex shrink-0 items-center justify-center rounded-full h-20 w-20 bg-primary shadow-lg shadow-primary/40 border-4 border-primary/20`}
+            style={[tw`flex shrink-0 items-center justify-center rounded-full h-20 w-20 shadow-lg border-4`, { backgroundColor: accent, shadowColor: accent, borderColor: accent + '33' }]}
             onPress={() => navigation.navigate('ActiveSet')}
           >
             <MaterialIcons name="photo-camera" size={36} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity style={tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border border-primary/20`}>
-            <MaterialIcons name="sync" size={24} color={tw.color('primary')} />
+          <TouchableOpacity style={[tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border`, { borderColor: accent + '33' }]}>
+            <MaterialIcons name="sync" size={24} color={accent} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Bottom Controls & Status */}
-      <View style={tw`bg-background-light dark:bg-background-dark p-6 rounded-t-3xl shadow-2xl space-y-4 flex-col gap-4`}>
+      <View style={tw`${isDark ? 'bg-background-dark' : 'bg-background-light'} p-6 rounded-t-3xl shadow-2xl space-y-4 flex-col gap-4`}>
         <View style={tw`items-center`}>
-          <Text style={tw`text-slate-900 dark:text-slate-100 tracking-tight text-2xl font-bold leading-tight`}>
+          <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} tracking-tight text-2xl font-bold leading-tight`}>
             Align Your Joints
           </Text>
-          <Text style={tw`text-slate-600 dark:text-slate-400 text-base font-normal leading-normal mt-1`}>
+          <Text style={tw`${isDark ? 'text-slate-400' : 'text-slate-600'} text-base font-normal leading-normal mt-1`}>
             Position yourself within the orange template
           </Text>
         </View>
@@ -98,20 +101,20 @@ export const CalibrationScreen = ({ navigation }: any) => {
         <View style={tw`flex-col gap-3 p-2`}>
           <View style={tw`flex-row gap-6 justify-between items-center`}>
             <View style={tw`flex-row items-center gap-2`}>
-              <MaterialIcons name="precision-manufacturing" size={20} color={tw.color('primary')} />
-              <Text style={tw`text-slate-900 dark:text-slate-100 text-sm font-semibold uppercase tracking-wider`}>
+              <MaterialIcons name="precision-manufacturing" size={20} color={accent} />
+              <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} text-sm font-semibold uppercase tracking-wider`}>
                 Calibration Progress
               </Text>
             </View>
-            <Text style={tw`text-primary text-lg font-bold`}>65%</Text>
+            <Text style={[tw`text-lg font-bold`, { color: accent }]}>65%</Text>
           </View>
-          <View style={tw`h-3 rounded-full bg-primary/10 w-full overflow-hidden`}>
-            <View style={tw`h-full rounded-full bg-primary shadow-lg shadow-primary/50 w-[65%]`} />
+          <View style={[tw`h-3 rounded-full w-full overflow-hidden`, { backgroundColor: accent + '1A' }]}>
+            <View style={[tw`h-full rounded-full shadow-lg w-[65%]`, { backgroundColor: accent, shadowColor: accent }]} />
           </View>
         </View>
 
         <View style={tw`flex-row justify-center pt-2`}>
-          <View style={tw`flex-row items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full`}>
+          <View style={tw`flex-row items-center gap-2 px-4 py-2 ${isDark ? 'bg-slate-800' : 'bg-slate-100'} rounded-full`}>
             <View style={tw`h-2 w-2 bg-green-500 rounded-full`} />
             <Text style={tw`text-xs font-medium text-slate-500 uppercase tracking-widest`}>AI Engine Active</Text>
           </View>

@@ -2,24 +2,26 @@ import React, { useState } from 'react';
 import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
+import { useTheme } from '../context/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
 import { Button } from '../components/Button';
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('home');
+  const { isDark, accent } = useTheme();
   return (
-    <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
-      <View style={tw`flex-row items-center p-4 pb-2 justify-between border-b border-primary/10 bg-background-light dark:bg-background-dark z-10`}>
-        <TouchableOpacity onPress={() => navigation.openDrawer && navigation.openDrawer()} style={tw`flex size-12 shrink-0 items-center justify-center`}>
-          <MaterialIcons name="menu" size={30} color={tw.color('slate-900')} style={tw`dark:text-slate-100`} />
+    <SafeAreaView style={tw`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
+      <View style={[tw`flex-row items-center p-4 pb-2 justify-between ${isDark ? 'bg-background-dark' : 'bg-background-light'} z-10`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>
+          <MaterialIcons name="person" size={28} color={accent} />
         </TouchableOpacity>
-        <Text style={tw`text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight flex-1 text-center`}>
+        <Text style={tw`${isDark ? 'text-slate-100' : 'text-slate-900'} text-lg font-bold leading-tight tracking-tight flex-1 text-center`}>
           Command Center
         </Text>
         <View style={tw`flex w-12 items-center justify-end`}>
           <TouchableOpacity style={tw`relative p-2`}>
-            <MaterialIcons name="notifications" size={24} color={tw.color('slate-900')} style={tw`dark:text-slate-100`} />
-            <View style={tw`absolute top-2 right-2 flex h-2 w-2 rounded-full bg-primary`} />
+            <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
+            <View style={[tw`absolute top-2 right-2 flex h-2 w-2 rounded-full`, { backgroundColor: accent }]} />
           </TouchableOpacity>
         </View>
       </View>
@@ -164,6 +166,9 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         onSelect={(id) => {
           setActiveTab(id);
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
+          if (id === 'meals') navigation.navigate('Meals');
+          if (id === 'messages') navigation.navigate('Messages');
+          if (id === 'profile') navigation.navigate('Profile');
         }}
         items={[
           { id: 'home', icon: 'home', label: 'Home' },

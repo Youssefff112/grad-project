@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ViewStyle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
+import { useTheme } from '../context/ThemeContext';
 
 interface NavItem {
   id: string;
@@ -22,26 +23,28 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onSelect,
   containerStyle,
 }) => {
+  const { isDark, accent } = useTheme();
+
   return (
-    <View style={[tw`flex-row items-center justify-around px-2 py-3 bg-white dark:bg-background-dark border-t border-slate-200 dark:border-slate-800 absolute bottom-0 left-0 right-0 z-20`, containerStyle]}>
+    <View style={[tw`flex-row items-center justify-around px-2 py-3 ${isDark ? 'bg-background-dark border-slate-800' : 'bg-white border-slate-200'} border-t absolute bottom-0 left-0 right-0 z-20`, containerStyle]}>
       {items.map((item) => {
         const isActive = item.id === activeId;
         return (
           <TouchableOpacity
             key={item.id}
             onPress={() => onSelect(item.id)}
-            style={tw`flex flex-col items-center gap-1 group transition-colors`}
+            style={tw`flex flex-col items-center gap-1`}
           >
             <MaterialIcons
               name={item.icon}
               size={24}
-              color={isActive ? tw.color('primary') : tw.color('slate-400')}
-              style={tw`group-hover:text-primary transition-colors`}
+              color={isActive ? accent : '#94a3b8'}
             />
             <Text
-              style={tw`text-[10px] font-bold uppercase tracking-tight ${
-                isActive ? 'text-primary' : 'text-slate-400 group-hover:text-primary'
-              }`}
+              style={[
+                tw`text-[10px] font-bold uppercase tracking-tight`,
+                { color: isActive ? accent : '#94a3b8' },
+              ]}
             >
               {item.label}
             </Text>

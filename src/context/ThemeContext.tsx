@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
+import tw from '../tw';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -24,6 +25,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const theme: ThemeMode = override ?? (systemScheme === 'dark' ? 'dark' : 'light');
   const isDark = theme === 'dark';
   const accent = isDark ? '#3b82f6' : '#ff6a00';
+
+  // Sync twrnc dark mode with our manual override
+  useEffect(() => {
+    tw.setColorScheme(theme);
+  }, [theme]);
 
   const toggleTheme = useCallback(() => {
     setOverride((prev) => {

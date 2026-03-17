@@ -1,14 +1,13 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, ImageBackground, useColorScheme } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, ImageBackground } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Line, Circle, Text as SvgText, Path } from 'react-native-svg';
 import tw from '../tw';
+import { useTheme } from '../context/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
 
 export const VisionAnalysisLabScreen = ({ navigation }: any) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const accent = isDark ? '#3b82f6' : '#ff6a00';
+  const { isDark, accent } = useTheme();
   const accentBg = accent + (isDark ? '20' : '16');
   const accentBorder = accent + (isDark ? '38' : '2a');
 
@@ -178,14 +177,19 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <BottomNav
-        activeId="analysis"
-        onSelect={() => {}}
-        containerStyle={tw`bg-white dark:bg-surface-dark border-t border-slate-200 dark:border-white/10`}
+        activeId="workouts"
+        onSelect={(id) => {
+          if (id === 'home') navigation.navigate('TraineeCommandCenter');
+          if (id === 'meals') navigation.navigate('Meals');
+          if (id === 'messages') navigation.navigate('Messages');
+          if (id === 'profile') navigation.navigate('Profile');
+        }}
         items={[
-          { id: 'clients', icon: 'group', label: 'Clients' },
-          { id: 'library', icon: 'menu-book', label: 'Library' },
-          { id: 'analysis', icon: 'bar-chart', label: 'Analysis' },
-          { id: 'settings', icon: 'settings', label: 'Settings' },
+          { id: 'home', icon: 'home', label: 'Home' },
+          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
+          { id: 'meals', icon: 'restaurant', label: 'Meals' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />
     </SafeAreaView>
