@@ -1,39 +1,59 @@
-import React from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
 
+const GOALS = [
+  {
+    id: 'hypertrophy',
+    label: 'Hypertrophy',
+    description: 'Build muscle size & raw strength',
+    icon: 'fitness-center' as const,
+    lightColors: ['#fff3ea', '#ffe5cc'] as const,
+    darkColors: ['#1a0f00', '#2a1800'] as const,
+  },
+  {
+    id: 'fatloss',
+    label: 'Fat Loss',
+    description: 'Burn fat & reveal definition',
+    icon: 'local-fire-department' as const,
+    lightColors: ['#fff3ea', '#ffe5cc'] as const,
+    darkColors: ['#1a0f00', '#2a1800'] as const,
+  },
+  {
+    id: 'athletic',
+    label: 'Athletic Performance',
+    description: 'Speed, power & agility',
+    icon: 'speed' as const,
+    lightColors: ['#fff3ea', '#ffe5cc'] as const,
+    darkColors: ['#1a0f00', '#2a1800'] as const,
+  },
+  {
+    id: 'longevity',
+    label: 'Longevity',
+    description: 'Long-term health & vitality',
+    icon: 'favorite' as const,
+    lightColors: ['#fff3ea', '#ffe5cc'] as const,
+    darkColors: ['#1a0f00', '#2a1800'] as const,
+  },
+];
+
 export const GoalsScreen = ({ navigation }: any) => {
-  const goals = [
-    {
-      id: 'hypertrophy',
-      label: 'Hypertrophy',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD-hciBuJnWL4EQPDeOz2l3tL7lqBCxM0eqhPrcv_OqAlU9pMEsjCi7Ro_y8euOHYwUfvFcXKFOVtaGJr2DSsYPl6TRi6paJLI6mc9yjLr0OR9_B2ag4hF7TyZ7hLEp-5AJZZisVxNDpZkZ2TzpE1O20FJu21G14yDf87h7MIbvbjgbrkvkAKcdTq7NLFBwV3qtCrwH18WpnnubZQAUd0f8zyEBGxpWiowu9UggqdYh4vBB9JXjy9mYgNVb28GcrH7BVrKAdD7WpfE',
-    },
-    {
-      id: 'fatloss',
-      label: 'Fat Loss',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAv9JhE5ValXvjAvk2dlDWuxZ3lcgYIY7cXQpneyM5lts4vuh6v9tDCVKONUMzPb2UbDdLUDGxU74A7i5nXbvJ5MA9HZfsHhFMX1rVfnF_INlzo_RNMSvknXDM6OV88XbWsLSjBpRsgCBa5jGjczG65JB8OiAWGwtSxVFP2raWjLCvry7BhCUnDMLwuK-1geL72UmMEze7FkinSaaR8vqtEP6acPE7FlvPPHs80X-xDyvKNqoofo-VMfED8HFynS0z-x4iIQplII7g',
-    },
-    {
-      id: 'athletic',
-      label: 'Athletic Performance',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAvaW8rKU_3T2bwSnC-pwQ7WD3Sc1n74sMqNbTU_3QeqjAQvI5V10JBHrMAMvQZI7Dcqv-crK8AK2mw-EM-vrEES1-Pa42vB4gkCU9k0GHJMOsdt8sAAezKqPmtqsfndaizU3ltCeYwvYRkD9vkUU7GyONMdLvAegtN9RTYV2Vfc5x7T_j_AyUoYlyLQH_1WGBYDHW0_LaK7GDwkOE3hQTNeI6aZIjVYZGD6PR7dB0LCqkwRRHZbdceR1PzzmiknOSqdpOyTpf3cZ4',
-    },
-    {
-      id: 'longevity',
-      label: 'Longevity',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCkgJwf3LtjfdDOdSim-P1Xweuk_1Sx59eUNkKaZpsUkjGa0l4aUYx2wuycvDvhwI6azQrCKRfnJEJIBxRqN8djj0iy_nQWYiYc9W9458zFhNLmDKgoeevp0Ksh0YM4hLWB5Y1i7NFrT2dIceESx8DW1i6wMf3FshKKpr5Q7vqHVCQ6ZpiFkS-k3vMjObsvGIOmykO3I2_Kxw7zWJYDP1m4BH0nqyqGBNCukjR_lbyLBaBitKYgRX9CUb56xrMKmeV65Sq8dXucU5g',
-    },
-  ];
+  const [selectedGoal, setSelectedGoal] = useState<string>('');
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   return (
     <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
       <View style={tw`flex-row items-center p-4 pb-2 justify-between`}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-12 items-center justify-center`}>
-          <MaterialIcons name="arrow-back" size={24} color={tw.color('slate-900')} style={tw`dark:text-slate-100`} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={tw`flex size-12 items-center justify-center`}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={tw.color('slate-900')} />
         </TouchableOpacity>
         <Text style={tw`text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight flex-1 text-center pr-12`}>
           Goal Definition
@@ -42,8 +62,8 @@ export const GoalsScreen = ({ navigation }: any) => {
 
       <ProgressBar progress={83.33} label="Your Progress" stepText="Step 5 of 6" containerStyle={tw`px-4`} />
 
-      <View style={tw`flex-1`}>
-        <View style={tw`px-4 pb-6 pt-4`}>
+      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-6`}>
+        <View style={tw`px-4 pb-4 pt-2`}>
           <Text style={tw`text-slate-900 dark:text-slate-100 tracking-tight text-3xl font-bold leading-tight text-center`}>
             What is your primary goal?
           </Text>
@@ -52,33 +72,75 @@ export const GoalsScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
-        <View style={tw`flex-row flex-wrap px-2`}>
-          {goals.map((goal) => (
-            <View key={goal.id} style={tw`w-1/2 p-2`}>
-              <TouchableOpacity style={tw`w-full aspect-[4/5] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800`}>
-                <ImageBackground
-                  source={{ uri: goal.image }}
-                  style={tw`w-full h-full justify-end`}
-                  imageStyle={tw`opacity-80`}
+        <View style={tw`flex-row flex-wrap px-3 gap-y-3`}>
+          {GOALS.map((goal) => {
+            const isSelected = selectedGoal === goal.id;
+            return (
+              <View key={goal.id} style={tw`w-1/2 px-1.5`}>
+                <TouchableOpacity
+                  onPress={() => setSelectedGoal(goal.id)}
+                  activeOpacity={0.85}
+                  style={[
+                    tw`rounded-2xl overflow-hidden`,
+                    {
+                      borderWidth: 2,
+                      borderColor: isSelected ? '#ff6a00' : isDark ? '#ffffff18' : '#00000014',
+                    },
+                  ]}
                 >
-                  <View style={tw`absolute inset-0 bg-black/40`} />
-                  <View style={tw`p-4 z-10`}>
-                    <Text style={tw`text-primary text-xl font-bold leading-tight uppercase tracking-wider text-center`}>
-                      {goal.label}
-                    </Text>
-                  </View>
-                </ImageBackground>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      </View>
+                  <LinearGradient
+                    colors={isDark ? goal.darkColors : goal.lightColors}
+                    style={tw`p-5 h-44 justify-between`}
+                  >
+                    <View style={tw`flex-row justify-between items-start`}>
+                      <View
+                        style={[
+                          tw`w-12 h-12 rounded-xl items-center justify-center`,
+                          {
+                            backgroundColor: isSelected ? '#ff6a00' : isDark ? '#ffffff18' : '#ff6a0018',
+                          },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={goal.icon}
+                          size={24}
+                          color={isSelected ? '#ffffff' : '#ff6a00'}
+                        />
+                      </View>
+                      {isSelected && (
+                        <View style={tw`w-6 h-6 rounded-full bg-primary items-center justify-center`}>
+                          <MaterialIcons name="check" size={14} color="white" />
+                        </View>
+                      )}
+                    </View>
 
-      <View style={tw`p-4 bg-background-light/80 dark:bg-background-dark/80`}>
+                    <View>
+                      <Text
+                        style={[
+                          tw`text-base font-black uppercase tracking-wide`,
+                          { color: isSelected ? '#ff6a00' : isDark ? '#e2e8f0' : '#1e293b' },
+                        ]}
+                      >
+                        {goal.label}
+                      </Text>
+                      <Text style={tw`text-slate-500 dark:text-slate-400 text-xs mt-1 leading-relaxed`}>
+                        {goal.description}
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={tw`p-4 bg-background-light dark:bg-background-dark border-t border-primary/5`}>
         <Button
-          title="CONTINUE"
+          title="Continue"
           size="lg"
           onPress={() => navigation.navigate('TraineeCommandCenter')}
+          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
       </View>
     </SafeAreaView>

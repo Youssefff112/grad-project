@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useColorScheme } from 'react-native';
 
 import { SplashScreen } from './src/screens/SplashScreen';
+import { AccountCreationScreen } from './src/screens/AccountCreationScreen';
 import { BiometricsScreen } from './src/screens/BiometricsScreen';
 import { SafeGuardIntakeScreen } from './src/screens/SafeGuardIntakeScreen';
 import { GoalsScreen } from './src/screens/GoalsScreen';
@@ -23,11 +24,12 @@ export default function App() {
         screenOptions={{
           headerShown: false,
           contentStyle: {
-            backgroundColor: colorScheme === 'dark' ? '#0a0a0a' : '#f8f6f6',
+            backgroundColor: colorScheme === 'dark' ? '#0a0a12' : '#f8f7f5',
           },
         }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
         <Stack.Screen name="Biometrics" component={BiometricsScreen} />
         <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
         <Stack.Screen name="Goals" component={GoalsScreen} />

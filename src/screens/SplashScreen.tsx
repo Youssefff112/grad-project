@@ -1,58 +1,115 @@
 import React from 'react';
-import { View, Text, ImageBackground, SafeAreaView } from 'react-native';
+import { View, Text, SafeAreaView, useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { Button } from '../components/Button';
 
 export const SplashScreen = ({ navigation }: any) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const accent = isDark ? '#3b82f6' : '#ff6a00';
+
   return (
-    <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
-      <View style={tw`flex-1 items-center justify-center w-full px-6 py-8`}>
-        <ImageBackground
-          source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAckR6US9s-vclKOzxqL6Xv0vvJlOocugIJQ2BaHUUAvxlJJ2IkbgocMGbBS_iFG2CDAFy0eyXMtGgCSZo04qSjdTRyfCXLoGv7qZ-8ZdJY0eJLnKZOrnR7wkdT5l4vHVQbGjQX36dGXmtOePaJxddTXsAzCMn4SFVncUtaY92DL7eoMq7Zlu-WNp1n35UqQYuuBbLG2HMQdDBsh_K2xSM79uCu2GJs7RRoEWF_mVOKO7rNvNJ4CMuHKz3CslAZbveOH-1aEWivams' }}
-          style={tw`w-full flex-col justify-center items-center overflow-hidden rounded-xl min-h-[60%] shadow-2xl`}
-          imageStyle={tw`opacity-60`}
-        >
-          <View style={tw`absolute inset-0 bg-background-light/60 dark:bg-background-dark/80`} />
-          <View style={tw`relative z-10 flex flex-col items-center px-4`}>
-            <View style={tw`mb-6`}>
-              <MaterialIcons name="bolt" size={60} color={tw.color('primary')} />
-            </View>
-            <Text style={tw`text-slate-900 dark:text-slate-100 tracking-tighter text-6xl font-bold leading-tight text-center`}>
-              APEX AI
-            </Text>
-            <View style={tw`w-24 h-1 bg-primary rounded-full my-6`} />
-            <Text style={tw`text-slate-700 dark:text-slate-300 text-xl font-medium leading-tight tracking-tight text-center max-w-sm`}>
-              Human Coaching + AI Precision
-            </Text>
+    <LinearGradient
+      colors={isDark ? ['#0a0a12', '#0d1020', '#0a0a12'] : ['#fff8f2', '#fff1e6', '#f8f7f5']}
+      style={tw`flex-1`}
+    >
+      <SafeAreaView style={tw`flex-1`}>
+        <View style={tw`flex-1 px-6 justify-between py-8`}>
 
-            <View style={tw`mt-10 w-full max-w-xs`}>
-              <Button
-                title="Get Started"
-                size="lg"
-                onPress={() => navigation.navigate('Biometrics')}
-                icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
-              />
+          {/* Logo & Brand */}
+          <View style={tw`flex-1 items-center justify-center`}>
+            <LinearGradient
+              colors={isDark ? ['#1e3a5f', '#0f2040'] : ['#ff8a30', '#ff6a00']}
+              style={tw`w-28 h-28 rounded-3xl items-center justify-center mb-10`}
+            >
+              <MaterialIcons name="bolt" size={60} color="white" />
+            </LinearGradient>
+
+            <View style={tw`items-center mb-2`}>
+              <Text
+                style={[
+                  tw`text-7xl font-black tracking-tight leading-none`,
+                  { color: isDark ? '#ffffff' : '#1a1a1a' },
+                ]}
+              >
+                APEX
+              </Text>
+              <Text
+                style={[tw`text-7xl font-black tracking-tight leading-none`, { color: accent }]}
+              >
+                AI
+              </Text>
+            </View>
+
+            <View style={tw`flex-row items-center gap-3 my-6 w-full`}>
+              <View style={[tw`h-px flex-1 rounded-full`, { backgroundColor: accent + '35' }]} />
+              <Text
+                style={[
+                  tw`text-[11px] font-bold tracking-widest uppercase`,
+                  { color: accent },
+                ]}
+              >
+                Human + AI Precision
+              </Text>
+              <View style={[tw`h-px flex-1 rounded-full`, { backgroundColor: accent + '35' }]} />
+            </View>
+
+            <Text
+              style={tw`text-slate-500 dark:text-slate-400 text-base text-center leading-relaxed max-w-[260px]`}
+            >
+              Elite coaching powered by real-time computer vision
+            </Text>
+          </View>
+
+          {/* Feature Pills */}
+          <View style={tw`mb-8`}>
+            <View style={tw`flex-row gap-3`}>
+              {[
+                { icon: 'psychology', label: 'Adaptive AI' },
+                { icon: 'fitness-center', label: 'Elite Training' },
+                { icon: 'videocam', label: 'Form Analysis' },
+              ].map((f) => (
+                <View
+                  key={f.label}
+                  style={[
+                    tw`flex-1 items-center py-4 px-2 rounded-2xl`,
+                    { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' },
+                  ]}
+                >
+                  <MaterialIcons name={f.icon as any} size={22} color={accent} />
+                  <Text
+                    style={[
+                      tw`text-[10px] font-bold mt-2 text-center`,
+                      { color: isDark ? '#94a3b8' : '#64748b' },
+                    ]}
+                  >
+                    {f.label}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
-        </ImageBackground>
 
-        <View style={tw`w-full flex-row justify-around mt-12 px-2`}>
-          <View style={tw`flex-col items-center p-4 rounded-xl bg-primary/5 w-[30%]`}>
-            <MaterialIcons name="psychology" size={30} color={tw.color('primary')} style={tw`mb-2`} />
-            <Text style={tw`font-bold text-xs text-center dark:text-white`}>Adaptive Insights</Text>
+          {/* CTA Buttons */}
+          <View style={tw`gap-3`}>
+            <Button
+              title="Get Started"
+              size="lg"
+              onPress={() => navigation.navigate('AccountCreation')}
+              icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
+            />
+            <Button
+              title="Sign In"
+              size="md"
+              variant="outline"
+              onPress={() => navigation.navigate('AccountCreation')}
+            />
           </View>
-          <View style={tw`flex-col items-center p-4 rounded-xl bg-primary/5 w-[30%]`}>
-            <MaterialIcons name="fitness-center" size={30} color={tw.color('primary')} style={tw`mb-2`} />
-            <Text style={tw`font-bold text-xs text-center dark:text-white`}>Elite Coaching</Text>
-          </View>
-          <View style={tw`flex-col items-center p-4 rounded-xl bg-primary/5 w-[30%]`}>
-            <MaterialIcons name="monitor" size={30} color={tw.color('primary')} style={tw`mb-2`} />
-            <Text style={tw`font-bold text-xs text-center dark:text-white`}>Precision Results</Text>
-          </View>
+
         </View>
-
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };

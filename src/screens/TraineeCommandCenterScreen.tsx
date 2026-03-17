@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -6,6 +6,7 @@ import { BottomNav } from '../components/BottomNav';
 import { Button } from '../components/Button';
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
+  const [activeTab, setActiveTab] = useState('home');
   return (
     <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
       <View style={tw`flex-row items-center p-4 pb-2 justify-between border-b border-primary/10 bg-background-light dark:bg-background-dark z-10`}>
@@ -159,8 +160,9 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <BottomNav
-        activeId="home"
+        activeId={activeTab}
         onSelect={(id) => {
+          setActiveTab(id);
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
         }}
         items={[

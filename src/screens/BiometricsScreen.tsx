@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, TextInput, SafeAreaView, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
 
 export const BiometricsScreen = ({ navigation }: any) => {
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('');
   return (
     <SafeAreaView style={tw`flex-1 bg-background-light dark:bg-background-dark`}>
       <View style={tw`p-4 flex-row justify-between items-center`}>
@@ -41,8 +42,28 @@ export const BiometricsScreen = ({ navigation }: any) => {
 
           <View>
             <Text style={tw`text-slate-800 dark:text-slate-200 text-sm font-bold uppercase tracking-wider mb-2`}>Gender</Text>
-            <View style={tw`w-full h-14 bg-white dark:bg-slate-800 border-2 border-primary/10 rounded-xl px-4 justify-center`}>
-              <Text style={tw`text-slate-400 text-lg`}>Select gender (Mock)</Text>
+            <View style={tw`flex-row gap-3`}>
+              {(['male', 'female', 'other'] as const).map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => setGender(option)}
+                  style={[
+                    tw`flex-1 h-14 rounded-xl items-center justify-center border-2`,
+                    gender === option
+                      ? tw`bg-primary border-primary`
+                      : tw`bg-white dark:bg-slate-800 border-primary/10`,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      tw`font-bold capitalize`,
+                      gender === option ? tw`text-white` : tw`text-slate-500 dark:text-slate-400`,
+                    ]}
+                  >
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 

@@ -3,10 +3,10 @@ module.exports = {
     extend: {
       colors: {
         "primary": "#ff6a00",
-        "primary-cyan": "#00f2ff",
+        "primary-blue": "#3b82f6",
         "background-light": "#f8f7f5",
-        "background-dark": "#23170f",
-        "surface-dark": "#1a1a1a",
+        "background-dark": "#0a0a12",
+        "surface-dark": "#111128",
       },
     },
   },
