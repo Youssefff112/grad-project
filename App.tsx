@@ -19,6 +19,7 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { EditProfileScreen } from './src/screens/EditProfileScreen';
 import { NotificationsSettingsScreen } from './src/screens/NotificationsSettingsScreen';
 import { MeasurementsSettingsScreen } from './src/screens/MeasurementsSettingsScreen';
+import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,6 +52,7 @@ function AppNavigator() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
       <Stack.Screen name="MeasurementsSettings" component={MeasurementsSettingsScreen} />
+      <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
     </Stack.Navigator>
   );
 }

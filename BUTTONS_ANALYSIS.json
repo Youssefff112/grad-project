@@ -1,0 +1,937 @@
+{
+  "appMetadata": {
+    "appName": "Apex AI",
+    "appType": "React Native Fitness Coaching Platform",
+    "analysisDate": "2026-03-23",
+    "totalScreens": 15,
+    "totalInteractiveElements": 82,
+    "functionalElements": 68,
+    "emptyHandlers": 14,
+    "completionPercentage": 83.3
+  },
+  "screens": [
+    {
+      "name": "SplashScreen",
+      "purpose": "Initial welcome screen with animated branding",
+      "completeness": "95%",
+      "buttons": [
+        {
+          "id": "splash_get_started",
+          "title": "Get Started",
+          "type": "CTA_Primary",
+          "handler": "navigation.navigate('AccountCreation')",
+          "status": "working",
+          "icon": "arrow-forward"
+        },
+        {
+          "id": "splash_sign_in",
+          "title": "Sign In",
+          "type": "CTA_Outline",
+          "handler": "navigation.navigate('AccountCreation')",
+          "status": "working",
+          "note": "Both buttons navigate to same screen - should differentiate"
+        }
+      ]
+    },
+    {
+      "name": "AccountCreationScreen",
+      "purpose": "User registration and initial onboarding",
+      "completeness": "95%",
+      "buttons": [
+        {
+          "id": "account_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "account_create",
+          "title": "Create Account",
+          "type": "Primary_Button",
+          "handler": "handleCreateAccount() -> sets user context -> navigation.navigate('Biometrics')",
+          "status": "working",
+          "setsContext": ["fullName", "email"]
+        },
+        {
+          "id": "account_signin_link",
+          "title": "Already have an account? Sign In",
+          "type": "Link_Text",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        }
+      ],
+      "formFields": [
+        "Full Name",
+        "Email Address",
+        "Password",
+        "Confirm Password"
+      ]
+    },
+    {
+      "name": "BiometricsScreen",
+      "purpose": "Collect physical metrics (Step 1 of 6)",
+      "completeness": "90%",
+      "buttons": [
+        {
+          "id": "biometrics_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "biometrics_continue",
+          "title": "Continue",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('SafeGuardIntake')",
+          "status": "working"
+        }
+      ],
+      "formFields": [
+        "Age (numeric)",
+        "Gender (radio: Male/Female/Other)",
+        "Height (cm)",
+        "Weight (kg)",
+        "Body Fat % (optional)"
+      ]
+    },
+    {
+      "name": "SafeGuardIntakeScreen",
+      "purpose": "Health screening and medical history (Step 2 of 6)",
+      "completeness": "90%",
+      "buttons": [
+        {
+          "id": "safeguard_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "safeguard_conditions_heart",
+          "title": "Heart Conditions",
+          "type": "Checkbox_Toggle",
+          "handler": "setConditions(...)",
+          "status": "working"
+        },
+        {
+          "id": "safeguard_conditions_hypertension",
+          "title": "Hypertension",
+          "type": "Checkbox_Toggle",
+          "handler": "setConditions(...)",
+          "status": "working"
+        },
+        {
+          "id": "safeguard_conditions_diabetes",
+          "title": "Diabetes",
+          "type": "Checkbox_Toggle",
+          "handler": "setConditions(...)",
+          "status": "working"
+        },
+        {
+          "id": "safeguard_continue",
+          "title": "Continue",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('Goals')",
+          "status": "working"
+        }
+      ],
+      "formFields": [
+        "Medical Conditions (checkbox)",
+        "Allergies (tags input)"
+      ]
+    },
+    {
+      "name": "GoalsScreen",
+      "purpose": "Select primary fitness goal (Step 5 of 6)",
+      "completeness": "95%",
+      "buttons": [
+        {
+          "id": "goals_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "goals_hypertrophy",
+          "title": "Hypertrophy",
+          "type": "Card_Selection",
+          "handler": "setSelectedGoal('hypertrophy')",
+          "status": "working"
+        },
+        {
+          "id": "goals_fatloss",
+          "title": "Fat Loss",
+          "type": "Card_Selection",
+          "handler": "setSelectedGoal('fatloss')",
+          "status": "working"
+        },
+        {
+          "id": "goals_athletic",
+          "title": "Athletic Performance",
+          "type": "Card_Selection",
+          "handler": "setSelectedGoal('athletic')",
+          "status": "working"
+        },
+        {
+          "id": "goals_longevity",
+          "title": "Longevity",
+          "type": "Card_Selection",
+          "handler": "setSelectedGoal('longevity')",
+          "status": "working"
+        },
+        {
+          "id": "goals_continue",
+          "title": "Continue",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('TraineeCommandCenter')",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "name": "TraineeCommandCenterScreen",
+      "purpose": "Main dashboard and home screen",
+      "completeness": "75%",
+      "buttons": [
+        {
+          "id": "tcc_profile_icon",
+          "title": "Profile Icon",
+          "type": "Icon_Button",
+          "handler": "navigation.navigate('Profile')",
+          "status": "working"
+        },
+        {
+          "id": "tcc_notifications",
+          "title": "Notifications Bell",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "HIGH",
+          "recommendation": "Implement notification center or notification list screen"
+        },
+        {
+          "id": "tcc_view_plan",
+          "title": "View Plan",
+          "type": "Link_Text",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Navigate to workout plan details screen"
+        },
+        {
+          "id": "tcc_workout_card",
+          "title": "[Workout Card - Start Session]",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('Calibration')",
+          "status": "working"
+        },
+        {
+          "id": "tcc_exercise_items",
+          "title": "Exercise List Items",
+          "type": "Card_Touchable",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Make clickable to show exercise details and instructions"
+        },
+        {
+          "id": "tcc_bottom_nav",
+          "title": "[5-Item Bottom Navigation]",
+          "type": "Navigation_Tabs",
+          "handler": "Conditional navigation to Meals, Messages, Profile, VisionAnalysisLab",
+          "status": "working"
+        }
+      ],
+      "missingFeatures": [
+        "Actual notification system",
+        "Detailed workout plan view",
+        "Exercise instructions/details"
+      ]
+    },
+    {
+      "name": "CalibrationScreen",
+      "purpose": "Body position calibration before workout",
+      "completeness": "80%",
+      "buttons": [
+        {
+          "id": "calibration_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "calibration_help",
+          "title": "Help Icon (?)",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "LOW",
+          "recommendation": "Add help modal or tooltip explaining calibration"
+        },
+        {
+          "id": "calibration_gallery",
+          "title": "Image Gallery Icon",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Integrate image picker for photo-based calibration"
+        },
+        {
+          "id": "calibration_camera",
+          "title": "Camera Button (Center Large)",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('ActiveSet')",
+          "status": "working"
+        },
+        {
+          "id": "calibration_sync",
+          "title": "Sync Icon",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "LOW",
+          "recommendation": "Implement sync functionality with cloud/backend"
+        }
+      ],
+      "cvIntegration": "SVG skeleton overlay for position guidance"
+    },
+    {
+      "name": "ActiveSetScreen",
+      "purpose": "Live workout session with AI form feedback",
+      "completeness": "75%",
+      "buttons": [
+        {
+          "id": "activeset_settings",
+          "title": "Settings Icon",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Add workout settings modal (weight, difficulty, etc.)"
+        },
+        {
+          "id": "activeset_finish",
+          "title": "Finish Set",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('TraineeCommandCenter')",
+          "status": "working"
+        },
+        {
+          "id": "activeset_pause",
+          "title": "Pause Button",
+          "type": "Secondary_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "HIGH",
+          "recommendation": "Implement pause/resume workout functionality"
+        }
+      ],
+      "displayedMetrics": [
+        "Rep counter (8 of 12)",
+        "Form score (85%)",
+        "Stability (98%)",
+        "Exercise name and weight"
+      ],
+      "notes": "Form analysis values are hardcoded - needs ML backend integration"
+    },
+    {
+      "name": "MealsScreen",
+      "purpose": "Nutrition tracking and meal planning",
+      "completeness": "98%",
+      "buttons": [
+        {
+          "id": "meals_meal_cards",
+          "title": "[4 Meal Cards]",
+          "type": "Card_Checkbox",
+          "handler": "toggleMeal(id) - Comprehensive meal logging",
+          "status": "working",
+          "mealsIncluded": [
+            "Breakfast (7:30 AM, 420 kcal)",
+            "Lunch (12:30 PM, 620 kcal)",
+            "Pre-Workout (4:00 PM, 310 kcal)",
+            "Dinner (7:30 PM, 580 kcal)"
+          ]
+        },
+        {
+          "id": "meals_water_decrease",
+          "title": "Decrease Water (-)",
+          "type": "Icon_Button",
+          "handler": "setWaterGlasses(prev => Math.max(prev - 1, 0))",
+          "status": "working"
+        },
+        {
+          "id": "meals_water_increase",
+          "title": "Increase Water (+)",
+          "type": "Icon_Button",
+          "handler": "setWaterGlasses(prev => Math.min(prev + 1, 12))",
+          "status": "working"
+        },
+        {
+          "id": "meals_water_glass_icons",
+          "title": "[8 Water Glass Icons]",
+          "type": "Visual_Indicator",
+          "handler": "Display only - not clickable",
+          "status": "working"
+        },
+        {
+          "id": "meals_bottom_nav",
+          "title": "[5-Item Bottom Navigation]",
+          "type": "Navigation_Tabs",
+          "handler": "Conditional navigation",
+          "status": "working"
+        }
+      ],
+      "stateManagement": {
+        "checkedMeals": "Tracks logged meals",
+        "waterGlasses": "Counter 0-12, default 3"
+      },
+      "features": [
+        "Circular progress ring for calories",
+        "Macro breakdown (Protein, Carbs, Fats)",
+        "Real-time calculation of consumed vs target",
+        "Water intake tracking"
+      ]
+    },
+    {
+      "name": "ChatScreen",
+      "purpose": "Messaging with AI coach and other users",
+      "completeness": "90%",
+      "buttons": [
+        {
+          "id": "chat_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "chat_more_options",
+          "title": "More Options (⋮)",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "LOW",
+          "recommendation": "Add message options menu (delete, pin, forward, etc.)"
+        },
+        {
+          "id": "chat_send",
+          "title": "Send Message",
+          "type": "Icon_Button",
+          "handler": "handleSend() - Sends message and scrolls to bottom",
+          "status": "working"
+        }
+      ],
+      "features": [
+        "Sample conversation with AI coach (5 messages)",
+        "Message timestamps",
+        "AI badge for AI messages",
+        "Keyboard-aware input",
+        "Auto-scroll on new message"
+      ]
+    },
+    {
+      "name": "MessagesScreen",
+      "purpose": "Conversation list and message hub",
+      "completeness": "85%",
+      "buttons": [
+        {
+          "id": "messages_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "messages_edit",
+          "title": "Edit Icon (Compose New)",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Implement new conversation compose screen"
+        },
+        {
+          "id": "messages_conversation_items",
+          "title": "[4 Conversation Cards]",
+          "type": "Card_Touchable",
+          "handler": "navigation.navigate('Chat', {...params})",
+          "status": "working",
+          "conversations": [
+            "Apex AI Coach (AI, 2 unread)",
+            "Dr. Sarah Miller (1h ago, 0 unread)",
+            "Training Group (3h ago, 5 unread)",
+            "Nutrition AI (5h ago, 1 unread)"
+          ]
+        },
+        {
+          "id": "messages_bottom_nav",
+          "title": "[5-Item Bottom Navigation]",
+          "type": "Navigation_Tabs",
+          "handler": "Conditional navigation",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "name": "ProfileScreen",
+      "purpose": "User profile and settings hub",
+      "completeness": "98%",
+      "buttons": [
+        {
+          "id": "profile_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "profile_dark_mode",
+          "title": "Dark/Light Mode Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggleTheme()",
+          "status": "working"
+        },
+        {
+          "id": "profile_edit_profile",
+          "title": "Edit Profile",
+          "type": "Menu_Item",
+          "handler": "navigation.navigate('EditProfile')",
+          "status": "working"
+        },
+        {
+          "id": "profile_notifications",
+          "title": "Notifications",
+          "type": "Menu_Item",
+          "handler": "navigation.navigate('NotificationsSettings')",
+          "status": "working"
+        },
+        {
+          "id": "profile_units",
+          "title": "Units & Measurements",
+          "type": "Menu_Item",
+          "handler": "navigation.navigate('MeasurementsSettings')",
+          "status": "working"
+        },
+        {
+          "id": "profile_privacy",
+          "title": "Privacy & Security",
+          "type": "Menu_Item",
+          "handler": "Alert.alert('Privacy & Security', 'End-to-end encryption...')",
+          "status": "working"
+        },
+        {
+          "id": "profile_subscription",
+          "title": "Subscription",
+          "type": "Menu_Item",
+          "handler": "Alert.alert('Subscription', 'You are on Apex AI Pro plan...')",
+          "status": "working"
+        },
+        {
+          "id": "profile_help",
+          "title": "Help Center",
+          "type": "Menu_Item",
+          "handler": "Alert.alert('Help Center', 'Email: support@apexai.com...')",
+          "status": "working"
+        },
+        {
+          "id": "profile_feedback",
+          "title": "Send Feedback",
+          "type": "Menu_Item",
+          "handler": "Alert.alert('Send Feedback', 'We would love to hear...')",
+          "status": "working"
+        },
+        {
+          "id": "profile_about",
+          "title": "About Apex AI",
+          "type": "Menu_Item",
+          "handler": "Alert.alert('About', 'Version 1.0.0...')",
+          "status": "working"
+        },
+        {
+          "id": "profile_signout",
+          "title": "Sign Out",
+          "type": "Destructive_Button",
+          "handler": "Alert.alert('Sign Out', '...') -> navigation.navigate('Splash')",
+          "status": "working"
+        },
+        {
+          "id": "profile_bottom_nav",
+          "title": "[5-Item Bottom Navigation]",
+          "type": "Navigation_Tabs",
+          "handler": "Conditional navigation",
+          "status": "working"
+        }
+      ],
+      "stats": [
+        "Workouts: 47",
+        "Streak: 12 days",
+        "PRs Hit: 8"
+      ]
+    },
+    {
+      "name": "EditProfileScreen",
+      "purpose": "Edit user profile information",
+      "completeness": "85%",
+      "buttons": [
+        {
+          "id": "edit_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "edit_change_photo",
+          "title": "Change Photo",
+          "type": "Secondary_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Integrate expo-image-picker for photo upload"
+        },
+        {
+          "id": "edit_save",
+          "title": "Save Changes",
+          "type": "Primary_Button",
+          "handler": "handleSave() -> Updates context -> Alert -> navigation.goBack()",
+          "status": "working"
+        }
+      ],
+      "formFields": [
+        "Full Name (input)",
+        "Email (input)"
+      ]
+    },
+    {
+      "name": "VisionAnalysisLabScreen",
+      "purpose": "Workout history and form analysis lab",
+      "completeness": "70%",
+      "buttons": [
+        {
+          "id": "visionlab_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "visionlab_history",
+          "title": "History Icon",
+          "type": "Icon_Button",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "MEDIUM",
+          "recommendation": "Show session history/details in modal or new screen"
+        },
+        {
+          "id": "visionlab_tab_live",
+          "title": "Live Session Tab",
+          "type": "Tab_Switch",
+          "handler": "setActiveTab('live')",
+          "status": "working"
+        },
+        {
+          "id": "visionlab_tab_history",
+          "title": "Past Sessions Tab",
+          "type": "Tab_Switch",
+          "handler": "setActiveTab('history')",
+          "status": "working"
+        },
+        {
+          "id": "visionlab_start",
+          "title": "Start Workout",
+          "type": "Primary_Button",
+          "handler": "navigation.navigate('Calibration')",
+          "status": "working"
+        },
+        {
+          "id": "visionlab_past_sessions",
+          "title": "[4 Past Session Cards]",
+          "type": "Card_Touchable",
+          "handler": "EMPTY - NO HANDLER",
+          "status": "empty",
+          "priority": "HIGH",
+          "recommendation": "Make clickable to show detailed session breakdown"
+        },
+        {
+          "id": "visionlab_bottom_nav",
+          "title": "[5-Item Bottom Navigation]",
+          "type": "Navigation_Tabs",
+          "handler": "Conditional navigation",
+          "status": "working"
+        }
+      ],
+      "pastSessions": [
+        {
+          "date": "Yesterday",
+          "type": "Push Day",
+          "duration": "1h 12m",
+          "score": "94%",
+          "exercises": 6
+        },
+        {
+          "date": "Mar 15",
+          "type": "Pull Day",
+          "duration": "58m",
+          "score": "89%",
+          "exercises": 5
+        },
+        {
+          "date": "Mar 14",
+          "type": "Leg Day",
+          "duration": "1h 05m",
+          "score": "91%",
+          "exercises": 7
+        },
+        {
+          "date": "Mar 12",
+          "type": "Push Day",
+          "duration": "1h 08m",
+          "score": "87%",
+          "exercises": 6
+        }
+      ]
+    },
+    {
+      "name": "NotificationsSettingsScreen",
+      "purpose": "Notification preferences",
+      "completeness": "95%",
+      "buttons": [
+        {
+          "id": "notif_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "notif_workout_reminders",
+          "title": "Workout Reminders Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggle('workoutReminders')",
+          "status": "working"
+        },
+        {
+          "id": "notif_form_alerts",
+          "title": "Form Alerts Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggle('formAlerts')",
+          "status": "working"
+        },
+        {
+          "id": "notif_rest_timer",
+          "title": "Rest Timer Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggle('restTimer')",
+          "status": "working"
+        },
+        {
+          "id": "notif_meal_reminders",
+          "title": "Meal Reminders Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggle('mealReminders')",
+          "status": "working"
+        },
+        {
+          "id": "notif_coach_messages",
+          "title": "AI Coach Messages Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggle('coachMessages')",
+          "status": "working"
+        },
+        {
+          "id": "notif_weekly_report",
+          "title": "Weekly Report Toggle",
+          "type": "Toggle_Switch",
+          "handler": "toggle('weeklyReport')",
+          "status": "working"
+        }
+      ],
+      "note": "Settings stored in local state only - not persisted to backend"
+    },
+    {
+      "name": "MeasurementsSettingsScreen",
+      "purpose": "Unit preferences (metric vs imperial)",
+      "completeness": "95%",
+      "buttons": [
+        {
+          "id": "units_back",
+          "title": "Back Arrow",
+          "type": "Icon_Button",
+          "handler": "navigation.goBack()",
+          "status": "working"
+        },
+        {
+          "id": "units_weight_kg",
+          "title": "Kilograms (kg)",
+          "type": "Radio_Option",
+          "handler": "setWeightUnit('kg')",
+          "status": "working"
+        },
+        {
+          "id": "units_weight_lbs",
+          "title": "Pounds (lbs)",
+          "type": "Radio_Option",
+          "handler": "setWeightUnit('lbs')",
+          "status": "working"
+        },
+        {
+          "id": "units_height_cm",
+          "title": "Centimeters (cm)",
+          "type": "Radio_Option",
+          "handler": "setHeightUnit('cm')",
+          "status": "working"
+        },
+        {
+          "id": "units_height_ft",
+          "title": "Feet & Inches (ft)",
+          "type": "Radio_Option",
+          "handler": "setHeightUnit('ft')",
+          "status": "working"
+        },
+        {
+          "id": "units_distance_km",
+          "title": "Kilometers (km)",
+          "type": "Radio_Option",
+          "handler": "setDistanceUnit('km')",
+          "status": "working"
+        },
+        {
+          "id": "units_distance_mi",
+          "title": "Miles (mi)",
+          "type": "Radio_Option",
+          "handler": "setDistanceUnit('mi')",
+          "status": "working"
+        }
+      ],
+      "note": "Settings stored in local state only - not persisted to backend"
+    }
+  ],
+  "summary": {
+    "emptyButtonsList": [
+      {
+        "screen": "TraineeCommandCenterScreen",
+        "button": "Notifications Bell",
+        "priority": "HIGH",
+        "recommendation": "Implement notification center or list of app notifications"
+      },
+      {
+        "screen": "TraineeCommandCenterScreen",
+        "button": "View Plan",
+        "priority": "MEDIUM",
+        "recommendation": "Create WorkoutPlanDetailScreen with full plan breakdown"
+      },
+      {
+        "screen": "TraineeCommandCenterScreen",
+        "button": "Exercise List Items",
+        "priority": "MEDIUM",
+        "recommendation": "Make clickable to show exercise videos, form cues, and tips"
+      },
+      {
+        "screen": "CalibrationScreen",
+        "button": "Help Icon",
+        "priority": "LOW",
+        "recommendation": "Add help modal explaining calibration process"
+      },
+      {
+        "screen": "CalibrationScreen",
+        "button": "Image Gallery",
+        "priority": "MEDIUM",
+        "recommendation": "Integrate expo-image-picker for photo-based calibration"
+      },
+      {
+        "screen": "CalibrationScreen",
+        "button": "Sync Icon",
+        "priority": "LOW",
+        "recommendation": "Implement sync with cloud backend for calibration data"
+      },
+      {
+        "screen": "ActiveSetScreen",
+        "button": "Settings",
+        "priority": "MEDIUM",
+        "recommendation": "Add settings modal for workout customization"
+      },
+      {
+        "screen": "ActiveSetScreen",
+        "button": "Pause",
+        "priority": "HIGH",
+        "recommendation": "Implement pause/resume functionality with timer preservation"
+      },
+      {
+        "screen": "ChatScreen",
+        "button": "More Options",
+        "priority": "LOW",
+        "recommendation": "Add message options (delete, pin, share, etc.)"
+      },
+      {
+        "screen": "MessagesScreen",
+        "button": "Edit (Compose)",
+        "priority": "MEDIUM",
+        "recommendation": "Create new conversation compose screen or modal"
+      },
+      {
+        "screen": "EditProfileScreen",
+        "button": "Change Photo",
+        "priority": "MEDIUM",
+        "recommendation": "Integrate image picker and upload to backend"
+      },
+      {
+        "screen": "VisionAnalysisLabScreen",
+        "button": "History Icon",
+        "priority": "MEDIUM",
+        "recommendation": "Show session details modal or drill-down screen"
+      },
+      {
+        "screen": "VisionAnalysisLabScreen",
+        "button": "Past Sessions",
+        "priority": "HIGH",
+        "recommendation": "Make clickable to show detailed exercise breakdown and metrics"
+      }
+    ],
+    "navigationRoutes": [
+      "AccountCreation",
+      "Biometrics",
+      "SafeGuardIntake",
+      "Goals",
+      "TraineeCommandCenter",
+      "Profile",
+      "EditProfile",
+      "NotificationsSettings",
+      "MeasurementsSettings",
+      "Calibration",
+      "ActiveSet",
+      "VisionAnalysisLab",
+      "Meals",
+      "Chat",
+      "Messages",
+      "Splash"
+    ],
+    "completionStatus": {
+      "fullyFunctional": [
+        "SplashScreen",
+        "AccountCreationScreen",
+        "BiometricsScreen",
+        "SafeGuardIntakeScreen",
+        "GoalsScreen",
+        "MealsScreen",
+        "ProfileScreen",
+        "NotificationsSettingsScreen",
+        "MeasurementsSettingsScreen"
+      ],
+      "partiallyFunctional": [
+        "TraineeCommandCenterScreen (75%)",
+        "CalibrationScreen (80%)",
+        "ActiveSetScreen (75%)",
+        "ChatScreen (90%)",
+        "MessagesScreen (85%)",
+        "EditProfileScreen (85%)",
+        "VisionAnalysisLabScreen (70%)"
+      ]
+    }
+  }
+}

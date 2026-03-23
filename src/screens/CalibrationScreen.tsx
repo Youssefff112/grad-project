@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle, Line, Path } from 'react-native-svg';
 import tw from '../tw';
@@ -19,7 +19,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
           Apex Vision
         </Text>
         <View style={tw`flex w-12 items-center justify-end`}>
-          <TouchableOpacity style={tw`flex items-center justify-center p-2`}>
+          <TouchableOpacity style={tw`flex items-center justify-center p-2`} onPress={() => Alert.alert('Apex Vision Help', 'Position yourself in the orange skeleton overlay. Make sure your full body is visible and well-lit for optimal form analysis.')}>
             <MaterialIcons name="help-outline" size={24} color={isDark ? '#f1f5f9' : '#1e293b'} />
           </TouchableOpacity>
         </View>
@@ -72,7 +72,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
 
         {/* Interaction Buttons */}
         <View style={tw`flex-row items-center justify-center gap-6 p-6 w-full max-w-md absolute bottom-0`}>
-          <TouchableOpacity style={[tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border`, { borderColor: accent + '33' }]}>
+          <TouchableOpacity style={[tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border`, { borderColor: accent + '33' }]} onPress={() => Alert.alert('Gallery', 'Upload a reference photo for better calibration (feature coming soon)')}>
             <MaterialIcons name="image" size={24} color={accent} />
           </TouchableOpacity>
           <TouchableOpacity
@@ -81,7 +81,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
           >
             <MaterialIcons name="photo-camera" size={36} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity style={[tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border`, { borderColor: accent + '33' }]}>
+          <TouchableOpacity style={[tw`flex shrink-0 items-center justify-center rounded-full h-12 w-12 bg-black/40 border`, { borderColor: accent + '33' }]} onPress={() => Alert.alert('Sync', 'Recalibrating AI engine and syncing with latest form data...')}>
             <MaterialIcons name="sync" size={24} color={accent} />
           </TouchableOpacity>
         </View>

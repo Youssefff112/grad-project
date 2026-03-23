@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -23,7 +23,7 @@ export const MessagesScreen = ({ navigation }: any) => {
           <MaterialIcons name="arrow-back" size={24} color={accent} />
         </TouchableOpacity>
         <Text style={[tw`text-lg font-bold tracking-tight flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Messages</Text>
-        <TouchableOpacity style={tw`flex size-12 items-center justify-center`}>
+        <TouchableOpacity style={tw`flex size-12 items-center justify-center`} onPress={() => Alert.alert('New Message', 'Start a new conversation with a coach, trainer, or AI assistant')}>
           <MaterialIcons name="edit" size={22} color={accent} />
         </TouchableOpacity>
       </View>

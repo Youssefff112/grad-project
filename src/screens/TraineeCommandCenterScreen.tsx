@@ -23,7 +23,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           Command Center
         </Text>
         <View style={tw`flex w-12 items-center justify-end`}>
-          <TouchableOpacity style={tw`relative p-2`}>
+          <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('NotificationsSettings')}>
             <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
             <View style={[tw`absolute top-2 right-2 flex h-2 w-2 rounded-full`, { backgroundColor: accent }]} />
           </TouchableOpacity>
@@ -107,7 +107,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
             <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
               Workout Anchor
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('VisionAnalysisLab')}>
               <Text style={[tw`text-sm font-bold`, { color: accent }]}>View Plan</Text>
             </TouchableOpacity>
           </View>
@@ -142,7 +142,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               { name: 'Barbell Squats', sets: '4 sets x 10 reps' },
               { name: 'Leg Extensions', sets: '3 sets x 15 reps' },
             ].map((exercise) => (
-              <View key={exercise.name} style={[tw`flex-row items-center justify-between p-4 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+              <TouchableOpacity key={exercise.name} onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name, sets: exercise.sets })} style={[tw`flex-row items-center justify-between p-4 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                 <View style={tw`flex-row items-center gap-3`}>
                   <View style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '14' }]}>
                     <MaterialIcons name="fitness-center" size={24} color={accent} />
@@ -153,7 +153,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                   </View>
                 </View>
                 <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>

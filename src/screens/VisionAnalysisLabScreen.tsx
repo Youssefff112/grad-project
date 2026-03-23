@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -21,7 +21,9 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
             Workouts
           </Text>
         </View>
-        <TouchableOpacity style={[tw`flex items-center justify-center rounded-lg h-10 w-10`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]}>
+        <TouchableOpacity style={[tw`flex items-center justify-center rounded-lg h-10 w-10`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]} onPress={() => {
+          setActiveTab('history');
+        }}>
           <MaterialIcons name="history" size={22} color={accent} />
         </TouchableOpacity>
       </View>
@@ -107,6 +109,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
           ].map((session, i) => (
             <TouchableOpacity
               key={i}
+              onPress={() => Alert.alert(session.type, `Date: ${session.date}\nDuration: ${session.duration}\nExercises: ${session.exercises}\nForm Score: ${session.score}\n\nDetailed form breakdown, joint angles, and recommendations available in full session review.`)}
               style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
             >
               <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>

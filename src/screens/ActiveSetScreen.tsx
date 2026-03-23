@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle, Line, Path } from 'react-native-svg';
 import tw from '../tw';
 
 export const ActiveSetScreen = ({ navigation }: any) => {
+  const [isPaused, setIsPaused] = React.useState(false);
   return (
     <SafeAreaView style={tw`flex-1 bg-[#221610]`}>
       <View style={tw`absolute inset-0 z-0`}>
@@ -142,8 +143,11 @@ export const ActiveSetScreen = ({ navigation }: any) => {
               <MaterialIcons name="stop-circle" size={24} color="black" />
               <Text style={tw`text-black font-black uppercase tracking-widest`}>Finish Set</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={tw`h-14 w-14 flex items-center justify-center rounded-xl bg-white/10 border border-white/10`}>
-              <MaterialIcons name="pause" size={24} color="white" />
+            <TouchableOpacity style={tw`h-14 w-14 flex items-center justify-center rounded-xl bg-white/10 border border-white/10`} onPress={() => {
+              setIsPaused(!isPaused);
+              Alert.alert(isPaused ? 'Workout Resumed' : 'Workout Paused', isPaused ? 'Form analysis is now active again.' : 'Form analysis is paused. Press again to resume.');
+            }}>
+              <MaterialIcons name={isPaused ? "play-arrow" : "pause"} size={24} color="white" />
             </TouchableOpacity>
           </View>
         </View>
