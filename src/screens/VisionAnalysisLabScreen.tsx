@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -53,10 +53,10 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
       </View>
 
       {activeTab === 'live' ? (
-        <View style={tw`flex-1`}>
+        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-32`}>
           {/* Camera Viewport - Empty for CV */}
-          <View style={[tw`flex-1 mx-4 mt-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' }]}>
-            <View style={tw`items-center gap-4`}>
+          <View style={[tw`mx-4 mt-4 mb-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', minHeight: 280 }]}>
+            <View style={tw`items-center gap-6 flex-1 justify-center py-6`}>
               <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: accent + '18' }]}>
                 <MaterialIcons name="videocam" size={40} color={accent} />
               </View>
@@ -64,10 +64,19 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
               <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
                 Computer vision will render here during your workout session
               </Text>
-              <View style={tw`flex-row items-center gap-2 mt-2`}>
+              <View style={tw`flex-row items-center gap-2`}>
                 <View style={tw`w-2 h-2 rounded-full bg-green-500`} />
                 <Text style={[tw`text-xs font-bold uppercase tracking-widest`, { color: '#4ade80' }]}>CV Engine Ready</Text>
               </View>
+
+              {/* Start Button */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Calibration')}
+                style={[tw`flex-row items-center justify-center gap-3 py-4 px-8 rounded-2xl mt-2`, { backgroundColor: accent, minWidth: 200 }]}
+              >
+                <MaterialIcons name="play-arrow" size={28} color="white" />
+                <Text style={tw`text-white text-lg font-black uppercase tracking-widest`}>Start Workout</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -87,19 +96,10 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
                 </View>
               ))}
             </View>
-
-            {/* Start Button */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Calibration')}
-              style={[tw`flex-row items-center justify-center gap-3 py-4 rounded-2xl`, { backgroundColor: accent }]}
-            >
-              <MaterialIcons name="play-arrow" size={28} color="white" />
-              <Text style={tw`text-white text-lg font-black uppercase tracking-widest`}>Start Workout</Text>
-            </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       ) : (
-        <View style={tw`flex-1 px-4 pt-4 gap-3 pb-24`}>
+        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 gap-3 pb-32`}>
           {/* Past Sessions */}
           {[
             { date: 'Yesterday', type: 'Push Day', duration: '1h 12m', score: '94%', exercises: 6 },
@@ -109,7 +109,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
           ].map((session, i) => (
             <TouchableOpacity
               key={i}
-              onPress={() => Alert.alert(session.type, `Date: ${session.date}\nDuration: ${session.duration}\nExercises: ${session.exercises}\nForm Score: ${session.score}\n\nDetailed form breakdown, joint angles, and recommendations available in full session review.`)}
+              onPress={() => navigation.navigate('WorkoutSessionDetail', { session })}
               style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
             >
               <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
@@ -125,7 +125,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
               </View>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       <BottomNav

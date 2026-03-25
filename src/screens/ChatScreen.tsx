@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -58,6 +59,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
@@ -85,12 +87,76 @@ export const ChatScreen = ({ navigation, route }: any) => {
     }, 100);
   };
 
+  const showMessageOptions = (message: Message) => {
+    const options = [
+      { text: 'Copy', onPress: () => handleCopy(message.text) },
+      ...(message.sent ? [{ text: 'Edit', onPress: () => handleEdit(message) }] : []),
+      ...(message.sent ? [{ text: 'Delete', onPress: () => handleDelete(message.id) }] : []),
+      { text: 'Reply', onPress: () => handleReply(message) },
+      { text: 'Cancel', onPress: () => {}, style: 'cancel' as const },
+    ];
+
+    Alert.alert('Message Options', '', options);
+  };
+
+  const handleCopy = (text: string) => {
+    Alert.alert('Copied', 'Message copied to clipboard');
+  };
+
+  const handleEdit = (message: Message) => {
+    setInputText(message.text);
+    setMessages((prev) => prev.filter((m) => m.id !== message.id));
+    Alert.alert('Edit Mode', 'Editing message. Update and send when ready.');
+  };
+
+  const handleDelete = (messageId: string) => {
+    Alert.alert('Delete Message', 'Are you sure you want to delete this message?', [
+      { text: 'Cancel', onPress: () => {} },
+      {
+        text: 'Delete',
+        onPress: () => {
+          setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        },
+        style: 'destructive',
+      },
+    ]);
+  };
+
+  const handleReply = (message: Message) => {
+    setInputText(`> ${message.text}\n\n`);
+  };
+
+  const showChatOptions = () => {
+    Alert.alert('Chat Options', '', [
+      { text: 'Clear Chat', onPress: () => handleClearChat(), style: 'destructive' },
+      { text: 'Report Conversation', onPress: () => Alert.alert('Reported', 'Conversation reported for review.') },
+      { text: 'Mute Notifications', onPress: () => Alert.alert('Muted', 'You will no longer receive notifications from this chat.') },
+      { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+    ]);
+  };
+
+  const handleClearChat = () => {
+    Alert.alert('Clear Chat', 'Are you sure? This cannot be undone.', [
+      { text: 'Cancel', onPress: () => {} },
+      {
+        text: 'Clear',
+        onPress: () => {
+          setMessages([]);
+          Alert.alert('Success', 'Chat cleared.');
+        },
+        style: 'destructive',
+      },
+    ]);
+  };
+
   const renderMessage = (message: Message) => {
     const isSent = message.sent;
 
     return (
-      <View
+      <TouchableOpacity
         key={message.id}
+        onLongPress={() => showMessageOptions(message)}
+        delayLongPress={300}
         style={[
           tw`mb-3 max-w-[80%]`,
           isSent ? tw`self-end` : tw`self-start`,
@@ -139,7 +205,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
         >
           {message.timestamp}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -195,7 +261,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
           </View>
         </View>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => showChatOptions()}>
           <MaterialIcons name="more-vert" size={24} color={secondaryText} />
         </TouchableOpacity>
       </View>

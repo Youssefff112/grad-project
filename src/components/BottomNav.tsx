@@ -26,7 +26,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const { isDark, accent } = useTheme();
 
   return (
-    <View style={[tw`flex-row items-center justify-around px-2 py-3 ${isDark ? 'bg-background-dark border-slate-800' : 'bg-white border-slate-200'} border-t absolute bottom-0 left-0 right-0 z-20`, containerStyle]}>
+    <View style={[tw`flex-row items-center justify-around px-2 py-3 border-t absolute bottom-0 left-0 right-0 z-20`, { backgroundColor: isDark ? '#0a0a12' : '#ffffff', borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, containerStyle]}>
       {items.map((item) => {
         const isActive = item.id === activeId;
         return (

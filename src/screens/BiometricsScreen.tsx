@@ -13,7 +13,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       <View style={tw`p-4 flex-row justify-between items-center`}>
-        <Text style={[tw`font-bold text-xl tracking-tighter`, { color: accent }]}>APEX AI</Text>
+        <Text style={[tw`font-bold text-xl tracking-tighter`, { color: accent }]}>VERTEX</Text>
         <Text style={[tw`text-sm font-medium`, { color: '#64748b' }]}>Step 1 of 6</Text>
       </View>
 
@@ -25,11 +25,11 @@ export const BiometricsScreen = ({ navigation }: any) => {
             Core Biometrics
           </Text>
           <Text style={[tw`text-base leading-relaxed`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-            Let's get to know you better to personalize your Apex AI experience. Accurate data ensures better performance tracking.
+            Let's get to know you better to personalize your Vertex experience. Accurate data ensures better performance tracking.
           </Text>
         </View>
 
-        <View style={tw`space-y-6 flex-col gap-6`}>
+        <View style={tw`flex-col gap-6`}>
           <View>
             <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: isDark ? '#e2e8f0' : '#1e293b' }]}>Age</Text>
             <View style={tw`relative`}>
@@ -170,7 +170,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
           title="Continue"
           size="lg"
           onPress={() => navigation.navigate('SafeGuardIntake')}
-          icon={<MaterialIcons name="arrow-forward" size={24} color="white" style={tw`ml-2`} />}
+          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
       </View>
     </SafeAreaView>

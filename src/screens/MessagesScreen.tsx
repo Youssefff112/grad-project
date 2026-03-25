@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { BottomNav } from '../components/BottomNav';
 
 const CONVERSATIONS = [
-  { id: '1', name: 'Apex AI Coach', avatar: 'smart-toy', lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.', time: '2m ago', unread: 2, isAI: true },
+  { id: '1', name: 'Vertex Coach', avatar: 'smart-toy', lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.', time: '2m ago', unread: 2, isAI: true },
   { id: '2', name: 'Dr. Sarah Miller', avatar: 'medical-services', lastMessage: 'Your recovery metrics look good. Cleared for heavy lifting.', time: '1h ago', unread: 0, isAI: false },
   { id: '3', name: 'Training Group', avatar: 'group', lastMessage: "Alex: Who's joining leg day tomorrow?", time: '3h ago', unread: 5, isAI: false },
   { id: '4', name: 'Nutrition AI', avatar: 'restaurant', lastMessage: "Your meal plan for tomorrow has been updated based on today's workout.", time: '5h ago', unread: 1, isAI: true },

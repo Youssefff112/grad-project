@@ -35,16 +35,16 @@ export const ProfileScreen = ({ navigation }: any) => {
         Alert.alert('Privacy & Security', 'End-to-end encryption is enabled. Your data is stored securely and never shared with third parties.', [{ text: 'OK' }]);
         break;
       case 'subscription':
-        Alert.alert('Subscription', 'You are on the Apex AI Pro plan.\n\nRenews: April 17, 2026\nPrice: $19.99/month', [{ text: 'Manage' }, { text: 'OK' }]);
+        Alert.alert('Subscription', 'You are on the Vertex Pro plan.\n\nRenews: April 17, 2026\nPrice: $19.99/month', [{ text: 'Manage' }, { text: 'OK' }]);
         break;
       case 'help':
         Alert.alert('Help Center', 'Need assistance?\n\nEmail: support@apexai.com\nResponse time: < 24 hours', [{ text: 'OK' }]);
         break;
       case 'feedback':
-        Alert.alert('Send Feedback', 'We\'d love to hear from you! Your feedback helps us improve Apex AI.', [{ text: 'Cancel' }, { text: 'Send Email', onPress: () => {} }]);
+        Alert.alert('Send Feedback', 'We\'d love to hear from you! Your feedback helps us improve Vertex.', [{ text: 'Cancel' }, { text: 'Send Email', onPress: () => {} }]);
         break;
       case 'about':
-        Alert.alert('About Apex AI', 'Version 1.0.0\n\nElite coaching powered by real-time computer vision and AI analysis.\n\nBuilt with precision for athletes.', [{ text: 'OK' }]);
+        Alert.alert('About Vertex', 'Version 1.0.0\n\nPeak performance coaching powered by real-time computer vision and AI analysis.\n\nBuilt with precision for athletes.', [{ text: 'OK' }]);
         break;
     }
   };
@@ -71,7 +71,7 @@ export const ProfileScreen = ({ navigation }: any) => {
       items: [
         { id: 'help', icon: 'help-outline', label: 'Help Center' },
         { id: 'feedback', icon: 'rate-review', label: 'Send Feedback' },
-        { id: 'about', icon: 'info-outline', label: 'About Apex AI' },
+        { id: 'about', icon: 'info-outline', label: 'About Vertex' },
       ],
     },
   ];
@@ -96,7 +96,7 @@ export const ProfileScreen = ({ navigation }: any) => {
             <MaterialIcons name="person" size={48} color={accent} />
           </View>
           <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{displayName}</Text>
-          <Text style={[tw`text-sm mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>{email || 'Apex AI Member'}</Text>
+          <Text style={[tw`text-sm mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>{email || 'Vertex Member'}</Text>
         </View>
 
         {/* Stats Row */}

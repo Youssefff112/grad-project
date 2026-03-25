@@ -72,7 +72,7 @@ export const MealsScreen = ({ navigation }: any) => {
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={tw`pb-28`}
+        contentContainerStyle={tw`pb-24`}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}

@@ -2,8 +2,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
-import { UserProvider } from './src/context/UserContext';
+import { UserProvider, useUser } from './src/context/UserContext';
 import { SplashScreen } from './src/screens/SplashScreen';
+import { SignInScreen } from './src/screens/SignInScreen';
+import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
+import { CodeVerificationScreen } from './src/screens/CodeVerificationScreen';
 import { AccountCreationScreen } from './src/screens/AccountCreationScreen';
 import { BiometricsScreen } from './src/screens/BiometricsScreen';
 import { SafeGuardIntakeScreen } from './src/screens/SafeGuardIntakeScreen';
@@ -20,15 +23,20 @@ import { EditProfileScreen } from './src/screens/EditProfileScreen';
 import { NotificationsSettingsScreen } from './src/screens/NotificationsSettingsScreen';
 import { MeasurementsSettingsScreen } from './src/screens/MeasurementsSettingsScreen';
 import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
+import { WorkoutSessionDetailScreen } from './src/screens/WorkoutSessionDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
   const { isDark } = useTheme();
+  const { fullName, isLoading } = useUser();
+  
+  // Determine initial route based on login status
+  const initialRouteName = isLoading ? 'Splash' : (fullName ? 'TraineeCommandCenter' : 'Splash');
 
   return (
     <Stack.Navigator
-      initialRouteName="Splash"
+      initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
         contentStyle: {
@@ -37,6 +45,9 @@ function AppNavigator() {
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
+      <Stack.Screen name="SignIn" component={SignInScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
       <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
       <Stack.Screen name="Biometrics" component={BiometricsScreen} />
       <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
@@ -53,6 +64,7 @@ function AppNavigator() {
       <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
       <Stack.Screen name="MeasurementsSettings" component={MeasurementsSettingsScreen} />
       <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
+      <Stack.Screen name="WorkoutSessionDetail" component={WorkoutSessionDetailScreen} />
     </Stack.Navigator>
   );
 }

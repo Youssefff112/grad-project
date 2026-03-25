@@ -41,10 +41,35 @@ export const MeasurementsSettingsScreen = ({ navigation }: any) => {
         <View style={tw`w-12`} />
       </View>
 
-      <ScrollView style={tw`flex-1 px-4 pt-6`}>
+      <ScrollView style={tw`flex-1 px-4 pt-6`} contentContainerStyle={tw`pb-8`}>
+        {/* Info Banner */}
+        <View style={[tw`p-4 rounded-2xl mb-8 flex-row items-center gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+          <MaterialIcons name="straighten" size={24} color={accent} />
+          <View style={tw`flex-1`}>
+            <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+              Unit Preferences
+            </Text>
+            <Text style={[tw`text-xs mt-1`, { color: '#94a3b8' }]}>
+              Set your preferred units for weights, measurements, and distances
+            </Text>
+          </View>
+        </View>
+
         <RadioGroup label="Weight" options={[{ id: 'kg', label: 'Kilograms (kg)' }, { id: 'lbs', label: 'Pounds (lbs)' }]} value={weightUnit} onChange={setWeightUnit} />
         <RadioGroup label="Height" options={[{ id: 'cm', label: 'Centimeters (cm)' }, { id: 'ft', label: 'Feet & Inches' }]} value={heightUnit} onChange={setHeightUnit} />
         <RadioGroup label="Distance" options={[{ id: 'km', label: 'Kilometers (km)' }, { id: 'mi', label: 'Miles (mi)' }]} value={distanceUnit} onChange={setDistanceUnit} />
+
+        {/* Conversion Reference */}
+        <View style={[tw`mt-8 p-4 rounded-2xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+          <Text style={[tw`font-bold text-sm mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            Quick Reference
+          </Text>
+          <View style={tw`gap-2`}>
+            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>• 1 kg = 2.2 lbs</Text>
+            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>• 1 inch = 2.54 cm</Text>
+            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>• 1 km = 0.62 miles</Text>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

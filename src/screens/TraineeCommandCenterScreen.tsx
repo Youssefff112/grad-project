@@ -30,7 +30,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         </View>
       </View>
 
-      <ScrollView style={tw`flex-1 pb-24`} contentContainerStyle={tw`pb-24`}>
+      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
         {/* Greeting */}
         <View style={tw`px-4 pt-6 pb-2`}>
           <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Welcome back,</Text>

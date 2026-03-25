@@ -94,12 +94,7 @@ export const SplashScreen = ({ navigation }: any) => {
                   { color: isDark ? '#ffffff' : '#1a1a1a' },
                 ]}
               >
-                APEX
-              </Text>
-              <Text
-                style={[tw`text-7xl font-black tracking-tight leading-none`, { color: accent }]}
-              >
-                AI
+                VERTEX
               </Text>
             </Animated.View>
 
@@ -130,7 +125,7 @@ export const SplashScreen = ({ navigation }: any) => {
                   { color: isDark ? '#94a3b8' : '#64748b' },
                 ]}
               >
-                Elite coaching powered by real-time computer vision and AI analysis
+                Peak performance coaching powered by real-time computer vision and AI analysis
               </Text>
             </Animated.View>
           </View>
@@ -207,7 +202,7 @@ export const SplashScreen = ({ navigation }: any) => {
                 title="Sign In"
                 size="md"
                 variant="outline"
-                onPress={() => navigation.navigate('AccountCreation')}
+                onPress={() => navigation.navigate('SignIn')}
               />
             </View>
           </Animated.View>

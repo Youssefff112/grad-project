@@ -25,7 +25,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           {label && (
             <View style={tw`flex-col`}>
               <Text style={[tw`text-xs font-bold uppercase tracking-widest`, { color: accent }]}>
-                Apex AI
+                Vertex
               </Text>
               <Text style={[tw`text-base font-medium leading-normal`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                 {label}

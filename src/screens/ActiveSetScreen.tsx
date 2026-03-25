@@ -1,11 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, SafeAreaView, TouchableOpacity, ImageBackground, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle, Line, Path } from 'react-native-svg';
 import tw from '../tw';
 
 export const ActiveSetScreen = ({ navigation }: any) => {
-  const [isPaused, setIsPaused] = React.useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (isPaused) return;
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPaused]);
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
   return (
     <SafeAreaView style={tw`flex-1 bg-[#221610]`}>
       <View style={tw`absolute inset-0 z-0`}>
@@ -97,7 +119,7 @@ export const ActiveSetScreen = ({ navigation }: any) => {
         </View>
 
         {/* Bottom Controls & Info */}
-        <View style={tw`space-y-4 flex-col gap-4`}>
+        <View style={tw`flex-col gap-4`}>
           {/* Workout Details Card */}
           <View style={tw`bg-black/60 border border-white/10 rounded-2xl p-6 shadow-2xl`}>
             <View style={tw`flex-row justify-between items-end mb-4`}>
@@ -125,10 +147,10 @@ export const ActiveSetScreen = ({ navigation }: any) => {
                 </View>
               </View>
               <View style={tw`flex-row flex-1 items-center gap-3 bg-white/10 p-3 rounded-xl border border-white/5`}>
-                <MaterialIcons name="timer" size={24} color={tw.color('primary')} />
+                <MaterialIcons name="timer" size={24} color="#00f2ff" />
                 <View>
-                  <Text style={tw`text-slate-400 text-[10px] font-bold uppercase`}>Tempo</Text>
-                  <Text style={tw`text-white font-bold text-xs`}>Controlled</Text>
+                  <Text style={tw`text-slate-400 text-[10px] font-bold uppercase`}>Elapsed Time</Text>
+                  <Text style={tw`text-white font-bold text-xs`}>{formatTime(elapsedSeconds)}</Text>
                 </View>
               </View>
             </View>

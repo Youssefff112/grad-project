@@ -43,6 +43,19 @@ export const NotificationsSettingsScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
+        {/* Banner */}
+        <View style={[tw`mx-4 mt-6 p-4 rounded-2xl flex-row items-center gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+          <MaterialIcons name="info-outline" size={24} color={accent} />
+          <View style={tw`flex-1`}>
+            <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+              Smart Notifications
+            </Text>
+            <Text style={[tw`text-xs mt-1`, { color: '#94a3b8' }]}>
+              We'll notify you at optimal times based on your activity
+            </Text>
+          </View>
+        </View>
+
         {SECTIONS.map((section) => (
           <View key={section.title} style={tw`px-4 mt-5`}>
             <Text style={[tw`text-xs font-bold uppercase tracking-widest mb-2 px-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{section.title}</Text>
