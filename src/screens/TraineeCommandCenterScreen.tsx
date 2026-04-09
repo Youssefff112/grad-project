@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -10,18 +10,25 @@ import { Button } from '../components/Button';
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('home');
   const { isDark, accent } = useTheme();
-  const { fullName } = useUser();
+  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant } = useUser();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
+
+  // Check if plan review is due (every 7 days)
+  const shouldShowPlanReview = useMemo(() => {
+    if (!lastPlanReviewDate) return true;
+    const lastReview = new Date(lastPlanReviewDate);
+    const today = new Date();
+    const daysDiff = Math.floor((today.getTime() - lastReview.getTime()) / (1000 * 60 * 60 * 24));
+    return daysDiff >= 7;
+  }, [lastPlanReviewDate]);
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       <View style={[tw`flex-row items-center p-4 pb-2 justify-between z-10`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+        <Text style={[tw`text-lg font-bold tracking-tighter`, { color: accent }]}>VERTEX</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>
-          <MaterialIcons name="person" size={28} color={accent} />
+          <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
         </TouchableOpacity>
-        <Text style={[tw`text-lg font-bold leading-tight tracking-tight flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-          Command Center
-        </Text>
         <View style={tw`flex w-12 items-center justify-end`}>
           <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('NotificationsSettings')}>
             <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
@@ -31,6 +38,23 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
+        {/* Plan Review Reminder Banner */}
+        {shouldShowPlanReview && (
+          <View style={[tw`mx-4 mt-4 rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+            <MaterialIcons name="notifications-active" size={20} color={accent} style={tw`mt-0.5`} />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                Time to Review Your Plan
+              </Text>
+              <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                It's been 7 days. Check out alternative plans to ensure the best fit for your goals.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('SubscriptionPlans')}>
+              <Text style={[tw`font-bold text-xs`, { color: accent }]}>Review</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {/* Greeting */}
         <View style={tw`px-4 pt-6 pb-2`}>
           <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Welcome back,</Text>
@@ -101,7 +125,40 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Workout Anchor Section */}
+        {/* AI/Workout & Meal Generation Section */}
+        {(canUseAIAssistant || subscriptionPlan !== 'Free') && (
+          <View style={tw`px-4 mt-8`}>
+            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+              Generate Plans
+            </Text>
+            <View style={tw`flex-row gap-3`}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('WorkoutGeneration')}
+                style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+              >
+                <MaterialIcons name="lightbulb" size={28} color={accent} style={tw`mb-2`} />
+                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Generate Workout
+                </Text>
+                <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Custom plan for you
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('MealGeneration')}
+                style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+              >
+                <MaterialIcons name="restaurant" size={28} color={accent} style={tw`mb-2`} />
+                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Generate Meals
+                </Text>
+                <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Personalized nutrition
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         <View style={tw`px-4 mt-8`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
             <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>

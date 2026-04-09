@@ -32,7 +32,7 @@ export const AccountCreationScreen = ({ navigation }: any) => {
   const handleCreateAccount = () => {
     setFullName(name);
     saveEmail(email);
-    navigation.navigate('Biometrics');
+    navigation.navigate('OnboardingPreferences');
   };
 
   return (

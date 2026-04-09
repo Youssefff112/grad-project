@@ -8,10 +8,12 @@ import { SignInScreen } from './src/screens/SignInScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { CodeVerificationScreen } from './src/screens/CodeVerificationScreen';
 import { AccountCreationScreen } from './src/screens/AccountCreationScreen';
+import { OnboardingPreferencesScreen } from './src/screens/OnboardingPreferencesScreen';
 import { BiometricsScreen } from './src/screens/BiometricsScreen';
 import { SafeGuardIntakeScreen } from './src/screens/SafeGuardIntakeScreen';
 import { GoalsScreen } from './src/screens/GoalsScreen';
 import { TraineeCommandCenterScreen } from './src/screens/TraineeCommandCenterScreen';
+import { SubscriptionPlansScreen } from './src/screens/SubscriptionPlansScreen';
 import { CalibrationScreen } from './src/screens/CalibrationScreen';
 import { ActiveSetScreen } from './src/screens/ActiveSetScreen';
 import { VisionAnalysisLabScreen } from './src/screens/VisionAnalysisLabScreen';
@@ -24,6 +26,9 @@ import { NotificationsSettingsScreen } from './src/screens/NotificationsSettings
 import { MeasurementsSettingsScreen } from './src/screens/MeasurementsSettingsScreen';
 import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
 import { WorkoutSessionDetailScreen } from './src/screens/WorkoutSessionDetailScreen';
+import { WorkoutGenerationScreen } from './src/screens/WorkoutGenerationScreen';
+import { MealGenerationScreen } from './src/screens/MealGenerationScreen';
+import { CoachAssignmentScreen } from './src/screens/CoachAssignmentScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -49,10 +54,12 @@ function AppNavigator() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
       <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
+      <Stack.Screen name="OnboardingPreferences" component={OnboardingPreferencesScreen} />
       <Stack.Screen name="Biometrics" component={BiometricsScreen} />
       <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
       <Stack.Screen name="Goals" component={GoalsScreen} />
       <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
+      <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <Stack.Screen name="Calibration" component={CalibrationScreen} />
       <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
       <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
@@ -65,6 +72,9 @@ function AppNavigator() {
       <Stack.Screen name="MeasurementsSettings" component={MeasurementsSettingsScreen} />
       <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
       <Stack.Screen name="WorkoutSessionDetail" component={WorkoutSessionDetailScreen} />
+      <Stack.Screen name="WorkoutGeneration" component={WorkoutGenerationScreen} />
+      <Stack.Screen name="MealGeneration" component={MealGenerationScreen} />
+      <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
     </Stack.Navigator>
   );
 }

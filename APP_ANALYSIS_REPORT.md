@@ -85,7 +85,7 @@ The Apex AI app is a comprehensive fitness coaching platform with AI-powered for
 #### Form Fields:
 
 - Age (numeric)
-- Gender (radio group: Male/Female/Other)
+- Gender (radio group: Male/Female)
 - Height (cm)
 - Weight (kg)
 - Body Fat % (optional)

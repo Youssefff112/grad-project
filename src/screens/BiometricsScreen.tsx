@@ -8,7 +8,7 @@ import { ProgressBar } from '../components/ProgressBar';
 
 export const BiometricsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -53,7 +53,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
           <View>
             <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: isDark ? '#e2e8f0' : '#1e293b' }]}>Gender</Text>
             <View style={tw`flex-row gap-3`}>
-              {(['male', 'female', 'other'] as const).map((option) => (
+              {(['male', 'female'] as const).map((option) => (
                 <TouchableOpacity
                   key={option}
                   onPress={() => setGender(option)}

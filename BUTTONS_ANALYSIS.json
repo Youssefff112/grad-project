@@ -90,7 +90,7 @@
       ],
       "formFields": [
         "Age (numeric)",
-        "Gender (radio: Male/Female/Other)",
+        "Gender (radio: Male/Female)",
         "Height (cm)",
         "Weight (kg)",
         "Body Fat % (optional)"

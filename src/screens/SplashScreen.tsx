@@ -112,7 +112,7 @@ export const SplashScreen = ({ navigation }: any) => {
                   { color: accent },
                 ]}
               >
-                Human + AI Precision
+                Your Fitness Journey
               </Text>
               <View style={[tw`h-px flex-1 rounded-full`, { backgroundColor: accent + '35' }]} />
             </Animated.View>
@@ -125,7 +125,7 @@ export const SplashScreen = ({ navigation }: any) => {
                   { color: isDark ? '#94a3b8' : '#64748b' },
                 ]}
               >
-                Peak performance coaching powered by real-time computer vision and AI analysis
+                Track workouts, reach your goals, and train with expert coaching guidance
               </Text>
             </Animated.View>
           </View>
@@ -140,9 +140,9 @@ export const SplashScreen = ({ navigation }: any) => {
           >
             <View style={tw`flex-row gap-3`}>
               {[
-                { icon: 'psychology', label: 'Adaptive AI', desc: 'Learns your style' },
-                { icon: 'fitness-center', label: 'Elite Training', desc: 'Pro-level plans' },
-                { icon: 'videocam', label: 'Form Analysis', desc: 'Real-time CV' },
+                { icon: 'fit-screen', label: 'Track Workouts', desc: 'Log your sessions' },
+                { icon: 'analytics', label: 'Monitor Progress', desc: 'See your gains' },
+                { icon: 'person-outline', label: 'Get Coaching', desc: 'Expert guidance' },
               ].map((f) => (
                 <View
                   key={f.label}
