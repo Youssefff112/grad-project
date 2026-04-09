@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -19,6 +20,8 @@ interface Message {
   text: string;
   sent: boolean;
   timestamp: string;
+  delivered?: boolean;
+  read?: boolean;
 }
 
 const INITIAL_MESSAGES: Message[] = [
@@ -27,40 +30,54 @@ const INITIAL_MESSAGES: Message[] = [
     text: "Good morning! Ready for today's session?",
     sent: false,
     timestamp: '9:00 AM',
+    read: true,
   },
   {
     id: '2',
     text: "Yes! What's the plan?",
     sent: true,
     timestamp: '9:01 AM',
+    delivered: true,
+    read: true,
   },
   {
     id: '3',
     text: "Today is Push Day - Bench Press, OHP, and accessories. Based on your last session, I've increased your working weight by 2.5kg.",
     sent: false,
     timestamp: '9:01 AM',
+    read: true,
   },
   {
     id: '4',
     text: "Sounds good, let's go",
     sent: true,
     timestamp: '9:02 AM',
+    delivered: true,
+    read: true,
   },
   {
     id: '5',
     text: 'Remember to focus on controlled eccentric phase. Your tempo was slightly fast last session.',
     sent: false,
     timestamp: '9:02 AM',
+    read: true,
   },
 ];
+
+const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 
 export const ChatScreen = ({ navigation, route }: any) => {
   const { chatName, isAI } = route.params as { chatName: string; isAI: boolean };
   const { isDark, accent } = useTheme();
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages, isTyping]);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const receivedBubble = isDark ? '#111128' : '#ffffff';
@@ -77,14 +94,33 @@ export const ChatScreen = ({ navigation, route }: any) => {
       text: inputText.trim(),
       sent: true,
       timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      delivered: true,
+      read: false,
     };
 
     setMessages((prev) => [...prev, newMessage]);
     setInputText('');
 
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    // Simulate AI response
+    if (isAI) {
+      setIsTyping(true);
+      setTimeout(() => {
+        const response: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "That's great! Keep up the excellent work. Your consistency will pay off.",
+          sent: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          read: false,
+        };
+        setMessages((prev) => [...prev, response]);
+        setIsTyping(false);
+      }, 1500);
+    }
+  };
+
+  const handleQuickReply = (reply: string) => {
+    setInputText(reply);
+    setTimeout(() => handleSend(), 300);
   };
 
   const showMessageOptions = (message: Message) => {
@@ -158,16 +194,17 @@ export const ChatScreen = ({ navigation, route }: any) => {
         onLongPress={() => showMessageOptions(message)}
         delayLongPress={300}
         style={[
-          tw`mb-3 max-w-[80%]`,
+          tw`mb-3 flex-row max-w-[85%]`,
           isSent ? tw`self-end` : tw`self-start`,
+          isSent && tw`flex-row-reverse`,
         ]}
       >
         {/* AI badge for received messages in AI chats */}
         {!isSent && isAI && (
-          <View style={tw`flex-row items-center gap-1 mb-1`}>
+          <View style={tw`flex-row items-center gap-1 mb-1 mr-2`}>
             <MaterialIcons name="smart-toy" size={12} color={accent} />
             <Text style={{ color: accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
-              AI COACH
+              AI
             </Text>
           </View>
         )}
@@ -180,9 +217,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
               borderWidth: isSent ? 0 : 1,
               borderColor: isSent ? 'transparent' : borderColor,
             },
-            isSent
-              ? tw`rounded-br-sm`
-              : tw`rounded-bl-sm`,
+            isSent ? tw`rounded-br-none` : tw`rounded-bl-none`,
           ]}
         >
           <Text
@@ -194,17 +229,19 @@ export const ChatScreen = ({ navigation, route }: any) => {
           >
             {message.text}
           </Text>
+          <View style={[tw`flex-row items-center gap-1 mt-1 justify-end`]}>
+            <Text style={{ color: isSent ? 'rgba(255,255,255,0.7)' : secondaryText, fontSize: 11 }}>
+              {message.timestamp}
+            </Text>
+            {isSent && (
+              <MaterialIcons
+                name={message.read ? 'done-all' : 'done'}
+                size={14}
+                color={message.read ? '#4ade80' : 'rgba(255,255,255,0.7)'}
+              />
+            )}
+          </View>
         </View>
-
-        <Text
-          style={[
-            tw`mt-1 text-xs`,
-            { color: secondaryText },
-            isSent ? tw`text-right` : tw`text-left`,
-          ]}
-        >
-          {message.timestamp}
-        </Text>
       </TouchableOpacity>
     );
   };
@@ -214,7 +251,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
       {/* Header */}
       <View
         style={[
-          tw`flex-row items-center px-4 py-3`,
+          tw`flex-row items-center px-4 py-3 justify-between`,
           {
             backgroundColor: bgColor,
             borderBottomWidth: 1,
@@ -222,46 +259,32 @@ export const ChatScreen = ({ navigation, route }: any) => {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`mr-3`}>
-          <MaterialIcons name="arrow-back" size={24} color={accent} />
-        </TouchableOpacity>
+        <View style={tw`flex-row items-center gap-3 flex-1`}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={24} color={accent} />
+          </TouchableOpacity>
 
-        <View style={tw`flex-1 flex-row items-center gap-2`}>
-          <View
-            style={[
-              tw`h-10 w-10 rounded-full items-center justify-center`,
-              { backgroundColor: accent + '20' },
-            ]}
-          >
-            <MaterialIcons
-              name={isAI ? 'smart-toy' : 'person'}
-              size={22}
-              color={accent}
-            />
-          </View>
-          <View>
-            <Text style={{ color: primaryText, fontSize: 16, fontWeight: '700' }}>
-              {chatName}
-            </Text>
-            {isAI && (
-              <View style={tw`flex-row items-center gap-1 mt-0.5`}>
-                <View
-                  style={[
-                    tw`px-2 py-0.5 rounded-full`,
-                    { backgroundColor: accent + '20' },
-                  ]}
-                >
-                  <Text style={{ color: accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
-                    AI
-                  </Text>
-                </View>
-                <Text style={{ color: secondaryText, fontSize: 11 }}>Always available</Text>
-              </View>
-            )}
+          <View style={tw`flex-1 flex-row items-center gap-2`}>
+            <View
+              style={[
+                tw`h-10 w-10 rounded-full items-center justify-center`,
+                { backgroundColor: accent + '20' },
+              ]}
+            >
+              <MaterialIcons name={isAI ? 'smart-toy' : 'person'} size={22} color={accent} />
+            </View>
+            <View style={tw`flex-1`}>
+              <Text style={{ color: primaryText, fontSize: 16, fontWeight: '700' }}>
+                {chatName}
+              </Text>
+              <Text style={{ color: secondaryText, fontSize: 11 }}>
+                {isAI ? 'Online' : 'Active now'}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => showChatOptions()}>
+        <TouchableOpacity onPress={() => showChatOptions()} style={tw`p-2`}>
           <MaterialIcons name="more-vert" size={24} color={secondaryText} />
         </TouchableOpacity>
       </View>
@@ -275,14 +298,14 @@ export const ChatScreen = ({ navigation, route }: any) => {
         <ScrollView
           ref={scrollViewRef}
           style={tw`flex-1`}
-          contentContainerStyle={tw`px-4 py-4`}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: false })}
+          contentContainerStyle={tw`px-4 py-4 pb-2`}
+          showsVerticalScrollIndicator={false}
         >
           {/* Date separator */}
           <View style={tw`items-center mb-4`}>
             <View
               style={[
-                tw`px-3 py-1 rounded-full`,
+                tw`px-3 py-1.5 rounded-full`,
                 { backgroundColor: isDark ? '#1a1a2e' : '#e2e8f0' },
               ]}
             >
@@ -293,12 +316,63 @@ export const ChatScreen = ({ navigation, route }: any) => {
           </View>
 
           {messages.map(renderMessage)}
+
+          {/* Typing indicator */}
+          {isTyping && (
+            <View style={[tw`flex-row items-center gap-1 mb-3`, tw`self-start`]}>
+              <View
+                style={[
+                  tw`px-4 py-3 rounded-2xl rounded-bl-none flex-row items-center gap-1`,
+                  { backgroundColor: receivedBubble, borderWidth: 1, borderColor: borderColor },
+                ]}
+              >
+                <View
+                  style={[
+                    tw`h-2 w-2 rounded-full`,
+                    { backgroundColor: secondaryText },
+                  ]}
+                />
+                <View
+                  style={[
+                    tw`h-2 w-2 rounded-full ml-1`,
+                    { backgroundColor: secondaryText },
+                  ]}
+                />
+                <View
+                  style={[
+                    tw`h-2 w-2 rounded-full ml-1`,
+                    { backgroundColor: secondaryText },
+                  ]}
+                />
+              </View>
+            </View>
+          )}
         </ScrollView>
+
+        {/* Quick Replies */}
+        {!isTyping && inputText === '' && (
+          <View style={[tw`px-4 py-2`, { borderTopWidth: 1, borderColor: borderColor }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`gap-2`}>
+              {QUICK_REPLIES.map((reply, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => handleQuickReply(reply)}
+                  style={[
+                    tw`px-3 py-2 rounded-full`,
+                    { backgroundColor: accent + '20' },
+                  ]}
+                >
+                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>{reply}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Input Bar */}
         <View
           style={[
-            tw`flex-row items-end px-4 py-3 gap-2`,
+            tw`flex-row items-end px-3 py-3 gap-2`,
             {
               backgroundColor: bgColor,
               borderTopWidth: 1,
@@ -306,15 +380,22 @@ export const ChatScreen = ({ navigation, route }: any) => {
             },
           ]}
         >
+          <TouchableOpacity
+            style={tw`h-10 w-10 rounded-full items-center justify-center`}
+            onPress={() => Alert.alert('Attachments', 'Photo, Video, File options coming soon')}
+          >
+            <MaterialIcons name="add-circle-outline" size={24} color={accent} />
+          </TouchableOpacity>
+
           <View
             style={[
-              tw`flex-1 flex-row items-end rounded-2xl px-4 py-2`,
+              tw`flex-1 flex-row items-center rounded-full px-4 py-2`,
               {
                 backgroundColor: inputBg,
                 borderWidth: 1,
                 borderColor: borderColor,
-                minHeight: 44,
-                maxHeight: 120,
+                minHeight: 40,
+                maxHeight: 100,
               },
             ]}
           >
@@ -323,8 +404,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
                 tw`flex-1 text-sm`,
                 {
                   color: primaryText,
-                  paddingTop: Platform.OS === 'ios' ? 8 : 4,
-                  paddingBottom: Platform.OS === 'ios' ? 8 : 4,
+                  paddingVertical: 8,
                 },
               ]}
               placeholder="Type a message..."
@@ -332,15 +412,14 @@ export const ChatScreen = ({ navigation, route }: any) => {
               value={inputText}
               onChangeText={setInputText}
               multiline
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
+              maxLength={500}
             />
           </View>
 
           <TouchableOpacity
             onPress={handleSend}
             style={[
-              tw`h-11 w-11 rounded-full items-center justify-center`,
+              tw`h-10 w-10 rounded-full items-center justify-center`,
               {
                 backgroundColor: inputText.trim() ? accent : isDark ? '#1a1a2e' : '#e2e8f0',
               },
@@ -348,7 +427,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
             disabled={!inputText.trim()}
           >
             <MaterialIcons
-              name="send"
+              name={inputText.trim() ? 'send' : 'mic'}
               size={20}
               color={inputText.trim() ? '#ffffff' : secondaryText}
             />

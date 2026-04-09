@@ -35,7 +35,7 @@ export const ProfileScreen = ({ navigation }: any) => {
         Alert.alert('Privacy & Security', 'End-to-end encryption is enabled. Your data is stored securely and never shared with third parties.', [{ text: 'OK' }]);
         break;
       case 'subscription':
-        Alert.alert('Subscription', 'You are on the Vertex Pro plan.\n\nRenews: April 17, 2026\nPrice: $19.99/month', [{ text: 'Manage' }, { text: 'OK' }]);
+        navigation.navigate('SubscriptionPlans');
         break;
       case 'help':
         Alert.alert('Help Center', 'Need assistance?\n\nEmail: support@apexai.com\nResponse time: < 24 hours', [{ text: 'OK' }]);
@@ -46,10 +46,27 @@ export const ProfileScreen = ({ navigation }: any) => {
       case 'about':
         Alert.alert('About Vertex', 'Version 1.0.0\n\nPeak performance coaching powered by real-time computer vision and AI analysis.\n\nBuilt with precision for athletes.', [{ text: 'OK' }]);
         break;
+      case 'experience':
+        navigation.navigate('EditExperience');
+        break;
+      case 'diet':
+        navigation.navigate('EditDiet');
+        break;
+      case 'goals':
+        navigation.navigate('Goals');
+        break;
     }
   };
 
   const MENU_SECTIONS = [
+    {
+      title: 'Onboarding',
+      items: [
+        { id: 'experience', icon: 'fitness-center', label: 'Fitness Level' },
+        { id: 'diet', icon: 'restaurant', label: 'Diet Preferences' },
+        { id: 'goals', icon: 'track-changes', label: 'Goals' },
+      ],
+    },
     {
       title: 'Preferences',
       items: [

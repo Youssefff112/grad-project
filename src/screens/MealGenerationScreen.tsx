@@ -275,6 +275,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
               </TouchableOpacity>
 
               <TouchableOpacity
+                onPress={() => Alert.alert('Build Custom Meal Plan', 'Meal planner builder coming soon! For now, use Generate Auto and modify the plan as needed.', [{ text: 'OK' }])}
                 style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
               >
                 <View style={[tw`p-3 rounded-lg`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
@@ -350,10 +351,10 @@ export const MealGenerationScreen = ({ navigation }: any) => {
       </ScrollView>
 
       {/* Meal Plan Preview Modal */}
-      <Modal visible={showPreview} animationType="slide" transparent>
+      <Modal visible={showPreview} animationType="slide" transparent onRequestClose={() => { setShowPreview(false); setGeneratedMeal(null); }}>
         <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
           <View style={[tw`p-4 flex-row items-center justify-between`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-            <TouchableOpacity onPress={() => setShowPreview(false)} style={tw`flex size-10 items-center justify-center`}>
+            <TouchableOpacity onPress={() => { setShowPreview(false); setGeneratedMeal(null); }} style={tw`flex size-10 items-center justify-center`}>
               <MaterialIcons name="close" size={24} color={accent} />
             </TouchableOpacity>
             <Text style={[tw`text-lg font-bold flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
@@ -444,7 +445,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   onPress={handleSubmitForApproval}
                   icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
                 />
-                <TouchableOpacity style={tw`items-center py-3`} onPress={() => setShowPreview(false)}>
+                <TouchableOpacity style={tw`items-center py-3`} onPress={() => { setShowPreview(false); setGeneratedMeal(null); }}>
                   <Text style={[tw`font-bold text-base`, { color: accent }]}>Cancel</Text>
                 </TouchableOpacity>
               </>

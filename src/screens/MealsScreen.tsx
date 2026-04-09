@@ -88,6 +88,35 @@ export const MealsScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
+        {/* Generate Meal Button */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('MealGeneration')}
+          style={[
+            tw`mx-5 mt-4 rounded-2xl p-4 flex-row items-center justify-between`,
+            { backgroundColor: accent + '14' }
+          ]}
+        >
+          <View style={tw`flex-row items-center gap-3`}>
+            <View
+              style={[
+                tw`w-10 h-10 rounded-lg items-center justify-center`,
+                { backgroundColor: accent + '28' }
+              ]}
+            >
+              <MaterialIcons name="restaurant" size={20} color={accent} />
+            </View>
+            <View>
+              <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                Generate Meals
+              </Text>
+              <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                AI-powered meal plans
+              </Text>
+            </View>
+          </View>
+          <MaterialIcons name="arrow-forward" size={20} color={accent} />
+        </TouchableOpacity>
+
         {/* Calorie Ring + Macros Section */}
         <View
           style={[

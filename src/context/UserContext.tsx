@@ -4,11 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
 export type SubscriptionPlan = 'Free' | 'Standard' | 'Premium' | 'ProCoach' | 'Elite';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
-export type DietPreference = 'omnivore' | 'vegetarian' | 'vegan' | 'keto' | 'paleo' | 'gluten-free' | 'other';
+export type DietPreference = 'omnivore' | 'vegetarian' | 'vegan' | 'keto' | 'paleo' | 'gluten-free' | 'pescatarian' | 'dairy-free' | 'nut-free' | 'low-carb' | 'mediterranean' | 'other';
 
 interface UserContextType {
   fullName: string;
   email: string;
+  weight: number | null;
+  bodyFatPercentage: number | null;
   userMode: UserMode;
   subscriptionPlan: SubscriptionPlan;
   experienceLevel: ExperienceLevel | null;
@@ -21,6 +23,8 @@ interface UserContextType {
   
   setFullName: (name: string) => void;
   setEmail: (email: string) => void;
+  setWeight: (weight: number) => void;
+  setBodyFatPercentage: (percentage: number) => void;
   setUserMode: (mode: UserMode) => void;
   setSubscriptionPlan: (plan: SubscriptionPlan) => void;
   setExperienceLevel: (level: ExperienceLevel) => void;
@@ -36,6 +40,8 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   fullName: '',
   email: '',
+  weight: null,
+  bodyFatPercentage: null,
   userMode: 'Basic',
   subscriptionPlan: 'Free',
   experienceLevel: null,
@@ -48,6 +54,8 @@ const UserContext = createContext<UserContextType>({
   
   setFullName: () => {},
   setEmail: () => {},
+  setWeight: () => {},
+  setBodyFatPercentage: () => {},
   setUserMode: () => {},
   setSubscriptionPlan: () => {},
   setExperienceLevel: () => {},
@@ -63,6 +71,8 @@ const UserContext = createContext<UserContextType>({
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [fullName, setFullNameState] = useState('');
   const [email, setEmailState] = useState('');
+  const [weight, setWeightState] = useState<number | null>(null);
+  const [bodyFatPercentage, setBodyFatPercentageState] = useState<number | null>(null);
   const [userMode, setUserModeState] = useState<UserMode>('Basic');
   const [subscriptionPlan, setSubscriptionPlanState] = useState<SubscriptionPlan>('Free');
   const [experienceLevel, setExperienceLevelState] = useState<ExperienceLevel | null>(null);
@@ -80,6 +90,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const savedName = await AsyncStorage.getItem('user_fullname');
         const savedEmail = await AsyncStorage.getItem('user_email');
+        const savedWeight = await AsyncStorage.getItem('user_weight');
+        const savedBodyFat = await AsyncStorage.getItem('user_body_fat_percentage');
         const savedMode = await AsyncStorage.getItem('user_mode') as UserMode | null;
         const savedPlan = await AsyncStorage.getItem('user_subscription_plan') as SubscriptionPlan | null;
         const savedExperience = await AsyncStorage.getItem('user_experience_level') as ExperienceLevel | null;
@@ -92,6 +104,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (savedName) setFullNameState(savedName);
         if (savedEmail) setEmailState(savedEmail);
+        if (savedWeight) setWeightState(parseFloat(savedWeight));
+        if (savedBodyFat) setBodyFatPercentageState(parseFloat(savedBodyFat));
         if (savedMode) setUserModeState(savedMode);
         if (savedPlan) setSubscriptionPlanState(savedPlan);
         if (savedExperience) setExperienceLevelState(savedExperience);
@@ -122,6 +136,20 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setEmailState(email);
     AsyncStorage.setItem('user_email', email).catch((error) =>
       console.log('Failed to save email:', error)
+    );
+  }, []);
+
+  const setWeight = useCallback((w: number) => {
+    setWeightState(w);
+    AsyncStorage.setItem('user_weight', w.toString()).catch((error) =>
+      console.log('Failed to save weight:', error)
+    );
+  }, []);
+
+  const setBodyFatPercentage = useCallback((percentage: number) => {
+    setBodyFatPercentageState(percentage);
+    AsyncStorage.setItem('user_body_fat_percentage', percentage.toString()).catch((error) =>
+      console.log('Failed to save body fat percentage:', error)
     );
   }, []);
 
@@ -205,6 +233,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <UserContext.Provider value={{
       fullName,
       email,
+      weight,
+      bodyFatPercentage,
       userMode,
       subscriptionPlan,
       experienceLevel,
@@ -216,6 +246,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastPlanReviewDate,
       setFullName,
       setEmail,
+      setWeight,
+      setBodyFatPercentage,
       setUserMode,
       setSubscriptionPlan,
       setExperienceLevel,

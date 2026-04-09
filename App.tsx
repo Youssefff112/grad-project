@@ -29,6 +29,8 @@ import { WorkoutSessionDetailScreen } from './src/screens/WorkoutSessionDetailSc
 import { WorkoutGenerationScreen } from './src/screens/WorkoutGenerationScreen';
 import { MealGenerationScreen } from './src/screens/MealGenerationScreen';
 import { CoachAssignmentScreen } from './src/screens/CoachAssignmentScreen';
+import { EditExperienceScreen } from './src/screens/EditExperienceScreen';
+import { EditDietScreen } from './src/screens/EditDietScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -47,6 +49,9 @@ function AppNavigator() {
         contentStyle: {
           backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
         },
+        animationEnabled: true,
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
@@ -75,6 +80,8 @@ function AppNavigator() {
       <Stack.Screen name="WorkoutGeneration" component={WorkoutGenerationScreen} />
       <Stack.Screen name="MealGeneration" component={MealGenerationScreen} />
       <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
+      <Stack.Screen name="EditExperience" component={EditExperienceScreen} />
+      <Stack.Screen name="EditDiet" component={EditDietScreen} />
     </Stack.Navigator>
   );
 }

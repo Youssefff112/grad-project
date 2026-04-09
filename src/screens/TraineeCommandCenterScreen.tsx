@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -9,9 +9,31 @@ import { Button } from '../components/Button';
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('home');
+  const [weightInput, setWeightInput] = useState('');
+  const [bodyFatInput, setBodyFatInput] = useState('');
   const { isDark, accent } = useTheme();
-  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant } = useUser();
+  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage } = useUser();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
+
+  // Calculate readiness score based on various factors
+  const readinessScore = Math.floor(Math.random() * 40 + 60); // 60-100%
+  const waterIntake = 1.2; // liters
+  const caloriesBurned = 1850;
+  const caloriesTarget = 2400;
+
+  const getReadinessStatus = () => {
+    if (readinessScore >= 80) return 'Optimal';
+    if (readinessScore >= 60) return 'Good';
+    return 'Fair';
+  };
+
+  const getReadinessRecommendation = () => {
+    const score = readinessScore;
+    if (score >= 85) return 'Your recovery is optimal. High intensity training is recommended today.';
+    if (score >= 70) return 'You\'re ready for moderate to high intensity. Recovery is adequate.';
+    if (score >= 50) return 'Consider lighter training today. Your body needs more recovery.';
+    return 'Take it easy today. Focus on stretching and mobility work.';
+  };
 
   // Check if plan review is due (every 7 days)
   const shouldShowPlanReview = useMemo(() => {
@@ -25,34 +47,96 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       <View style={[tw`flex-row items-center p-4 pb-2 justify-between z-10`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-        <Text style={[tw`text-lg font-bold tracking-tighter`, { color: accent }]}>VERTEX</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>
-          <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
-        </TouchableOpacity>
-        <View style={tw`flex w-12 items-center justify-end`}>
+        <View style={tw`flex w-12 items-center justify-start`}>
           <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('NotificationsSettings')}>
             <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
             <View style={[tw`absolute top-2 right-2 flex h-2 w-2 rounded-full`, { backgroundColor: accent }]} />
           </TouchableOpacity>
         </View>
+        <Text style={[tw`text-lg font-bold tracking-tighter flex-1 text-center`, { color: accent }]}>VERTEX</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>
+          <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
-        {/* Plan Review Reminder Banner */}
+        {/* Personal Info & Plan Review Reminder Banner */}
         {shouldShowPlanReview && (
-          <View style={[tw`mx-4 mt-4 rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
-            <MaterialIcons name="notifications-active" size={20} color={accent} style={tw`mt-0.5`} />
-            <View style={tw`flex-1`}>
-              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                Time to Review Your Plan
-              </Text>
-              <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                It's been 7 days. Check out alternative plans to ensure the best fit for your goals.
-              </Text>
+          <View style={[tw`mx-4 mt-4 rounded-xl p-4 flex-col gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+            <View style={tw`flex-row items-start gap-3`}>
+              <MaterialIcons name="scale" size={22} color={accent} style={tw`mt-0.5`} />
+              <View style={tw`flex-1`}>
+                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Weekly Check-In: Weigh In
+                </Text>
+                <Text style={[tw`text-xs mt-1.5 leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Weigh yourself this week to track your progress accurately. Your weight helps us optimize your personalized plan for better results.
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('SubscriptionPlans')}>
-              <Text style={[tw`font-bold text-xs`, { color: accent }]}>Review</Text>
-            </TouchableOpacity>
+
+            {/* Action Buttons */}
+            <View style={tw`flex-col gap-2 mt-2`}>
+              <View style={tw`flex-row gap-2 items-center`}>
+                <TextInput
+                  placeholder="Weight"
+                  placeholderTextColor={isDark ? '#64748b' : '#cbd5e1'}
+                  value={weightInput}
+                  onChangeText={setWeightInput}
+                  keyboardType="decimal-pad"
+                  style={[tw`flex-1 rounded-lg p-3 text-base font-semibold`, { 
+                    backgroundColor: isDark ? '#1a1a2e' : '#ffffff',
+                    color: isDark ? '#f1f5f9' : '#1e293b',
+                    borderWidth: 1,
+                    borderColor: accent + '40'
+                  }]}
+                />
+                <TextInput
+                  placeholder="Body Fat %"
+                  placeholderTextColor={isDark ? '#64748b' : '#cbd5e1'}
+                  value={bodyFatInput}
+                  onChangeText={setBodyFatInput}
+                  keyboardType="decimal-pad"
+                  style={[tw`flex-1 rounded-lg p-3 text-base font-semibold`, { 
+                    backgroundColor: isDark ? '#1a1a2e' : '#ffffff',
+                    color: isDark ? '#f1f5f9' : '#1e293b',
+                    borderWidth: 1,
+                    borderColor: accent + '40'
+                  }]}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (weightInput.trim() || bodyFatInput.trim()) {
+                      if (weightInput.trim()) {
+                        const newWeight = parseFloat(weightInput);
+                        setWeight(newWeight);
+                      }
+                      if (bodyFatInput.trim()) {
+                        const newBodyFat = parseFloat(bodyFatInput);
+                        setBodyFatPercentage(newBodyFat);
+                      }
+                      setWeightInput('');
+                      setBodyFatInput('');
+                    }
+                  }}
+                  style={[tw`rounded-lg p-3 items-center justify-center`, { backgroundColor: accent }]}
+                >
+                  <MaterialIcons name="check" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+              <View style={tw`flex-row gap-2 text-xs`}>
+                {weight && <Text style={[tw`flex-1 text-xs text-center`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Weight: {weight} kg</Text>}
+                {bodyFatPercentage && <Text style={[tw`flex-1 text-xs text-center`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Fat: {bodyFatPercentage}%</Text>}
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('SubscriptionPlans')}
+                style={[tw`rounded-lg p-3 items-center`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}
+              >
+                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Review Plans
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
         {/* Greeting */}
@@ -72,7 +156,11 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
           <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
             {/* Calories Card */}
-            <View style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Meals')}
+              activeOpacity={0.7}
+              style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
               <View style={tw`flex-row items-center gap-2`}>
                 <MaterialIcons name="local-fire-department" size={20} color={accent} />
                 <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#475569' }]}>Calories</Text>
@@ -84,10 +172,14 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 <View style={[tw`h-full rounded-full`, { backgroundColor: accent, width: '77%' }]} />
               </View>
               <Text style={tw`text-red-500 text-xs font-semibold`}>-550 kcal left</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Water Card */}
-            <View style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Meals')}
+              activeOpacity={0.7}
+              style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
               <View style={tw`flex-row items-center gap-2`}>
                 <MaterialIcons name="water-drop" size={20} color="#3b82f6" />
                 <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#475569' }]}>Water</Text>
@@ -99,29 +191,33 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 <View style={tw`bg-blue-500 h-full rounded-full w-[40%]`} />
               </View>
               <Text style={tw`text-green-500 text-xs font-semibold`}>+0.4L since 1h</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Readiness Score */}
-            <View style={[tw`w-full flex-col gap-2 rounded-xl p-5 shadow-sm mt-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('VisionAnalysisLab')}
+              activeOpacity={0.7}
+              style={[tw`w-full flex-col gap-2 rounded-xl p-5 shadow-sm mt-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+            >
               <View style={tw`flex-row items-center justify-between`}>
                 <View style={tw`flex-row items-center gap-2`}>
                   <MaterialIcons name="bolt" size={24} color={accent} />
                   <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Readiness Score</Text>
                 </View>
-                <Text style={[tw`text-2xl font-black`, { color: accent }]}>85%</Text>
+                <Text style={[tw`text-2xl font-black`, { color: accent }]}>{readinessScore}%</Text>
               </View>
               <Text style={[tw`text-sm leading-relaxed mt-1`, { color: isDark ? '#94a3b8' : '#475569' }]}>
-                Your recovery is optimal. High intensity training is recommended today.
+                {getReadinessRecommendation()}
               </Text>
               <View style={tw`flex-row gap-2 mt-2`}>
                 <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent + '28' }]}>
-                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: accent }]}>Optimal</Text>
+                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: accent }]}>{getReadinessStatus()}</Text>
                 </View>
                 <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
-                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: isDark ? '#cbd5e1' : '#475569' }]}>High Energy</Text>
+                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Start Workout →</Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -158,7 +254,45 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
           </View>
+          </View>
         )}
+
+        {/* Hub Section - Quick Access */}
+        <View style={tw`px-4 mt-8 mb-6`}>
+          <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            Important
+          </Text>
+          <View style={tw`flex-row gap-3 flex-wrap`}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SubscriptionPlans')}
+              style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' }]}
+            >
+              <MaterialIcons name="card-membership" size={24} color={accent} style={tw`mb-2`} />
+              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                Subscription
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Profile')}
+              style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <MaterialIcons name="person" size={24} color={accent} style={tw`mb-2`} />
+              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                Profile
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Messages')}
+              style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <MaterialIcons name="chat-bubble" size={24} color={accent} style={tw`mb-2`} />
+              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                Coaching
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={tw`px-4 mt-8`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
             <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>

@@ -39,9 +39,14 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
     { value: 'omnivore', label: 'Omnivore', icon: 'fastfood' },
     { value: 'vegetarian', label: 'Vegetarian', icon: 'eco' },
     { value: 'vegan', label: 'Vegan', icon: 'leaf' },
+    { value: 'pescatarian', label: 'Pescatarian', icon: 'water-drop' },
     { value: 'keto', label: 'Keto', icon: 'local-fire-department' },
     { value: 'paleo', label: 'Paleo', icon: 'nature' },
+    { value: 'low-carb', label: 'Low-Carb', icon: 'trending-down' },
+    { value: 'mediterranean', label: 'Mediterranean', icon: 'public' },
     { value: 'gluten-free', label: 'Gluten-Free', icon: 'block' },
+    { value: 'dairy-free', label: 'Dairy-Free', icon: 'local-drink' },
+    { value: 'nut-free', label: 'Nut-Free', icon: 'do-not-disturb' },
   ];
 
   const toggleDiet = (diet: DietPreference) => {

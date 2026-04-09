@@ -428,6 +428,202 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
             ))}
           </View>
         </View>
+
+        {/* Current Subscription Management */}
+        <View style={tw`mt-8 mb-4`}>
+          <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            Manage Subscription
+          </Text>
+
+          {/* Current Plan Card */}
+          <View style={[tw`rounded-xl p-5 mb-4`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '28' }]}>
+            <View style={tw`flex-row items-center justify-between mb-3`}>
+              <View>
+                <Text style={[tw`text-xs font-semibold uppercase tracking-wide`, { color: accent }]}>
+                  Current Plan
+                </Text>
+                <Text style={[tw`text-2xl font-bold mt-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  {subscriptionPlan}
+                </Text>
+              </View>
+              <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent + '20' }]}>
+                <Text style={[tw`text-xs font-bold`, { color: accent }]}>Active</Text>
+              </View>
+            </View>
+            <View style={[tw`h-px mb-3`, { backgroundColor: accent + '28' }]} />
+            <View style={tw`gap-2`}>
+              <View style={tw`flex-row items-center justify-between`}>
+                <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Next renewal</Text>
+                <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>April 17, 2026</Text>
+              </View>
+              <View style={tw`flex-row items-center justify-between`}>
+                <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Amount</Text>
+                <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  ${subscriptionPlan === 'Free' ? '0.00' : subscriptionPlan === 'Standard' ? '9.99' : subscriptionPlan === 'Premium' ? '19.99' : subscriptionPlan === 'ProCoach' ? '49.99' : '99.99'}/month
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Management Actions */}
+          <View style={tw`gap-3`}>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Billing History', 'Your invoices and payment history will appear here', [{ text: 'OK' }])}
+              style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <View style={[tw`p-3 rounded-lg`, { backgroundColor: accent + '15' }]}>
+                <MaterialIcons name="receipt" size={22} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Billing History
+                </Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  View invoices and payments
+                </Text>
+              </View>
+              <MaterialIcons name="arrow-forward" size={20} color={accent} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => Alert.alert('Update Payment Method', 'Your payment method will be updated securely', [{ text: 'Cancel' }, { text: 'Update', onPress: () => Alert.alert('Success', 'Payment method updated') }])}
+              style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <View style={[tw`p-3 rounded-lg`, { backgroundColor: accent + '15' }]}>
+                <MaterialIcons name="payment" size={22} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Update Payment
+                </Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Change payment method
+                </Text>
+              </View>
+              <MaterialIcons name="arrow-forward" size={20} color={accent} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => Alert.alert('Download Invoice', 'Your latest invoice is ready to download', [{ text: 'Cancel' }, { text: 'Download', onPress: () => Alert.alert('Downloaded', 'Invoice saved to your device') }])}
+              style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <View style={[tw`p-3 rounded-lg`, { backgroundColor: accent + '15' }]}>
+                <MaterialIcons name="download" size={22} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Download Invoice
+                </Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Get a copy of your invoice
+                </Text>
+              </View>
+              <MaterialIcons name="arrow-forward" size={20} color={accent} />
+            </TouchableOpacity>
+
+            {subscriptionPlan !== 'Free' && (
+              <TouchableOpacity
+                onPress={() => Alert.alert('Cancel Subscription', `Are you sure you want to cancel your ${subscriptionPlan} plan?`, [{ text: 'Keep Plan' }, { text: 'Cancel Plan', onPress: () => { setSubscriptionPlan('Free'); Alert.alert('Cancelled', 'Your subscription has been cancelled. You now have access to the Free plan.'); }, style: 'destructive' }])}
+                style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: '#ef4444' + '15', borderWidth: 1, borderColor: '#ef4444' + '40' }]}
+              >
+                <View style={[tw`p-3 rounded-lg`, { backgroundColor: '#ef4444' + '25' }]}>
+                  <MaterialIcons name="cancel" size={22} color="#ef4444" />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`font-bold text-base`, { color: '#ef4444' }]}>
+                    Cancel Subscription
+                  </Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: '#ef4444' + '80' }]}>
+                    Downgrade to Free plan
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-forward" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Terms & Conditions */}
+          <View style={tw`mt-8 mb-4`}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+              Terms & Conditions
+            </Text>
+
+            <View style={tw`gap-4`}>
+              {/* Billing */}
+              <View>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: accent }]}>
+                  Billing & Renewal
+                </Text>
+                <Text style={[tw`text-sm leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Your subscription renews automatically on the same date each month. Billing occurs on your renewal date. You can update your payment method or cancel anytime without penalty.
+                </Text>
+              </View>
+
+              {/* Changes */}
+              <View>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: accent }]}>
+                  Plan Changes
+                </Text>
+                <Text style={[tw`text-sm leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  You can upgrade or downgrade your plan at any time. Upgrades take effect immediately. Downgrades take effect at your next renewal date.
+                </Text>
+              </View>
+
+              {/* Refunds */}
+              <View>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: accent }]}>
+                  Refunds & Cancellations
+                </Text>
+                <Text style={[tw`text-sm leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  We do not offer refunds for partial months or unused services. If you cancel mid-cycle, your current plan remains active until the end of your billing period.
+                </Text>
+              </View>
+
+              {/* Security */}
+              <View>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: accent }]}>
+                  Payment Security
+                </Text>
+                <Text style={[tw`text-sm leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  All payments are processed securely through industry-standard encryption. Your payment information is never stored on our servers and is handled by trusted payment processors.
+                </Text>
+              </View>
+
+              {/* Suspension */}
+              <View>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: accent }]}>
+                  Account Suspension
+                </Text>
+                <Text style={[tw`text-sm leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Vertex reserves the right to suspend accounts with fraudulent activity or payment issues. You will be notified of any suspension with at least 7 days notice.
+                </Text>
+              </View>
+
+              {/* Privacy */}
+              <View>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: accent }]}>
+                  Data & Privacy
+                </Text>
+                <Text style={[tw`text-sm leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Your subscription data and health information are encrypted end-to-end. We never share your data with third parties without explicit consent.
+                </Text>
+              </View>
+
+              {/* Support */}
+              <View style={[tw`rounded-xl p-3 mt-2`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
+                <View style={tw`flex-row items-center gap-2 mb-2`}>
+                  <MaterialIcons name="support-agent" size={18} color={accent} />
+                  <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                    Questions?
+                  </Text>
+                </View>
+                <Text style={[tw`text-xs leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  Contact support@vertex.app for billing inquiries or business questions.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Plan Disclaimer Modal */}

@@ -54,6 +54,21 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
 
       {activeTab === 'live' ? (
         <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-32`}>
+          {/* Generate Workout Button */}
+          <View style={tw`px-4 pt-4 pb-2`}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('WorkoutGeneration')}
+              style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+            >
+              <MaterialIcons name="auto-awesome" size={24} color={accent} />
+              <View style={tw`flex-1`}>
+                <Text style={[tw`font-bold text-sm`, { color: accent }]}>Generate Workout</Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Create AI-powered plan</Text>
+              </View>
+              <MaterialIcons name="arrow-forward" size={20} color={accent} />
+            </TouchableOpacity>
+          </View>
+
           {/* Camera Viewport - Empty for CV */}
           <View style={[tw`mx-4 mt-4 mb-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', minHeight: 280 }]}>
             <View style={tw`items-center gap-6 flex-1 justify-center py-6`}>
