@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TextInput,
   View,
@@ -10,14 +10,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 
-interface FormInputProps extends TextInputProps {
+interface FormInputProps extends Omit<TextInputProps, 'editable'> {
   label?: string;
   placeholder?: string;
-  error?: string;
+  error?: boolean;
   helperText?: string;
-  icon?: string;
-  showPassword?: boolean;
-  onTogglePassword?: () => void;
+  icon?: React.ReactNode;
   isPassword?: boolean;
   required?: boolean;
   disabled?: boolean;
@@ -29,8 +27,6 @@ export const FormInput: React.FC<FormInputProps> = ({
   error,
   helperText,
   icon,
-  showPassword,
-  onTogglePassword,
   isPassword = false,
   required = false,
   disabled = false,
@@ -39,6 +35,7 @@ export const FormInput: React.FC<FormInputProps> = ({
   ...props
 }) => {
   const { isDark, accent } = useTheme();
+  const [showPassword, setShowPassword] = useState(false);
 
   const inputBg = isDark ? '#1e293b' : '#ffffff';
   const inputBorder = error ? '#ef4444' : isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
@@ -86,7 +83,7 @@ export const FormInput: React.FC<FormInputProps> = ({
         {/* Right Icon (password toggle or custom icon) */}
         {isPassword ? (
           <TouchableOpacity
-            onPress={onTogglePassword}
+            onPress={() => setShowPassword(!showPassword)}
             style={tw`absolute right-4 top-4`}
             disabled={disabled}
           >
@@ -97,12 +94,9 @@ export const FormInput: React.FC<FormInputProps> = ({
             />
           </TouchableOpacity>
         ) : icon ? (
-          <MaterialIcons
-            name={icon as any}
-            size={22}
-            color="#94a3b8"
-            style={tw`absolute right-4 top-4`}
-          />
+          <View style={tw`absolute right-4 top-4`}>
+            {icon}
+          </View>
         ) : null}
       </View>
 
@@ -113,7 +107,7 @@ export const FormInput: React.FC<FormInputProps> = ({
             <MaterialIcons name="error" size={14} color="#ef4444" />
           )}
           <Text style={[tw`text-xs font-medium`, { color: helperColor }]}>
-            {error || helperText}
+            {error ? (helperText || 'Error') : helperText}
           </Text>
         </View>
       )}
