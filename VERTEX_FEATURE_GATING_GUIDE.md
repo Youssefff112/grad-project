@@ -269,9 +269,9 @@ npx expo start
 # - Use quick-login on Sign In screen
 ```
 
-## Branding: Apex → Vertex
+## Branding: Vertex → Vertex
 
-The app has been rebranded from "Apex" to "Vertex":
+The app has been rebranded from "Vertex" to "Vertex":
 
 - ✅ Sign In screen shows "VERTEX"
 - ✅ Subscription plans reference "Welcome to Vertex!"

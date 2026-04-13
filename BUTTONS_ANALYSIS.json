@@ -1,6 +1,6 @@
 {
   "appMetadata": {
-    "appName": "Apex AI",
+    "appName": "Vertex",
     "appType": "React Native Fitness Coaching Platform",
     "analysisDate": "2026-03-23",
     "totalScreens": 15,
@@ -462,7 +462,7 @@
           "handler": "navigation.navigate('Chat', {...params})",
           "status": "working",
           "conversations": [
-            "Apex AI Coach (AI, 2 unread)",
+            "Vertex Coach (AI, 2 unread)",
             "Dr. Sarah Miller (1h ago, 0 unread)",
             "Training Group (3h ago, 5 unread)",
             "Nutrition AI (5h ago, 1 unread)"
@@ -528,7 +528,7 @@
           "id": "profile_subscription",
           "title": "Subscription",
           "type": "Menu_Item",
-          "handler": "Alert.alert('Subscription', 'You are on Apex AI Pro plan...')",
+          "handler": "Alert.alert('Subscription', 'You are on Vertex Pro plan...')",
           "status": "working"
         },
         {
@@ -547,7 +547,7 @@
         },
         {
           "id": "profile_about",
-          "title": "About Apex AI",
+          "title": "About Vertex",
           "type": "Menu_Item",
           "handler": "Alert.alert('About', 'Version 1.0.0...')",
           "status": "working"

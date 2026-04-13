@@ -99,7 +99,7 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
           icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
         <Text style={tw`text-center text-slate-500 text-xs mt-4 uppercase font-semibold`}>
-          By continuing, you agree to Apex AI Health Terms
+          By continuing, you agree to Vertex Health Terms
         </Text>
       </View>
     </SafeAreaView>

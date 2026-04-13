@@ -2,7 +2,7 @@
 
 ## ✅ What Was Done
 
-Successfully upgraded the **Apex** fitness app to **Vertex** with comprehensive **plan-based feature gating**. The app now supports 5 subscription plans (Free, Standard, Premium, ProCoach, Elite) with dynamic feature access control based on the user's plan.
+Successfully upgraded the **Vertex** fitness app to **Vertex** with comprehensive **plan-based feature gating**. The app now supports 5 subscription plans (Free, Standard, Premium, ProCoach, Elite) with dynamic feature access control based on the user's plan.
 
 ---
 

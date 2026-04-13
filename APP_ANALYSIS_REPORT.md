@@ -1,4 +1,4 @@
-# Apex AI - React Native App Analysis Report
+# Vertex - React Native App Analysis Report
 
 **Generated:** March 23, 2026  
 **App Type:** AI-Powered Fitness & Coaching Platform  
@@ -8,7 +8,7 @@
 
 ## EXECUTIVE SUMMARY
 
-The Apex AI app is a comprehensive fitness coaching platform with AI-powered form analysis, meal planning, and personalized training. The app follows a consistent design pattern with a bottom navigation bar for main sections and modular screen architecture. Most screens are **functionally complete** with proper navigation and button handlers, though a few screens have placeholder or incomplete features.
+The Vertex app is a comprehensive fitness coaching platform with AI-powered form analysis, meal planning, and personalized training. The app follows a consistent design pattern with a bottom navigation bar for main sections and modular screen architecture. Most screens are **functionally complete** with proper navigation and button handlers, though a few screens have placeholder or incomplete features.
 
 **Health Status:** ✅ ~85% Complete | 🟡 ~15% Incomplete/Placeholder Buttons
 
@@ -131,7 +131,7 @@ The Apex AI app is a comprehensive fitness coaching platform with AI-powered for
 
 #### Notes:
 
-- Requires agreement to "Apex AI Health Terms" before proceeding
+- Requires agreement to "Vertex Health Terms" before proceeding
 
 ---
 
@@ -404,7 +404,7 @@ The Apex AI app is a comprehensive fitness coaching platform with AI-powered for
 #### Content:
 
 - 4 Pre-configured conversations:
-  - Apex AI Coach (AI with unread)
+  - Vertex Coach (AI with unread)
   - Dr. Sarah Miller (medical)
   - Training Group (group conversation)
   - Nutrition AI (AI assistant)

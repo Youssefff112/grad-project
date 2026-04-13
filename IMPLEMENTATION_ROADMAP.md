@@ -1,4 +1,4 @@
-# Implementation Roadmap - Apex AI Missing Features
+# Implementation Roadmap - Vertex Missing Features
 
 **Generated:** March 23, 2026  
 **Priority Levels:** CRITICAL 🔴 | HIGH 🟠 | MEDIUM 🟡 | LOW 🔵
@@ -342,7 +342,7 @@ npx expo install expo-secure-store
 export const NewConversationModal = ({ navigation, visible, onClose }: any) => {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [availableUsers] = useState([
-    { id: '1', name: 'Apex AI Coach', isAI: true },
+    { id: '1', name: 'Vertex Coach', isAI: true },
     { id: '2', name: 'Dr. Sarah Miller', isAI: false },
     { id: '3', name: 'John Smith', isAI: false },
   ]);

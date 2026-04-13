@@ -66,7 +66,7 @@ export const ActiveSetScreen = ({ navigation }: any) => {
       <View style={tw`relative z-10 flex-row items-center p-4 justify-between bg-black/20`}>
         <View style={tw`flex-row items-center gap-2`}>
           <MaterialIcons name="videocam" size={24} color="#00f2ff" />
-          <Text style={tw`text-white text-lg font-bold leading-tight tracking-tight uppercase`}>Apex Vision</Text>
+          <Text style={tw`text-white text-lg font-bold leading-tight tracking-tight uppercase`}>Vertex Vision</Text>
         </View>
         <View style={tw`flex-row gap-4 items-center`}>
           <View style={tw`flex-row items-center gap-2 px-3 py-1 bg-red-600 rounded-full`}>

@@ -5,12 +5,14 @@
 ### Phase 1: Infrastructure & Authentication (COMPLETED)
 
 #### 1. Environment Configuration (`src/config/environment.ts`)
+
 - Loads backend URL from `EXPO_PUBLIC_BACKEND_URL` environment variable
 - Configurable API prefix (`EXPO_PUBLIC_API_PREFIX`)
 - Environment mode detection (`EXPO_PUBLIC_ENV`)
 - **Usage**: Centralized configuration for all API calls
 
 #### 2. Token Management (`src/utils/tokenManager.ts`)
+
 - **Functions**:
   - `saveTokens()` - Persist JWT tokens to AsyncStorage
   - `getAccessToken()` - Retrieve current access token
@@ -25,6 +27,7 @@
   - `token_expiry` - Token expiration timestamp
 
 #### 3. API Client (`src/services/api.ts`)
+
 - **Features**:
   - Axios instance with 30-second timeout
   - Automatic JWT injection in `Authorization: Bearer <token>` header
@@ -41,12 +44,13 @@
   - `apiDelete<T>(url, config)` - DELETE requests
   - `checkBackendHealth()` - Health check
 
-- **Error Handling**: 
+- **Error Handling**:
   - 401: Auto-refresh token, retry request
   - 403: Clear tokens, force logout
   - Network errors gracefully handled
 
 #### 4. Authentication Service (`src/services/auth.service.ts`)
+
 - **Functions**:
   - `login(email, password)` - Sign in user
   - `register(firstName, lastName, email, password, userType)` - Create account
@@ -74,17 +78,20 @@
 #### 5. Enhanced UserContext (`src/context/UserContext.tsx`)
 
 **New Fields**:
+
 - `authToken: string | null` - JWT access token
 - `refreshToken: string | null` - Refresh token
 - `userId: string | null` - User ID from backend
 - `isAuthenticated: boolean` - Authentication state
 
 **New Methods**:
+
 - `setAuthTokens(accessToken, refreshToken)` - Save tokens after login/register
 - `clearAuth()` - Clear tokens without clearing profile
 - `logout()` - Full logout (clear tokens + profile + cache)
 
 **Enhanced Initialization**:
+
 - Loads tokens from AsyncStorage on app startup
 - Validates token expiration
 - Auto-clears expired tokens
@@ -93,6 +100,7 @@
 ### Phase 3: Authentication Screens (COMPLETED)
 
 #### 6. SignInScreen Updates (`src/screens/SignInScreen.tsx`)
+
 - **Backend Integration**:
   - Calls `POST /api/v1/auth/login` instead of local validation
   - Receives JWT tokens and stores them securely
@@ -112,6 +120,7 @@
   - Server error (5xx) → "Please try again later"
 
 #### 7. AccountCreationScreen Updates (`src/screens/AccountCreationScreen.tsx`)
+
 - **Password Validation Bug Fixed** ✅:
   - Now validates `password === confirmPassword`
   - Prevents account creation with mismatched passwords
@@ -127,6 +136,7 @@
 ### Phase 4: Environment Variables (COMPLETED)
 
 #### 8. `.env` File
+
 ```
 EXPO_PUBLIC_BACKEND_URL=http://localhost:5000
 EXPO_PUBLIC_API_PREFIX=/api/v1
@@ -134,6 +144,7 @@ EXPO_PUBLIC_ENV=development
 ```
 
 **Update for Deployment**:
+
 - Development: `http://localhost:5000`
 - Staging: Update to staging backend URL
 - Production: Update to production backend URL
@@ -143,6 +154,7 @@ EXPO_PUBLIC_ENV=development
 ## 🔄 Authentication Flow (New)
 
 ### Sign Up Flow
+
 ```
 AccountCreationScreen
   ↓ [User enters name, email, password]
@@ -166,6 +178,7 @@ Navigation → Onboarding flow
 ```
 
 ### Sign In Flow
+
 ```
 SignInScreen
   ↓ [User enters email, password]
@@ -184,6 +197,7 @@ Navigation → TraineeCommandCenter
 ```
 
 ### Token Refresh Flow
+
 ```
 [API call with expired token]
   ↓
@@ -206,12 +220,14 @@ Request completes successfully
 ## 📊 File Changes Summary
 
 ### New Files Created (4)
+
 1. `src/config/environment.ts` - Environment configuration
 2. `src/utils/tokenManager.ts` - JWT token management
 3. `src/services/api.ts` - Axios HTTP client
 4. `src/services/auth.service.ts` - Authentication API service
 
 ### Files Modified (5)
+
 1. `src/context/UserContext.tsx` - Added auth fields + methods
 2. `src/screens/SignInScreen.tsx` - Integrated backend login
 3. `src/screens/AccountCreationScreen.tsx` - Added validation + loading
@@ -219,6 +235,7 @@ Request completes successfully
 5. `.env` - Added backend configuration
 
 ### Files Unchanged (Reusable)
+
 - `src/utils/planUtils.ts` - Feature gating logic (still works)
 - `src/components/FeatureLocked.tsx` - UI component (unchanged)
 - `src/data/mockUsers.ts` - Available for fallback/demo
@@ -229,28 +246,34 @@ Request completes successfully
 ## 🚀 How to Use
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Update Backend URL (if needed)
+
 Edit `.env`:
+
 ```
 EXPO_PUBLIC_BACKEND_URL=http://your-backend-url:5000
 ```
 
 ### 3. Start Backend Service
+
 ```bash
 cd backend
 npm run dev
 ```
 
 ### 4. Start App
+
 ```bash
 npm start
 ```
 
 ### 5. Test Authentication
+
 - **Sign Up**: Create new account
 - **Sign In**: Login with created credentials
 - **Token Refresh**: App automatically handles token refresh
@@ -261,12 +284,14 @@ npm start
 ## 🔐 Security Features
 
 ### Token Storage
+
 - ✅ Tokens stored in AsyncStorage (platform-appropriate secure storage)
 - ✅ Auto-expiration checking
 - ✅ Token refresh on expiration (transparent to user)
 - ✅ Tokens cleared on logout
 
 ### API Security
+
 - ✅ JWT authentication on all protected endpoints
 - ✅ Automatic Authorization header injection
 - ✅ HTTPS ready (configure at backend)
@@ -274,6 +299,7 @@ npm start
 - ✅ CORS enabled in backend
 
 ### Error Handling
+
 - ✅ No credentials logged to console
 - ✅ User-friendly error messages
 - ✅ Failed requests queued during token refresh
@@ -284,6 +310,7 @@ npm start
 ## ⚠️ Current Limitations & Next Steps
 
 ### Phase 1 Limitations (By Design)
+
 - ✅ Implemented: Core auth flow (login, register, token refresh, logout)
 - ⏳ Not Yet: User profile sync (partially ready)
 - ⏳ Not Yet: Subscription plan from backend
@@ -291,11 +318,13 @@ npm start
 - ⏳ Not Yet: CI/CD verification of backend integration
 
 ### What Still Uses Local Data
+
 - `subscriptionPlan` → Currently hardcoded to 'Free', should fetch from backend
 - `userMode`, `dietPreferences` → Not synced with backend yet
 - Profile fields → Being sent but not relied upon for feature gating
 
 ### Recommended Next Steps
+
 1. **Phase 3 - Data Sync**:
    - Fetch user profile on app startup
    - Update subscription plan from backend
@@ -335,17 +364,20 @@ npm start
 All these endpoints are already implemented in the backend:
 
 ✅ **Auth**
+
 - `POST /api/v1/auth/register` - Create account
 - `POST /api/v1/auth/login` - Sign in
 - `POST /api/v1/auth/refresh-token` - Refresh JWT
 - `POST /api/v1/auth/logout` - Logout
 
 ✅ **Users**
+
 - `GET /api/v1/users/profile` - Fetch profile
 - `PATCH /api/v1/users/profile` - Update profile
 - `POST /api/v1/users/onboarding` - Complete onboarding
 
 ✅ **Subscriptions**
+
 - `GET /api/v1/subscriptions/active` - Get active subscription
 
 ---
@@ -381,21 +413,23 @@ FitCore Backend API
 ## 📚 Code Examples
 
 ### Sign In with Backend
+
 ```typescript
-import * as authService from '../services/auth.service';
+import * as authService from "../services/auth.service";
 
 const response = await authService.login({ email, password });
 if (response.success) {
   await setAuthTokens(response.data.token, response.data.refreshToken);
   setFullName(response.data.user.firstName);
-  navigation.navigate('TraineeCommandCenter');
+  navigation.navigate("TraineeCommandCenter");
 }
 ```
 
 ### Automatic Token Refresh
+
 ```typescript
 // No action needed! Happens automatically
-const data = await apiGet('/api/v1/users/profile');
+const data = await apiGet("/api/v1/users/profile");
 // If token expired:
 //   1. API interceptor catches 401
 //   2. Calls refresh-token endpoint
@@ -405,6 +439,7 @@ const data = await apiGet('/api/v1/users/profile');
 ```
 
 ### Logout
+
 ```typescript
 const { logout } = useUser();
 await logout();
@@ -416,6 +451,7 @@ await logout();
 ## ✨ Key Improvements Made
 
 ### Before
+
 - ❌ No backend connection
 - ❌ All data local-only
 - ❌ No user accounts
@@ -423,6 +459,7 @@ await logout();
 - ❌ Mock users only
 
 ### After
+
 - ✅ Full backend integration
 - ✅ Real user accounts (server-side)
 - ✅ JWT authentication
