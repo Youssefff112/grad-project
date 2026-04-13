@@ -13,10 +13,11 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
+import { validateMockUser, MOCK_USERS } from '../data/mockUsers';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail } = useUser();
+  const { setFullName, setEmail: saveEmail, setSubscriptionPlan } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -43,10 +44,21 @@ export const SignInScreen = ({ navigation }: any) => {
       return;
     }
 
-    // Extract name from email for demo purposes
+    // Try to validate against mock users first
+    const mockUser = validateMockUser(email, password);
+    if (mockUser) {
+      setFullName(mockUser.fullName);
+      saveEmail(mockUser.email);
+      setSubscriptionPlan(mockUser.subscriptionPlan);
+      navigation.navigate('TraineeCommandCenter');
+      return;
+    }
+
+    // Fallback: Extract name from email for regular login
     const nameFromEmail = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1);
     setFullName(nameFromEmail);
     saveEmail(email);
+    setSubscriptionPlan('Free'); // Default to Free plan for new users
 
     // Navigate to main app
     navigation.navigate('TraineeCommandCenter');
@@ -76,6 +88,44 @@ export const SignInScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`flex-col gap-5`}>
+          {/* Quick Mock User Login Section */}
+          <View>
+            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-3`, { color: labelColor }]}>
+              Demo: Quick Login
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
+              <View style={tw`flex-row gap-2`}>
+                {MOCK_USERS.map((user) => (
+                  <TouchableOpacity
+                    key={user.id}
+                    onPress={() => {
+                      setEmail(user.email);
+                      setPassword(user.password);
+                      // Auto-login
+                      setTimeout(() => {
+                        setFullName(user.fullName);
+                        saveEmail(user.email);
+                        setSubscriptionPlan(user.subscriptionPlan);
+                        navigation.navigate('TraineeCommandCenter');
+                      }, 100);
+                    }}
+                    style={[tw`px-4 py-2 rounded-lg border`, {
+                      backgroundColor: accent + '0a',
+                      borderColor: accent + '40'
+                    }]}
+                  >
+                    <View style={tw`flex-row items-center gap-1`}>
+                      <MaterialIcons name="person" size={14} color={accent} />
+                      <View>
+                        <Text style={[tw`text-xs font-bold`, { color: accent }]}>{user.subscriptionPlan}</Text>
+                        <Text style={[tw`text-xs`, { color: '#94a3b8' }]} numberOfLines={1}>{user.fullName.split(' ')[0]}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
           {/* Email */}
           <View>
             <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>

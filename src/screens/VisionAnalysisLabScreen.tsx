@@ -3,11 +3,29 @@ import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'r
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { useUser } from '../context/UserContext';
+import { hasFeatureAccess } from '../utils/planUtils';
+import { FeatureLocked } from '../components/FeatureLocked';
 import { BottomNav } from '../components/BottomNav';
 
 export const VisionAnalysisLabScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const { subscriptionPlan } = useUser();
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
+
+  // Check if user has access to computer vision
+  if (!hasFeatureAccess(subscriptionPlan, 'hasComputerVision')) {
+    return (
+      <FeatureLocked
+        featureName="Computer Vision"
+        featureIcon="videocam"
+        description="AI-powered form tracking and exercise analysis"
+        upgradePlans={['Premium', 'ProCoach', 'Elite']}
+        onUpgradePress={() => navigation.navigate('SubscriptionPlans')}
+        onBackPress={() => navigation.goBack()}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>

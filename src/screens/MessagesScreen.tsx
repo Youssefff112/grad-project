@@ -3,6 +3,8 @@ import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert, TextInpu
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { useUser } from '../context/UserContext';
+import { hasFeatureAccess } from '../utils/planUtils';
 import { BottomNav } from '../components/BottomNav';
 
 const CONVERSATIONS = [
@@ -14,6 +16,7 @@ const CONVERSATIONS = [
 
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const { subscriptionPlan } = useUser();
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
 
@@ -124,127 +127,162 @@ export const MessagesScreen = ({ navigation }: any) => {
             </Text>
           </View>
         ) : (
-          filteredConversations.map((convo, index) => (
-            <TouchableOpacity
-              key={convo.id}
-              onPress={() => navigation.navigate('Chat', { chatName: convo.name, isAI: convo.isAI })}
-              onLongPress={() =>
-                Alert.alert('Message Options', '', [
-                  { text: 'Mute Notifications', onPress: () => Alert.alert('Muted', `Notifications muted for ${convo.name}`) },
-                  { text: 'Archive', onPress: () => Alert.alert('Archived', `${convo.name} archived`) },
-                  { text: 'Pin Conversation', onPress: () => Alert.alert('Pinned', `${convo.name} pinned to top`) },
-                  { text: 'Delete', style: 'destructive', onPress: () => Alert.alert('Deleted', `${convo.name} conversation deleted`) },
-                  { text: 'Cancel', style: 'cancel' },
-                ])
-              }
-              delayLongPress={400}
-              style={[
-                tw`flex-row items-center gap-3 px-4 py-3.5`,
-                {
-                  backgroundColor:
-                    convo.unread > 0 ? (isDark ? '#1a1a2e' : accent + '08') : 'transparent',
-                  borderBottomWidth: 1,
-                  borderColor:
-                    index < filteredConversations.length - 1
-                      ? isDark
-                        ? 'rgba(255,255,255,0.04)'
-                        : 'rgba(0,0,0,0.03)'
-                      : 'transparent',
-                },
-              ]}
-            >
-              {/* Avatar */}
-              <View
+          filteredConversations.map((convo, index) => {
+            // Determine if this conversation is locked
+            const isAILocked = convo.isAI && convo.name.includes('Vertex Coach') && !hasFeatureAccess(subscriptionPlan, 'hasAIChat');
+            const isCoachLocked = convo.isAI && convo.name.includes('Dr.') && !hasFeatureAccess(subscriptionPlan, 'hasCoachChat');
+
+            return (
+              <TouchableOpacity
+                key={convo.id}
+                onPress={() => {
+                  if (isAILocked) {
+                    Alert.alert(
+                      'Feature Locked',
+                      'AI Chat is only available on Premium and Elite plans. Upgrade now to access AI coaching.',
+                      [
+                        { text: 'Cancel', onPress: () => {} },
+                        { text: 'Upgrade', onPress: () => navigation.navigate('SubscriptionPlans') },
+                      ]
+                    );
+                  } else if (isCoachLocked) {
+                    Alert.alert(
+                      'Feature Locked',
+                      'Coach Chat is only available on Pro Coach and Elite plans. Upgrade now to connect with your dedicated coach.',
+                      [
+                        { text: 'Cancel', onPress: () => {} },
+                        { text: 'Upgrade', onPress: () => navigation.navigate('SubscriptionPlans') },
+                      ]
+                    );
+                  } else {
+                    navigation.navigate('Chat', { chatName: convo.name, isAI: convo.isAI });
+                  }
+                }}
+                onLongPress={() =>
+                  !isAILocked && !isCoachLocked &&
+                  Alert.alert('Message Options', '', [
+                    { text: 'Mute Notifications', onPress: () => Alert.alert('Muted', `Notifications muted for ${convo.name}`) },
+                    { text: 'Archive', onPress: () => Alert.alert('Archived', `${convo.name} archived`) },
+                    { text: 'Pin Conversation', onPress: () => Alert.alert('Pinned', `${convo.name} pinned to top`) },
+                    { text: 'Delete', style: 'destructive', onPress: () => Alert.alert('Deleted', `${convo.name} conversation deleted`) },
+                    { text: 'Cancel', style: 'cancel' },
+                  ])
+                }
+                delayLongPress={400}
                 style={[
-                  tw`relative h-12 w-12 rounded-full items-center justify-center flex-shrink-0`,
+                  tw`flex-row items-center gap-3 px-4 py-3.5`,
                   {
-                    backgroundColor: convo.isAI ? accent + '20' : isDark ? '#1e293b' : '#f1f5f9',
-                    borderWidth: convo.isAI ? 1 : 0,
-                    borderColor: accent + '40',
+                    backgroundColor:
+                      convo.unread > 0 ? (isDark ? '#1a1a2e' : accent + '08') : 'transparent',
+                    borderBottomWidth: 1,
+                    borderColor:
+                      index < filteredConversations.length - 1
+                        ? isDark
+                          ? 'rgba(255,255,255,0.04)'
+                          : 'rgba(0,0,0,0.03)'
+                        : 'transparent',
+                    opacity: isAILocked || isCoachLocked ? 0.6 : 1,
                   },
                 ]}
               >
-                <MaterialIcons
-                  name={convo.avatar as any}
-                  size={24}
-                  color={convo.isAI ? accent : isDark ? '#94a3b8' : '#64748b'}
-                />
-                {convo.unread > 0 && (
-                  <View
-                    style={[
-                      tw`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2`,
-                      { backgroundColor: accent, borderColor: isDark ? '#0a0a12' : '#f8f7f5' },
-                    ]}
+                {/* Avatar */}
+                <View
+                  style={[
+                    tw`relative h-12 w-12 rounded-full items-center justify-center flex-shrink-0`,
+                    {
+                      backgroundColor: convo.isAI ? accent + '20' : isDark ? '#1e293b' : '#f1f5f9',
+                      borderWidth: convo.isAI ? 1 : 0,
+                      borderColor: accent + '40',
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={convo.avatar as any}
+                    size={24}
+                    color={convo.isAI ? accent : isDark ? '#94a3b8' : '#64748b'}
                   />
-                )}
-              </View>
+                  {(isAILocked || isCoachLocked) && (
+                    <View style={[tw`absolute inset-0 rounded-full items-center justify-center`, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                      <MaterialIcons name="lock" size={16} color="white" />
+                    </View>
+                  )}
+                  {convo.unread > 0 && !isAILocked && !isCoachLocked && (
+                    <View
+                      style={[
+                        tw`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2`,
+                        { backgroundColor: accent, borderColor: isDark ? '#0a0a12' : '#f8f7f5' },
+                      ]}
+                    />
+                  )}
+                </View>
 
-              {/* Content */}
-              <View style={tw`flex-1 min-w-0`}>
-                <View style={tw`flex-row items-center justify-between mb-1.5`}>
-                  <View style={tw`flex-row items-center gap-2 flex-1`}>
+                {/* Content */}
+                <View style={tw`flex-1 min-w-0`}>
+                  <View style={tw`flex-row items-center justify-between mb-1.5`}>
+                    <View style={tw`flex-row items-center gap-2 flex-1`}>
+                      <Text
+                        style={[
+                          tw`font-bold flex-1`,
+                          {
+                            color: convo.unread > 0 ? (isDark ? '#f1f5f9' : '#1e293b') : isDark ? '#cbd5e1' : '#475569',
+                            fontSize: convo.unread > 0 ? 15 : 14,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {convo.name}
+                      </Text>
+                      {convo.isAI && (
+                        <View style={[tw`px-1.5 py-0.5 rounded`, { backgroundColor: accent + '20' }]}>
+                          <Text style={[tw`text-[9px] font-bold uppercase`, { color: accent }]}>
+                            {isAILocked || isCoachLocked ? 'Locked' : 'AI'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <Text
                       style={[
-                        tw`font-bold flex-1`,
+                        tw`text-xs`,
+                        { color: convo.unread > 0 ? accent : '#94a3b8' },
+                      ]}
+                    >
+                      {convo.time}
+                    </Text>
+                  </View>
+
+                  {/* Message Preview */}
+                  <View style={tw`flex-row items-center justify-between gap-2`}>
+                    <Text
+                      style={[
+                        tw`text-sm flex-1`,
                         {
-                          color: convo.unread > 0 ? (isDark ? '#f1f5f9' : '#1e293b') : isDark ? '#cbd5e1' : '#475569',
-                          fontSize: convo.unread > 0 ? 15 : 14,
+                          color: convo.unread > 0 ? (isDark ? '#cbd5e1' : '#475569') : '#94a3b8',
+                          fontWeight: convo.unread > 0 ? '600' : '400',
                         },
                       ]}
                       numberOfLines={1}
                     >
-                      {convo.name}
+                      {isAILocked || isCoachLocked ? '🔒 Upgrade to unlock' : convo.lastMessage}
                     </Text>
-                    {convo.isAI && (
-                      <View style={[tw`px-1.5 py-0.5 rounded`, { backgroundColor: accent + '20' }]}>
-                        <Text style={[tw`text-[9px] font-bold uppercase`, { color: accent }]}>
-                          AI
+
+                    {/* Unread Badge */}
+                    {convo.unread > 0 && !isAILocked && !isCoachLocked && (
+                      <View
+                        style={[
+                          tw`min-w-[20px] h-5 rounded-full items-center justify-center px-1.5 flex-shrink-0`,
+                          { backgroundColor: accent },
+                        ]}
+                      >
+                        <Text style={tw`text-white text-[10px] font-bold`}>
+                          {convo.unread > 99 ? '99+' : convo.unread}
                         </Text>
                       </View>
                     )}
                   </View>
-                  <Text
-                    style={[
-                      tw`text-xs`,
-                      { color: convo.unread > 0 ? accent : '#94a3b8' },
-                    ]}
-                  >
-                    {convo.time}
-                  </Text>
                 </View>
-
-                {/* Message Preview */}
-                <View style={tw`flex-row items-center justify-between gap-2`}>
-                  <Text
-                    style={[
-                      tw`text-sm flex-1`,
-                      {
-                        color: convo.unread > 0 ? (isDark ? '#cbd5e1' : '#475569') : '#94a3b8',
-                        fontWeight: convo.unread > 0 ? '600' : '400',
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {convo.lastMessage}
-                  </Text>
-
-                  {/* Unread Badge */}
-                  {convo.unread > 0 && (
-                    <View
-                      style={[
-                        tw`min-w-[20px] h-5 rounded-full items-center justify-center px-1.5 flex-shrink-0`,
-                        { backgroundColor: accent },
-                      ]}
-                    >
-                      <Text style={tw`text-white text-[10px] font-bold`}>
-                        {convo.unread > 99 ? '99+' : convo.unread}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
 

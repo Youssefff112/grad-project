@@ -13,6 +13,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { hasFeatureAccess } from '../utils/planUtils';
+import { FeatureLocked } from '../components/FeatureLocked';
 import { Button } from '../components/Button';
 
 interface MealItem {
@@ -41,7 +43,22 @@ interface GeneratedMealPlan {
 
 export const MealGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { userMode, canUseAIAssistant, coachId, coachName, dietPreferences } = useUser();
+  const { userMode, subscriptionPlan, coachId, coachName, dietPreferences } = useUser();
+
+  // Check if user has access to AI meal generation
+  if (!hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
+    return (
+      <FeatureLocked
+        featureName="AI Meal Planning"
+        featureIcon="restaurant"
+        description="Generate personalized meal plans powered by AI"
+        upgradePlans={['Premium', 'Elite']}
+        onUpgradePress={() => navigation.navigate('SubscriptionPlans')}
+        onBackPress={() => navigation.goBack()}
+      />
+    );
+  }
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMeal, setGeneratedMeal] = useState<GeneratedMealPlan | null>(null);
   const [showPreview, setShowPreview] = useState(false);

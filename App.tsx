@@ -8,6 +8,7 @@ import { SignInScreen } from './src/screens/SignInScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { CodeVerificationScreen } from './src/screens/CodeVerificationScreen';
 import { AccountCreationScreen } from './src/screens/AccountCreationScreen';
+import { SubscriptionSelectionScreen } from './src/screens/SubscriptionSelectionScreen';
 import { OnboardingPreferencesScreen } from './src/screens/OnboardingPreferencesScreen';
 import { BiometricsScreen } from './src/screens/BiometricsScreen';
 import { SafeGuardIntakeScreen } from './src/screens/SafeGuardIntakeScreen';
@@ -59,6 +60,7 @@ function AppNavigator() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
       <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
+      <Stack.Screen name="SubscriptionSelection" component={SubscriptionSelectionScreen} />
       <Stack.Screen name="OnboardingPreferences" component={OnboardingPreferencesScreen} />
       <Stack.Screen name="Biometrics" component={BiometricsScreen} />
       <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />

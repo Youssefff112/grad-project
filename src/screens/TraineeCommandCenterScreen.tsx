@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { hasFeatureAccess } from '../utils/planUtils';
 import { BottomNav } from '../components/BottomNav';
 import { Button } from '../components/Button';
 
@@ -222,7 +223,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         </View>
 
         {/* AI/Workout & Meal Generation Section */}
-        {(canUseAIAssistant || subscriptionPlan !== 'Free') && (
+        {(hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration') || hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) && (
           <View style={tw`px-4 mt-8`}>
             <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
               Generate Plans
@@ -253,7 +254,6 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
           </View>
         )}
 

@@ -13,6 +13,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { hasFeatureAccess } from '../utils/planUtils';
+import { FeatureLocked } from '../components/FeatureLocked';
 import { Button } from '../components/Button';
 
 interface GeneratedWorkout {
@@ -34,7 +36,22 @@ interface GeneratedWorkout {
 
 export const WorkoutGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { userMode, canUseAIAssistant, coachId, coachName, experienceLevel } = useUser();
+  const { userMode, subscriptionPlan, coachId, coachName, experienceLevel } = useUser();
+
+  // Check if user has access to AI workout generation
+  if (!hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration')) {
+    return (
+      <FeatureLocked
+        featureName="AI Workout Generation"
+        featureIcon="lightbulb"
+        description="Generate personalized workout plans powered by AI"
+        upgradePlans={['Premium', 'Elite']}
+        onUpgradePress={() => navigation.navigate('SubscriptionPlans')}
+        onBackPress={() => navigation.goBack()}
+      />
+    );
+  }
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [showPreview, setShowPreview] = useState(false);
