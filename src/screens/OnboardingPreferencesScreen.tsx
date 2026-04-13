@@ -5,6 +5,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
+import { Card } from '../components/Card';
 import { ProgressBar } from '../components/ProgressBar';
 import type { ExperienceLevel, DietPreference } from '../context/UserContext';
 
@@ -188,12 +189,14 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
         </View>
 
         {/* Info Banner */}
-        <View style={[tw`rounded-xl p-4 flex-row gap-3`, { backgroundColor: accent + '0D', borderColor: accent + '1A', borderWidth: 1 }]}>
-          <MaterialIcons name="info" size={20} color={accent} />
-          <Text style={[tw`flex-1 text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-            These preferences help us generate better workout and meal plans tailored to your specific needs and goals.
-          </Text>
-        </View>
+        <Card variant="filled" padding="md">
+          <View style={tw`flex-row gap-3`}>
+            <MaterialIcons name="info" size={20} color={accent} />
+            <Text style={[tw`flex-1 text-sm leading-5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+              These preferences help us generate better workout and meal plans tailored to your specific needs and goals.
+            </Text>
+          </View>
+        </Card>
       </ScrollView>
 
       <View
