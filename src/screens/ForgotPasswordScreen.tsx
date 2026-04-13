@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
@@ -12,31 +11,37 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/Button';
+import { FormInput } from '../components/FormInput';
+import { Card } from '../components/Card';
 
 export const ForgotPasswordScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const inputBg = isDark ? '#1e293b' : '#ffffff';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
-  const inputText = isDark ? '#ffffff' : '#1e293b';
-  const labelColor = isDark ? '#e2e8f0' : '#1e293b';
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
-  const handleSendCode = () => {
+  const validateEmail = (): string => {
     if (!email.trim()) {
-      Alert.alert('Validation', 'Please enter your email address');
-      return;
+      return 'Please enter your email address';
     }
-
     if (!email.includes('@')) {
-      Alert.alert('Validation', 'Please enter a valid email address');
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const handleSendCode = () => {
+    const validationError = validateEmail();
+    if (validationError) {
+      setError(validationError);
+      Alert.alert('Validation Error', validationError);
       return;
     }
 
     setIsLoading(true);
-    
+
     // Simulate API call
     setTimeout(() => {
       setIsLoading(false);
@@ -74,43 +79,38 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
             <MaterialIcons name="mail-outline" size={64} color={accent} />
           </View>
 
-          {/* Email Input */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Email Address
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="you@email.com"
-                placeholderTextColor="#94a3b8"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!isLoading}
-              />
-              <MaterialIcons name="email" size={22} color="#94a3b8" style={tw`absolute right-4 top-4`} />
-            </View>
-            <Text style={[tw`text-xs mt-2`, { color: subtextColor }]}>
-              We'll send a verification code to this email address.
-            </Text>
-          </View>
+          <FormInput
+            label="Email Address"
+            placeholder="you@email.com"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) setError('');
+            }}
+            error={!!error}
+            helperText={error || 'We\'ll send a verification code to this email address.'}
+            icon={<MaterialIcons name="email" size={20} color={accent} />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            editable={!isLoading}
+          />
 
           {/* Info Box */}
-          <View style={[tw`rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
-            <MaterialIcons name="info" size={18} color={accent} style={tw`mt-0.5`} />
-            <Text style={[tw`text-sm flex-1`, { color: subtextColor }]}>
-              Check your email (including spam folder) for the verification code.
-            </Text>
-          </View>
+          <Card variant="filled" padding="md">
+            <View style={tw`flex-row gap-3`}>
+              <MaterialIcons name="info" size={18} color={accent} style={tw`mt-0.5`} />
+              <Text style={[tw`text-sm flex-1 leading-5`, { color: subtextColor }]}>
+                Check your email (including spam folder) for the verification code.
+              </Text>
+            </View>
+          </Card>
         </View>
       </ScrollView>
 
       <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
         <Button
-          title={isLoading ? "Sending Code..." : "Send Verification Code"}
+          title={isLoading ? 'Sending Code...' : 'Send Verification Code'}
           size="lg"
           onPress={handleSendCode}
           disabled={isLoading}
