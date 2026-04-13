@@ -93,7 +93,7 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
-            editable={!isLoading}
+            disabled={isLoading}
           />
 
           {/* Info Box */}
