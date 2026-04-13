@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { UserProvider, useUser } from './src/context/UserContext';
+import { LoadingProvider } from './src/context/LoadingContext';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
@@ -90,12 +92,16 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <UserProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </UserProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <UserProvider>
+          <LoadingProvider>
+            <NavigationContainer>
+              <AppNavigator />
+            </NavigationContainer>
+          </LoadingProvider>
+        </UserProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

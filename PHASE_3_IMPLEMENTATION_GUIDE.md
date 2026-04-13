@@ -1,6 +1,7 @@
 # Phase 3 Implementation Guide - Testing, Polish & Documentation
 
 ## Overview
+
 Phase 3 focuses on making the app production-ready through comprehensive testing, documentation, and final polish. Estimated effort: 2-3 weeks with focused development.
 
 ---
@@ -15,23 +16,25 @@ npx jest --init
 ```
 
 **Create `backend/jest.config.js`**:
+
 ```javascript
 module.exports = {
-  testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.js', '**/?(*.)+(spec|test).js'],
-  collectCoverageFrom: ['SRC/**/*.js', '!SRC/Utils/**'],
+  testEnvironment: "node",
+  testMatch: ["**/__tests__/**/*.test.js", "**/?(*.)+(spec|test).js"],
+  collectCoverageFrom: ["SRC/**/*.js", "!SRC/Utils/**"],
   coverageThreshold: {
     global: {
       branches: 70,
       functions: 70,
       lines: 70,
-      statements: 70
-    }
-  }
+      statements: 70,
+    },
+  },
 };
 ```
 
 **Update `backend/package.json`**:
+
 ```json
 {
   "scripts": {
@@ -45,6 +48,7 @@ module.exports = {
 ### 1.2 Write Critical Tests
 
 **Test Priority Order**:
+
 1. ✅ Auth module (register, login, refresh, logout)
 2. ✅ Authorization (role-based access)
 3. ✅ Input validation (Joi schemas)
@@ -52,55 +56,56 @@ module.exports = {
 5. ✅ Subscriptions (revenue-critical)
 
 **Example: Auth Tests** (`backend/SRC/Modules/Auth/__tests__/auth.service.test.js`):
+
 ```javascript
-describe('Auth Service', () => {
-  describe('Register', () => {
-    it('should create user with valid data', async () => {
+describe("Auth Service", () => {
+  describe("Register", () => {
+    it("should create user with valid data", async () => {
       const userData = {
-        firstName: 'Test',
-        lastName: 'User',
-        email: 'test@example.com',
-        password: 'Password123!',
-        userType: 'onsite',
-        role: 'client'
+        firstName: "Test",
+        lastName: "User",
+        email: "test@example.com",
+        password: "Password123!",
+        userType: "onsite",
+        role: "client",
       };
-      
+
       const result = await authService.register(userData);
-      
-      expect(result).toHaveProperty('token');
-      expect(result).toHaveProperty('refreshToken');
+
+      expect(result).toHaveProperty("token");
+      expect(result).toHaveProperty("refreshToken");
       expect(result.user.email).toBe(userData.email);
     });
 
-    it('should fail with duplicate email', async () => {
+    it("should fail with duplicate email", async () => {
       // Test duplicate prevention
     });
 
-    it('should hash password before storing', async () => {
+    it("should hash password before storing", async () => {
       // Verify bcrypt hashing
     });
   });
 
-  describe('Login', () => {
-    it('should return token on valid credentials', async () => {
+  describe("Login", () => {
+    it("should return token on valid credentials", async () => {
       // Valid login test
     });
 
-    it('should fail with wrong password', async () => {
+    it("should fail with wrong password", async () => {
       // Invalid password test
     });
 
-    it('should rate-limit after 5 attempts', async () => {
+    it("should rate-limit after 5 attempts", async () => {
       // Rate limiting test
     });
   });
 
-  describe('Token Refresh', () => {
-    it('should issue new token on valid refresh token', async () => {
+  describe("Token Refresh", () => {
+    it("should issue new token on valid refresh token", async () => {
       // Refresh token test
     });
 
-    it('should reject expired refresh tokens', async () => {
+    it("should reject expired refresh tokens", async () => {
       // Expiration test
     });
   });
@@ -110,43 +115,37 @@ describe('Auth Service', () => {
 ### 1.3 Add Missing Input Validations
 
 **Create `backend/SRC/Modules/Diet/diet.validation.js`**:
+
 ```javascript
-const Joi = require('joi');
+const Joi = require("joi");
 
 const generateDietPlanSchema = Joi.object({
-  dietaryPreferences: Joi.array()
-    .items(Joi.string())
-    .required(),
-  calorieGoal: Joi.number()
-    .min(800)
-    .max(5000)
-    .optional(),
-  allergies: Joi.array()
-    .items(Joi.string())
-    .optional(),
-  mealsPerDay: Joi.number()
-    .min(1)
-    .max(6)
-    .required()
+  dietaryPreferences: Joi.array().items(Joi.string()).required(),
+  calorieGoal: Joi.number().min(800).max(5000).optional(),
+  allergies: Joi.array().items(Joi.string()).optional(),
+  mealsPerDay: Joi.number().min(1).max(6).required(),
 });
 
 module.exports = {
-  generateDietPlanSchema
+  generateDietPlanSchema,
 };
 ```
 
 Add to diet routes:
+
 ```javascript
-router.post('/generate', 
-  authenticate, 
-  validate(generateDietPlanSchema), 
-  dietController.generatePlan
+router.post(
+  "/generate",
+  authenticate,
+  validate(generateDietPlanSchema),
+  dietController.generatePlan,
 );
 ```
 
 **Repeat for**:
+
 - Workout endpoints
-- Vision endpoints  
+- Vision endpoints
 - Chatbot endpoints
 - Progress endpoints
 
@@ -165,6 +164,7 @@ router.post('/generate',
 ### 2.1 Implement Error Boundary
 
 **Create `src/components/ErrorBoundary.tsx`**:
+
 ```typescript
 import React from 'react';
 import { View, Text } from 'react-native';
@@ -212,6 +212,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 ```
 
 **Wrap App in ErrorBoundary** (`App.tsx`):
+
 ```typescript
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -233,6 +234,7 @@ export default function App() {
 ### 2.2 Add Global Loading Context
 
 **Create `src/context/LoadingContext.tsx`**:
+
 ```typescript
 import React, { createContext, useState } from 'react';
 
@@ -268,12 +270,13 @@ export const useLoading = () => React.useContext(LoadingContext);
 
 ### 3.1 Create Comprehensive README
 
-```markdown
+````markdown
 # Vertex - AI-Powered Fitness App
 
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ and npm
 - Expo CLI globally installed
 - React Native debugging tools
@@ -289,14 +292,14 @@ export const useLoading = () => React.useContext(LoadingContext);
    \`\`\`
 
 2. **Environment Setup**
-   
+
    Create `.env` in root:
    \`\`\`
    EXPO_PUBLIC_BACKEND_URL=http://localhost:5000
    EXPO_PUBLIC_API_PREFIX=/api/v1
    EXPO_PUBLIC_ENV=development
    \`\`\`
-   
+
    Create `backend/.env`:
    \`\`\`
    PORT=5000
@@ -311,12 +314,14 @@ export const useLoading = () => React.useContext(LoadingContext);
    npx sequelize-cli db:create
    npx sequelize-cli db:migrate
    ```
+````
 
 4. **Start Services**
+
    ```bash
    # Terminal 1: Backend
    cd backend && npm run dev
-   
+
    # Terminal 2: Frontend
    npm start
    ```
@@ -324,12 +329,14 @@ export const useLoading = () => React.useContext(LoadingContext);
 ## Architecture
 
 ### Frontend (React Native/Expo)
+
 - **Navigation**: React Navigation Stack
 - **State**: UserContext + ThemeContext
 - **Styling**: Tailwind CSS + twrnc
 - **Components**: Modular, reusable component library
 
 ### Backend (Express.js)
+
 - **Database**: PostgreSQL with Sequelize ORM
 - **Authentication**: JWT with refresh tokens
 - **API**: RESTful with 13+ modules
@@ -337,6 +344,7 @@ export const useLoading = () => React.useContext(LoadingContext);
 ## Feature Gating
 
 Vertex uses plan-based feature access:
+
 - **Free**: Basic tracking
 - **Standard**: Enhanced metrics
 - **Premium**: AI features + Computer Vision
@@ -363,12 +371,14 @@ Target: 80%+ coverage on auth, validation, errors.
 ## Deployment
 
 ### Production Build
+
 ```bash
 npm run build:web  # or android/ios
 eas build --platform all
 ```
 
 ### Environment Variables
+
 Update backend URL for production.
 
 ## Security
@@ -390,54 +400,60 @@ Update backend URL for production.
 ## Troubleshooting
 
 ### Backend won't start
+
 - Check `.env` file exists
 - Verify PostgreSQL running
 - Run migrations: `npx sequelize-cli db:migrate`
 
 ### App crashes
+
 - Check Error Boundary logs
 - Verify token still valid
 - Restart Expo dev server
 
 ### API calls failing
+
 - Ensure backend running on correct port
 - Check network connectivity
 - Verify API endpoint paths
-```
+
+````
 
 ### 3.2 Add API Documentation
 
 Generate OpenAPI/Swagger:
 ```bash
 npm install --save-dev swagger-jsdoc swagger-ui-express
-```
+````
 
 **Create `backend/swagger.config.js`**:
+
 ```javascript
-const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerJsdoc = require("swagger-jsdoc");
 
 const options = {
   definition: {
-    openapi: '3.0.0',
+    openapi: "3.0.0",
     info: {
-      title: 'Vertex API',
-      version: '1.0.0',
-      description: 'AI-powered fitness tracking API'
+      title: "Vertex API",
+      version: "1.0.0",
+      description: "AI-powered fitness tracking API",
     },
     servers: [
       {
-        url: 'http://localhost:5000/api/v1',
-        description: 'Development'
-      }
-    ]
+        url: "http://localhost:5000/api/v1",
+        description: "Development",
+      },
+    ],
   },
-  apis: ['./SRC/**/*.js']
+  apis: ["./SRC/**/*.js"],
 };
 
 module.exports = swaggerJsdoc(options);
 ```
 
 Add endpoint JSDoc:
+
 ```javascript
 /**
  * @openapi
@@ -467,6 +483,7 @@ Add endpoint JSDoc:
 ### GitHub Actions Update
 
 **Update `.github/workflows/ci.yml`**:
+
 ```yaml
 - name: Run Tests
   run: npm test -- --coverage
@@ -490,24 +507,28 @@ Add endpoint JSDoc:
 ## 📊 Success Metrics
 
 ### Code Quality
+
 - ✅ >80% test coverage (auth module: >90%)
 - ✅ 0 linting errors
 - ✅ 0 TypeScript errors
 - ✅ All endpoints validated
 
 ### Performance
+
 - ✅ App starts in <3 seconds
 - ✅ No janky animations (60fps)
 - ✅ No N+1 queries
 - ✅ Memoization applied to heavy components
 
 ### Accessibility
+
 - ✅ WCAG AA compliance
 - ✅ All touch targets ≥48x48px
 - ✅ Screen reader support
 - ✅ Dark/light mode tested
 
 ### Security
+
 - ✅ No secrets in git
 - ✅ Rate limiting active
 - ✅ Input validation on all endpoints
