@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
@@ -13,6 +12,8 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
+import { FormInput } from '../components/FormInput';
+import { Card } from '../components/Card';
 import { validateMockUser, MOCK_USERS } from '../data/mockUsers';
 import * as authService from '../services/auth.service';
 
@@ -21,28 +22,34 @@ export const SignInScreen = ({ navigation }: any) => {
   const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const inputBg = isDark ? '#1e293b' : '#ffffff';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
-  const inputText = isDark ? '#ffffff' : '#1e293b';
-  const labelColor = isDark ? '#e2e8f0' : '#1e293b';
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
+  const validateForm = (): Record<string, string> => {
+    const newErrors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      newErrors.email = 'Please enter your email address';
+    } else if (!email.includes('@')) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!password.trim()) {
+      newErrors.password = 'Please enter your password';
+    } else if (password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+
+    return newErrors;
+  };
+
   const handleSignIn = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Validation', 'Please enter both email and password');
-      return;
-    }
-
-    if (!email.includes('@')) {
-      Alert.alert('Validation', 'Please enter a valid email address');
-      return;
-    }
-
-    if (password.length < 8) {
-      Alert.alert('Validation', 'Password must be at least 8 characters');
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      Alert.alert('Validation Error', Object.values(formErrors)[0]);
       return;
     }
 
@@ -124,7 +131,7 @@ export const SignInScreen = ({ navigation }: any) => {
         <View style={tw`flex-col gap-5`}>
           {/* Quick Mock User Login Section */}
           <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-3`, { color: labelColor }]}>
+            <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
               Demo: Quick Login
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
@@ -160,50 +167,40 @@ export const SignInScreen = ({ navigation }: any) => {
               </View>
             </ScrollView>
           </View>
-          {/* Email */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Email Address
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="you@email.com"
-                placeholderTextColor="#94a3b8"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
-              <MaterialIcons name="email" size={22} color="#94a3b8" style={tw`absolute right-4 top-4`} />
-            </View>
-          </View>
 
-          {/* Password */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Password
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="Enter your password"
-                placeholderTextColor="#94a3b8"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoComplete="password"
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={tw`absolute right-4 top-4`}>
-                <MaterialIcons name={showPassword ? 'visibility' : 'visibility-off'} size={22} color="#94a3b8" />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <FormInput
+            label="Email Address"
+            placeholder="you@email.com"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (errors.email) setErrors({ ...errors, email: '' });
+            }}
+            error={!!errors.email}
+            helperText={errors.email}
+            icon={<MaterialIcons name="email" size={20} color={accent} />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+          />
+
+          <FormInput
+            label="Password"
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errors.password) setErrors({ ...errors, password: '' });
+            }}
+            error={!!errors.password}
+            helperText={errors.password}
+            isPassword
+            autoCapitalize="none"
+            autoComplete="password"
+          />
 
           {/* Forgot Password */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={tw`items-end py-1`}
             onPress={() => navigation.navigate('ForgotPassword')}
           >
@@ -212,12 +209,14 @@ export const SignInScreen = ({ navigation }: any) => {
             </Text>
           </TouchableOpacity>
 
-          <View style={[tw`mt-2 rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
-            <MaterialIcons name="lock" size={18} color={accent} />
-            <Text style={[tw`text-sm flex-1`, { color: subtextColor }]}>
-              Your credentials are encrypted and secured with industry-standard encryption.
-            </Text>
-          </View>
+          <Card variant="filled" padding="md">
+            <View style={tw`flex-row gap-3`}>
+              <MaterialIcons name="lock" size={18} color={accent} />
+              <Text style={[tw`text-sm flex-1 leading-5`, { color: subtextColor }]}>
+                Your credentials are encrypted and secured with industry-standard encryption.
+              </Text>
+            </View>
+          </Card>
         </View>
       </ScrollView>
 

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
-  TextInput,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Text,
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -13,6 +12,8 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
+import { FormInput } from '../components/FormInput';
+import { Card } from '../components/Card';
 
 export const AccountCreationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -21,46 +22,44 @@ export const AccountCreationScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const inputBg = isDark ? '#1e293b' : '#ffffff';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
-  const inputText = isDark ? '#ffffff' : '#1e293b';
-  const labelColor = isDark ? '#e2e8f0' : '#1e293b';
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
-  const validateForm = (): string | null => {
+  const validateForm = (): Record<string, string> => {
+    const newErrors: Record<string, string> = {};
+
     if (!name.trim()) {
-      return 'Please enter your full name';
+      newErrors.name = 'Please enter your full name';
     }
     if (!email.trim()) {
-      return 'Please enter your email address';
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return 'Please enter a valid email address';
+      newErrors.email = 'Please enter your email address';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        newErrors.email = 'Please enter a valid email address';
+      }
     }
     if (!password) {
-      return 'Please enter a password';
-    }
-    if (password.length < 8) {
-      return 'Password must be at least 8 characters long';
+      newErrors.password = 'Please enter a password';
+    } else if (password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long';
     }
     if (!confirmPassword) {
-      return 'Please confirm your password';
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
     }
-    if (password !== confirmPassword) {
-      return 'Passwords do not match';
-    }
-    return null;
+
+    return newErrors;
   };
 
   const handleCreateAccount = () => {
-    const validationError = validateForm();
-    if (validationError) {
-      Alert.alert('Validation Error', validationError);
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      Alert.alert('Validation Error', Object.values(formErrors)[0]);
       return;
     }
 
@@ -101,94 +100,74 @@ export const AccountCreationScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`flex-col gap-5`}>
-          {/* Full Name */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Full Name
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="John Doe"
-                placeholderTextColor="#94a3b8"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                autoComplete="name"
-              />
-              <MaterialIcons name="person" size={22} color="#94a3b8" style={tw`absolute right-4 top-4`} />
-            </View>
-          </View>
+          <FormInput
+            label="Full Name"
+            placeholder="John Doe"
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              if (errors.name) setErrors({ ...errors, name: '' });
+            }}
+            error={!!errors.name}
+            helperText={errors.name}
+            icon={<MaterialIcons name="person" size={20} color={accent} />}
+            autoCapitalize="words"
+            autoComplete="name"
+          />
 
-          {/* Email */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Email Address
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="you@email.com"
-                placeholderTextColor="#94a3b8"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
-              <MaterialIcons name="email" size={22} color="#94a3b8" style={tw`absolute right-4 top-4`} />
-            </View>
-          </View>
+          <FormInput
+            label="Email Address"
+            placeholder="you@email.com"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (errors.email) setErrors({ ...errors, email: '' });
+            }}
+            error={!!errors.email}
+            helperText={errors.email}
+            icon={<MaterialIcons name="email" size={20} color={accent} />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+          />
 
-          {/* Password */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Password
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="Min. 8 characters"
-                placeholderTextColor="#94a3b8"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoComplete="new-password"
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={tw`absolute right-4 top-4`}>
-                <MaterialIcons name={showPassword ? 'visibility' : 'visibility-off'} size={22} color="#94a3b8" />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <FormInput
+            label="Password"
+            placeholder="Min. 8 characters"
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errors.password) setErrors({ ...errors, password: '' });
+            }}
+            error={!!errors.password}
+            helperText={errors.password}
+            isPassword
+            autoCapitalize="none"
+            autoComplete="new-password"
+          />
 
-          {/* Confirm Password */}
-          <View>
-            <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-2`, { color: labelColor }]}>
-              Confirm Password
-            </Text>
-            <View style={tw`relative`}>
-              <TextInput
-                style={[tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`, { backgroundColor: inputBg, borderWidth: 2, borderColor: inputBorder, color: inputText }]}
-                placeholder="Repeat password"
-                placeholderTextColor="#94a3b8"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirm}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)} style={tw`absolute right-4 top-4`}>
-                <MaterialIcons name={showConfirm ? 'visibility' : 'visibility-off'} size={22} color="#94a3b8" />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <FormInput
+            label="Confirm Password"
+            placeholder="Repeat password"
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+            }}
+            error={!!errors.confirmPassword}
+            helperText={errors.confirmPassword}
+            isPassword
+            autoCapitalize="none"
+          />
 
-          <View style={[tw`mt-1 rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
-            <MaterialIcons name="lock" size={18} color={accent} />
-            <Text style={[tw`text-sm flex-1`, { color: subtextColor }]}>
-              Your data is encrypted end-to-end and never shared with third parties.
-            </Text>
-          </View>
+          <Card variant="filled" padding="md">
+            <View style={tw`flex-row gap-3`}>
+              <MaterialIcons name="lock" size={18} color={accent} />
+              <Text style={[tw`text-sm flex-1 leading-5`, { color: subtextColor }]}>
+                Your data is encrypted end-to-end and never shared with third parties.
+              </Text>
+            </View>
+          </Card>
         </View>
       </ScrollView>
 
