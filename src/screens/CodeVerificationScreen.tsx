@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/Button';
+import { Card } from '../components/Card';
 
 export const CodeVerificationScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
@@ -176,12 +177,14 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
           </View>
 
           {/* Info Box */}
-          <View style={[tw`rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
-            <MaterialIcons name="info" size={18} color={accent} style={tw`mt-0.5`} />
-            <Text style={[tw`text-sm flex-1`, { color: subtextColor }]}>
-              The code expires in 15 minutes. Check your spam folder if you haven't received it.
-            </Text>
-          </View>
+          <Card variant="filled" padding="md">
+            <View style={tw`flex-row gap-3`}>
+              <MaterialIcons name="info" size={18} color={accent} style={tw`mt-0.5`} />
+              <Text style={[tw`text-sm flex-1 leading-5`, { color: subtextColor }]}>
+                The code expires in 15 minutes. Check your spam folder if you haven't received it.
+              </Text>
+            </View>
+          </Card>
         </View>
       </ScrollView>
 
