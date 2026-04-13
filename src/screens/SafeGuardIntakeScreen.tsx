@@ -5,9 +5,11 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
+import { Card } from '../components/Card';
 
 export const SafeGuardIntakeScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
   const [conditions, setConditions] = useState({
     heart: false,
@@ -40,12 +42,12 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
           <Text style={[tw`tracking-tight text-2xl font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             Medical History
           </Text>
-          <Text style={[tw`text-sm font-normal leading-relaxed mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+          <Text style={[tw`text-sm font-normal leading-relaxed mt-2`, { color: subtextColor }]}>
             Identify any existing health conditions for personalized AI monitoring.
           </Text>
         </View>
 
-<View style={tw`px-6 mt-6 flex-col gap-2`}>
+        <View style={tw`px-6 mt-6 flex-col gap-2`}>
           {[
             { id: 'heart', label: 'Heart Conditions' },
             { id: 'hypertension', label: 'Hypertension' },
@@ -54,7 +56,7 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
             <TouchableOpacity
               key={item.id}
               style={[tw`flex-row items-center justify-between p-4 rounded-xl border`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-              onPress={() => setConditions(prev => ({...prev, [item.id]: !prev[item.id as keyof typeof conditions]}))}  
+              onPress={() => setConditions(prev => ({...prev, [item.id]: !prev[item.id as keyof typeof conditions]}))}
             >
               <Text style={[tw`text-base font-medium`, { color: isDark ? '#e2e8f0' : '#1e293b' }]}>{item.label}</Text>
               <MaterialIcons
@@ -67,10 +69,10 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`px-6 mt-8 mb-6`}>
-          <Text style={[tw`tracking-tight text-lg font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+          <Text style={[tw`tracking-tight text-lg font-bold leading-tight mb-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             Allergies
           </Text>
-          <Text style={[tw`text-sm font-normal mb-3`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+          <Text style={[tw`text-sm font-normal mb-3`, { color: subtextColor }]}>
             Multi-select any known allergies.
           </Text>
           <View style={[tw`flex-row flex-wrap gap-2 p-3 rounded-xl border min-h-[56px] items-center`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
