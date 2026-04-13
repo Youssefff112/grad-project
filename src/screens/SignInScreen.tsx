@@ -14,13 +14,15 @@ import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { validateMockUser, MOCK_USERS } from '../data/mockUsers';
+import * as authService from '../services/auth.service';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setSubscriptionPlan } = useUser();
+  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const inputBg = isDark ? '#1e293b' : '#ffffff';
   const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
@@ -28,7 +30,7 @@ export const SignInScreen = ({ navigation }: any) => {
   const labelColor = isDark ? '#e2e8f0' : '#1e293b';
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Validation', 'Please enter both email and password');
       return;
@@ -44,24 +46,56 @@ export const SignInScreen = ({ navigation }: any) => {
       return;
     }
 
-    // Try to validate against mock users first
-    const mockUser = validateMockUser(email, password);
-    if (mockUser) {
-      setFullName(mockUser.fullName);
-      saveEmail(mockUser.email);
-      setSubscriptionPlan(mockUser.subscriptionPlan);
-      navigation.navigate('TraineeCommandCenter');
-      return;
+    setIsLoading(true);
+    try {
+      // Try backend login first
+      const response = await authService.login({ email, password });
+
+      if (response.success && response.data?.user && response.data?.token) {
+        const user = response.data.user;
+        const firstName = user.firstName || '';
+        const lastName = user.lastName || '';
+        const fullName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
+
+        // Save tokens to context (which also handles AsyncStorage)
+        await setAuthTokens(response.data.token, response.data.refreshToken);
+
+        // Update user profile info
+        setFullName(fullName);
+        saveEmail(user.email);
+
+        // TODO: Fetch actual subscription plan from backend profile
+        setSubscriptionPlan('Free'); // Default for now, should come from backend
+
+        // Navigate to main app
+        navigation.navigate('TraineeCommandCenter');
+      }
+    } catch (error: any) {
+      let errorMessage = 'Sign in failed. Please try again.';
+
+      if (error.response?.status === 400) {
+        errorMessage = 'Invalid email or password';
+      } else if (error.response?.status === 429) {
+        errorMessage = 'Too many login attempts. Please try again later.';
+      } else if (error.message === 'Network Error' || !error.response) {
+        // Fallback to mock user for demo/offline mode
+        console.log('Backend unavailable, trying mock user...');
+        const mockUser = validateMockUser(email, password);
+        if (mockUser) {
+          setFullName(mockUser.fullName);
+          saveEmail(mockUser.email);
+          setSubscriptionPlan(mockUser.subscriptionPlan);
+          navigation.navigate('TraineeCommandCenter');
+          return;
+        }
+        errorMessage = 'Backend is unavailable. Please check your connection.';
+      }
+
+      Alert.alert('Sign In Error', errorMessage);
+      console.error('Sign in error:', error);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Fallback: Extract name from email for regular login
-    const nameFromEmail = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1);
-    setFullName(nameFromEmail);
-    saveEmail(email);
-    setSubscriptionPlan('Free'); // Default to Free plan for new users
-
-    // Navigate to main app
-    navigation.navigate('TraineeCommandCenter');
   };
 
   return (
@@ -189,12 +223,13 @@ export const SignInScreen = ({ navigation }: any) => {
 
       <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
         <Button
-          title="Sign In"
+          title={isLoading ? 'Signing In...' : 'Sign In'}
           size="lg"
           onPress={handleSignIn}
-          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
+          disabled={isLoading}
+          icon={!isLoading && <MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
-        <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.navigate('AccountCreation')}>
+        <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.navigate('AccountCreation')} disabled={isLoading}>
           <Text style={[tw`text-sm`, { color: subtextColor }]}>
             Don't have an account?{' '}
             <Text style={[tw`font-bold`, { color: accent }]}>Create One</Text>

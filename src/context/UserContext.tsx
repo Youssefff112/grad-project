@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as tokenManager from '../utils/tokenManager';
 
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
 export type SubscriptionPlan = 'Free' | 'Standard' | 'Premium' | 'ProCoach' | 'Elite';
@@ -20,7 +21,13 @@ interface UserContextType {
   canUseComputerVision: boolean;
   canUseAIAssistant: boolean;
   lastPlanReviewDate: string | null;
-  
+
+  // Authentication fields
+  authToken: string | null;
+  refreshToken: string | null;
+  userId: string | null;
+  isAuthenticated: boolean;
+
   setFullName: (name: string) => void;
   setEmail: (email: string) => void;
   setWeight: (weight: number) => void;
@@ -34,6 +41,12 @@ interface UserContextType {
   setComputerVisionEnabled: (enabled: boolean) => void;
   setAIAssistantEnabled: (enabled: boolean) => void;
   updateLastPlanReview: () => void;
+
+  // Authentication methods
+  setAuthTokens: (accessToken: string, refreshToken: string) => Promise<void>;
+  clearAuth: () => Promise<void>;
+  logout: () => Promise<void>;
+
   isLoading: boolean;
 }
 
@@ -51,7 +64,13 @@ const UserContext = createContext<UserContextType>({
   canUseComputerVision: false,
   canUseAIAssistant: false,
   lastPlanReviewDate: null,
-  
+
+  // Authentication defaults
+  authToken: null,
+  refreshToken: null,
+  userId: null,
+  isAuthenticated: false,
+
   setFullName: () => {},
   setEmail: () => {},
   setWeight: () => {},
@@ -65,6 +84,12 @@ const UserContext = createContext<UserContextType>({
   setComputerVisionEnabled: () => {},
   setAIAssistantEnabled: () => {},
   updateLastPlanReview: () => {},
+
+  // Authentication methods defaults
+  setAuthTokens: async () => {},
+  clearAuth: async () => {},
+  logout: async () => {},
+
   isLoading: true,
 });
 
@@ -82,12 +107,20 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [canUseComputerVision, setCanUseComputerVisionState] = useState(false);
   const [canUseAIAssistant, setCanUseAIAssistantState] = useState(false);
   const [lastPlanReviewDate, setLastPlanReviewDateState] = useState<string | null>(null);
+
+  // Authentication state
+  const [authToken, setAuthTokenState] = useState<string | null>(null);
+  const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
+  const [userId, setUserIdState] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticatedState] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
 
   // Load saved user data on mount
   useEffect(() => {
     const loadUserData = async () => {
       try {
+        // Load user profile data
         const savedName = await AsyncStorage.getItem('user_fullname');
         const savedEmail = await AsyncStorage.getItem('user_email');
         const savedWeight = await AsyncStorage.getItem('user_weight');
@@ -101,7 +134,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedCV = await AsyncStorage.getItem('user_cv_enabled');
         const savedAI = await AsyncStorage.getItem('user_ai_enabled');
         const savedReviewDate = await AsyncStorage.getItem('user_last_plan_review');
-        
+        const savedUserId = await AsyncStorage.getItem('user_id');
+
+        // Load authentication data
+        const tokens = await tokenManager.getTokens();
+        const isTokenValid = await tokenManager.isTokenValid();
+
         if (savedName) setFullNameState(savedName);
         if (savedEmail) setEmailState(savedEmail);
         if (savedWeight) setWeightState(parseFloat(savedWeight));
@@ -115,6 +153,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedCV) setCanUseComputerVisionState(JSON.parse(savedCV));
         if (savedAI) setCanUseAIAssistantState(JSON.parse(savedAI));
         if (savedReviewDate) setLastPlanReviewDateState(savedReviewDate);
+
+        // Set authentication state if tokens are valid
+        if (tokens.accessToken && isTokenValid) {
+          setAuthTokenState(tokens.accessToken);
+          setRefreshTokenState(tokens.refreshToken);
+          if (savedUserId) setUserIdState(savedUserId);
+          setIsAuthenticatedState(true);
+        } else if (tokens.accessToken) {
+          // Token expired, clear it
+          await tokenManager.clearTokens();
+        }
       } catch (error) {
         console.log('Failed to load user data:', error);
       } finally {
@@ -229,6 +278,81 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, []);
 
+  const setAuthTokens = useCallback(async (accessToken: string, refreshToken: string) => {
+    try {
+      setAuthTokenState(accessToken);
+      setRefreshTokenState(refreshToken);
+      setIsAuthenticatedState(true);
+
+      // Save tokens using tokenManager
+      await tokenManager.saveTokens({
+        accessToken,
+        refreshToken,
+        expiresIn: 86400, // 24 hours default
+      });
+    } catch (error) {
+      console.error('Failed to set auth tokens:', error);
+      throw error;
+    }
+  }, []);
+
+  const clearAuth = useCallback(async () => {
+    try {
+      setAuthTokenState(null);
+      setRefreshTokenState(null);
+      setUserIdState(null);
+      setIsAuthenticatedState(false);
+
+      // Clear tokens from storage
+      await tokenManager.clearTokens();
+    } catch (error) {
+      console.error('Failed to clear auth:', error);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      // Clear auth state
+      await clearAuth();
+
+      // Also clear user profile data
+      setFullNameState('');
+      setEmailState('');
+      setWeightState(null);
+      setBodyFatPercentageState(null);
+      setUserModeState('Basic');
+      setSubscriptionPlanState('Free');
+      setExperienceLevelState(null);
+      setDietPreferencesState([]);
+      setCoachIdState(null);
+      setCoachNameState(null);
+      setCanUseComputerVisionState(false);
+      setCanUseAIAssistantState(false);
+      setLastPlanReviewDateState(null);
+
+      // Clear all stored data
+      await Promise.all([
+        AsyncStorage.removeItem('user_fullname'),
+        AsyncStorage.removeItem('user_email'),
+        AsyncStorage.removeItem('user_weight'),
+        AsyncStorage.removeItem('user_body_fat_percentage'),
+        AsyncStorage.removeItem('user_mode'),
+        AsyncStorage.removeItem('user_subscription_plan'),
+        AsyncStorage.removeItem('user_experience_level'),
+        AsyncStorage.removeItem('user_diet_preferences'),
+        AsyncStorage.removeItem('user_coach_id'),
+        AsyncStorage.removeItem('user_coach_name'),
+        AsyncStorage.removeItem('user_cv_enabled'),
+        AsyncStorage.removeItem('user_ai_enabled'),
+        AsyncStorage.removeItem('user_last_plan_review'),
+        AsyncStorage.removeItem('user_id'),
+      ]);
+    } catch (error) {
+      console.error('Failed to logout:', error);
+      throw error;
+    }
+  }, [clearAuth]);
+
   return (
     <UserContext.Provider value={{
       fullName,
@@ -244,6 +368,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       canUseComputerVision,
       canUseAIAssistant,
       lastPlanReviewDate,
+
+      // Authentication fields
+      authToken,
+      refreshToken,
+      userId,
+      isAuthenticated,
+
       setFullName,
       setEmail,
       setWeight,
@@ -257,6 +388,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setComputerVisionEnabled,
       setAIAssistantEnabled,
       updateLastPlanReview,
+
+      // Authentication methods
+      setAuthTokens,
+      clearAuth,
+      logout,
+
       isLoading,
     }}>
       {children}

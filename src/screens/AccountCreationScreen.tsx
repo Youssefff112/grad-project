@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -22,6 +23,7 @@ export const AccountCreationScreen = ({ navigation }: any) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const inputBg = isDark ? '#1e293b' : '#ffffff';
   const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
@@ -29,10 +31,50 @@ export const AccountCreationScreen = ({ navigation }: any) => {
   const labelColor = isDark ? '#e2e8f0' : '#1e293b';
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
+  const validateForm = (): string | null => {
+    if (!name.trim()) {
+      return 'Please enter your full name';
+    }
+    if (!email.trim()) {
+      return 'Please enter your email address';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return 'Please enter a valid email address';
+    }
+    if (!password) {
+      return 'Please enter a password';
+    }
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!confirmPassword) {
+      return 'Please confirm your password';
+    }
+    if (password !== confirmPassword) {
+      return 'Passwords do not match';
+    }
+    return null;
+  };
+
   const handleCreateAccount = () => {
-    setFullName(name);
-    saveEmail(email);
-    navigation.navigate('SubscriptionSelection');
+    const validationError = validateForm();
+    if (validationError) {
+      Alert.alert('Validation Error', validationError);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      setFullName(name);
+      saveEmail(email);
+      navigation.navigate('SubscriptionSelection');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create account. Please try again.');
+      console.error('Account creation error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -152,12 +194,13 @@ export const AccountCreationScreen = ({ navigation }: any) => {
 
       <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
         <Button
-          title="Create Account"
+          title={isLoading ? 'Creating Account...' : 'Create Account'}
           size="lg"
           onPress={handleCreateAccount}
-          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
+          disabled={isLoading}
+          icon={!isLoading && <MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
-        <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.goBack()} disabled={isLoading}>
           <Text style={[tw`text-sm`, { color: subtextColor }]}>
             Already have an account?{' '}
             <Text style={[tw`font-bold`, { color: accent }]}>Sign In</Text>
