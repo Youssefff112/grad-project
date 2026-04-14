@@ -5,7 +5,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle } from 'react-native-svg';
@@ -334,6 +333,37 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
               </Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Analytics Section */}
+        <View style={tw`px-5 mt-6`}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ProgressScreen')}
+            style={[
+              tw`rounded-2xl p-4 flex-row items-center justify-between`,
+              { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' },
+            ]}
+          >
+            <View style={tw`flex-row items-center gap-3`}>
+              <View
+                style={[
+                  tw`w-10 h-10 rounded-lg items-center justify-center`,
+                  { backgroundColor: accent + '28' },
+                ]}
+              >
+                <MaterialIcons name="trending-up" size={20} color={accent} />
+              </View>
+              <View>
+                <Text style={[tw`font-bold text-sm`, { color: accent }]}>
+                  View Analytics
+                </Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                  Weekly stats & progress
+                </Text>
+              </View>
+            </View>
+            <MaterialIcons name="arrow-forward" size={20} color={accent} />
+          </TouchableOpacity>
         </View>
 
         {/* Today's Meals Summary */}

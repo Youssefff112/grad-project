@@ -5,7 +5,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -362,7 +361,7 @@ export const ProgressScreen = ({ navigation }: any) => {
 
       {/* Bottom Navigation */}
       <BottomNav
-        activeId="progress"
+        activeId="track"
         onSelect={(id) => {
           if (id === 'home') navigation.navigate('TraineeCommandCenter');
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
