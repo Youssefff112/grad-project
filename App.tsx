@@ -5,6 +5,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { UserProvider, useUser } from './src/context/UserContext';
 import { LoadingProvider } from './src/context/LoadingContext';
 import { NotificationProvider } from './src/context/NotificationContext';
+import { OfflineProvider } from './src/context/OfflineContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
@@ -53,9 +54,6 @@ function AppNavigator() {
         contentStyle: {
           backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
         },
-        animationEnabled: true,
-        gestureEnabled: true,
-        gestureDirection: 'horizontal',
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
@@ -96,13 +94,15 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <UserProvider>
-          <NotificationProvider>
-            <LoadingProvider>
-              <NavigationContainer>
-                <AppNavigator />
-              </NavigationContainer>
-            </LoadingProvider>
-          </NotificationProvider>
+          <OfflineProvider>
+            <NotificationProvider>
+              <LoadingProvider>
+                <NavigationContainer>
+                  <AppNavigator />
+                </NavigationContainer>
+              </LoadingProvider>
+            </NotificationProvider>
+          </OfflineProvider>
         </UserProvider>
       </ThemeProvider>
     </ErrorBoundary>

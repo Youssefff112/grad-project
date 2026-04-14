@@ -63,11 +63,11 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   return (
     <Animated.View
       style={[
+        size,
         {
-          ...size,
           backgroundColor: bgColor,
           opacity: shimmerOpacity,
-        },
+        } as any,
         style,
       ]}
       {...props}

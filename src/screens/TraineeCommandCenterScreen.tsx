@@ -5,6 +5,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useOffline } from '../context/OfflineContext';
 import { hasFeatureAccess } from '../utils/planUtils';
 import { BottomNav } from '../components/BottomNav';
 import { Button } from '../components/Button';
@@ -16,6 +17,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage } = useUser();
   const { totalUnread } = useNotifications();
+  const { isOnline, syncInProgress, queuedCount } = useOffline();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
 
   // Calculate readiness score based on various factors
@@ -53,8 +55,33 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         <View style={tw`flex w-12 items-center justify-start`}>
           <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('NotificationsSettings')}>
             <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
-            <View style={[tw`absolute top-2 right-2 flex h-2 w-2 rounded-full`, { backgroundColor: accent }]} />
+            {totalUnread > 0 && (
+              <View style={[tw`absolute top-1 right-0 rounded-full items-center justify-center h-5 w-5`, { backgroundColor: accent }]}>
+                <Text style={tw`text-white text-xs font-bold`}>
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
+        </View>
+        <View style={tw`flex-row items-center gap-2`}>
+          {!isOnline && (
+            <View style={[tw`px-3 py-1 rounded-full flex-row items-center gap-1`, { backgroundColor: '#ef444430' }]}>
+              <MaterialIcons name="wifi-off" size={12} color="#ef4444" />
+              <Text style={tw`text-xs text-red-500 font-bold`}>Offline</Text>
+            </View>
+          )}
+          {syncInProgress && (
+            <View style={tw`flex-row items-center gap-1`}>
+              <MaterialIcons name="cloud-upload" size={16} color={accent} />
+              <Text style={[tw`text-xs font-semibold`, { color: accent }]}>Syncing...</Text>
+            </View>
+          )}
+          {queuedCount > 0 && (
+            <View style={tw`px-2 py-0.5 rounded bg-yellow-500/20`}>
+              <Text style={tw`text-xs text-yellow-600 font-bold`}>{queuedCount} pending</Text>
+            </View>
+          )}
         </View>
         <Text style={[tw`text-lg font-bold tracking-tighter flex-1 text-center`, { color: accent }]}>VERTEX</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>

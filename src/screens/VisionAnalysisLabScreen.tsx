@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
+import * as offlineService from '../services/offlineService';
 import { hasFeatureAccess } from '../utils/planUtils';
 import { FeatureLocked } from '../components/FeatureLocked';
 import { BottomNav } from '../components/BottomNav';
@@ -11,7 +13,31 @@ import { BottomNav } from '../components/BottomNav';
 export const VisionAnalysisLabScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { subscriptionPlan } = useUser();
+  const { totalUnread } = useNotifications();
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
+  const [cachedHistory, setCachedHistory] = useState<Array<{
+    date: string;
+    type: string;
+    duration: string;
+    score: string;
+    exercises: number;
+  }> | null>(null);
+
+  // Load cached workout history on mount
+  useEffect(() => {
+    const loadCachedWorkouts = async () => {
+      try {
+        const cached = await offlineService.getCachedWorkoutHistory();
+        if (cached && cached.length > 0) {
+          setCachedHistory(cached);
+          console.log('[VisionAnalysisLab] Loaded cached workout history');
+        }
+      } catch (error) {
+        console.error('Error loading cached workouts:', error);
+      }
+    };
+    loadCachedWorkouts();
+  }, []);
 
   // Check if user has access to computer vision
   if (!hasFeatureAccess(subscriptionPlan, 'hasComputerVision')) {
@@ -134,12 +160,12 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
       ) : (
         <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 gap-3 pb-32`}>
           {/* Past Sessions */}
-          {[
+          {(cachedHistory || [
             { date: 'Yesterday', type: 'Push Day', duration: '1h 12m', score: '94%', exercises: 6 },
             { date: 'Mar 15', type: 'Pull Day', duration: '58m', score: '89%', exercises: 5 },
             { date: 'Mar 14', type: 'Leg Day', duration: '1h 05m', score: '91%', exercises: 7 },
             { date: 'Mar 12', type: 'Push Day', duration: '1h 08m', score: '87%', exercises: 6 },
-          ].map((session, i) => (
+          ]).map((session, i) => (
             <TouchableOpacity
               key={i}
               onPress={() => navigation.navigate('WorkoutSessionDetail', { session })}
@@ -173,7 +199,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

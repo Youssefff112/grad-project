@@ -1,11 +1,15 @@
 /**
  * API Client Service
  * Handles all HTTP requests with JWT token injection and refresh logic
+ * Includes offline support with queue and caching
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { environment } from '../config/environment';
 import * as tokenManager from '../utils/tokenManager';
+import * as offlineService from './offlineService';
+import * as syncQueueService from './syncQueueService';
+import { getCurrentNetworkState } from './networkService';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -46,12 +50,47 @@ apiClient.interceptors.request.use(
 );
 
 /**
- * Response interceptor - Handle token refresh and errors
+ * Response interceptor - Handle token refresh, offline queuing, and caching
  */
 apiClient.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    // Cache successful GET responses for offline access
+    if (response.config.method === 'get') {
+      const endpoint = response.config.url || '';
+      await offlineService.cacheResponse(endpoint, response.data);
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const method = originalRequest.method?.toUpperCase() as 'POST' | 'PUT' | 'PATCH' | 'GET' | 'DELETE' | undefined;
+
+    // Handle network errors (no response) for write operations
+    if (!error.response && method && ['POST', 'PUT', 'PATCH'].includes(method)) {
+      const networkState = await getCurrentNetworkState();
+      if (!networkState.isOnline) {
+        console.log(`[Offline] Queuing ${method} request: ${originalRequest.url}`);
+        // Queue the operation for later sync
+        await syncQueueService.enqueueOperation(
+          'message', // default type, can be overridden
+          originalRequest.url || '',
+          method,
+          originalRequest.data ? JSON.parse(typeof originalRequest.data === 'string' ? originalRequest.data : JSON.stringify(originalRequest.data)) : {},
+          2 // priority
+        );
+        return Promise.resolve({ data: { queued: true } } as any);
+      }
+    }
+
+    // For GET requests when offline, try to return cached data
+    if (!error.response && originalRequest.method === 'get') {
+      const endpoint = originalRequest.url || '';
+      const cached = await offlineService.getCachedResponse(endpoint);
+      if (cached) {
+        console.log(`[Offline] Returning cached response for: ${endpoint}`);
+        return Promise.resolve({ data: cached } as any);
+      }
+    }
 
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {

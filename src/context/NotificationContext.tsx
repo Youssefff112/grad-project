@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Conversation {
   id: string;
@@ -15,6 +16,7 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NOTIFICATIONS_CACHE_KEY = 'notifications_cache';
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [conversations, setConversations] = useState<Map<string, number>>(() => {
@@ -27,40 +29,79 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return map;
   });
 
+  // Load persisted notifications on mount
+  useEffect(() => {
+    const loadPersistedNotifications = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(NOTIFICATIONS_CACHE_KEY);
+        if (cached) {
+          const entries = JSON.parse(cached);
+          const newMap = new Map(entries);
+          setConversations(newMap);
+          console.log('[Notifications] Loaded persisted notifications');
+        }
+      } catch (error) {
+        console.error('Error loading persisted notifications:', error);
+      }
+    };
+
+    loadPersistedNotifications();
+  }, []);
+
   const totalUnread = Array.from(conversations.values()).reduce((sum, count) => sum + count, 0);
+
+  // Persist notifications whenever they change
+  const persistNotifications = useCallback(async (map: Map<string, number>) => {
+    try {
+      const entries = Array.from(map.entries());
+      await AsyncStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(entries));
+    } catch (error) {
+      console.error('Error persisting notifications:', error);
+    }
+  }, []);
 
   const markAsRead = useCallback((conversationId: string) => {
     setConversations((prev) => {
       const newMap = new Map(prev);
       newMap.set(conversationId, 0);
+      persistNotifications(newMap);
       return newMap;
     });
-  }, []);
+  }, [persistNotifications]);
 
-  const markAsUnread = useCallback((conversationId: string, count: number) => {
-    setConversations((prev) => {
-      const newMap = new Map(prev);
-      newMap.set(conversationId, count);
-      return newMap;
-    });
-  }, []);
+  const markAsUnread = useCallback(
+    (conversationId: string, count: number) => {
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(conversationId, count);
+        persistNotifications(newMap);
+        return newMap;
+      });
+    },
+    [persistNotifications]
+  );
 
-  const addNotification = useCallback((conversationId: string) => {
-    setConversations((prev) => {
-      const newMap = new Map(prev);
-      const current = newMap.get(conversationId) || 0;
-      newMap.set(conversationId, current + 1);
-      return newMap;
-    });
-  }, []);
+  const addNotification = useCallback(
+    (conversationId: string) => {
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        const current = newMap.get(conversationId) || 0;
+        newMap.set(conversationId, current + 1);
+        persistNotifications(newMap);
+        return newMap;
+      });
+    },
+    [persistNotifications]
+  );
 
   const clearAllNotifications = useCallback(() => {
     setConversations((prev) => {
       const newMap = new Map(prev);
       newMap.forEach((_, key) => newMap.set(key, 0));
+      persistNotifications(newMap);
       return newMap;
     });
-  }, []);
+  }, [persistNotifications]);
 
   return (
     <NotificationContext.Provider

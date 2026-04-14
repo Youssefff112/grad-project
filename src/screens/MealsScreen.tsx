@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle } from 'react-native-svg';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
+import * as offlineService from '../services/offlineService';
 import { BottomNav } from '../components/BottomNav';
 
 const MEALS = [
@@ -19,6 +21,7 @@ const DAILY_TARGET = { calories: 2400, protein: 160, carbs: 220, fats: 65 };
 export const MealsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName } = useUser();
+  const { totalUnread } = useNotifications();
 
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({
     breakfast: false,
@@ -28,6 +31,33 @@ export const MealsScreen = ({ navigation }: any) => {
   });
 
   const [waterGlasses, setWaterGlasses] = useState(3);
+
+  // Load cached meal data on mount
+  useEffect(() => {
+    const loadCachedMeals = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const cached = await offlineService.getCachedMealLog(today);
+      if (cached) {
+        setCheckedMeals(cached.checkedMeals);
+        setWaterGlasses(cached.waterGlasses);
+        console.log('[MealsScreen] Loaded cached meal data');
+      }
+    };
+    loadCachedMeals();
+  }, []);
+
+  // Cache meal data whenever it changes
+  useEffect(() => {
+    const cacheMealData = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      await offlineService.cacheMealLog(today, {
+        checkedMeals,
+        waterGlasses,
+        date: today,
+      });
+    };
+    cacheMealData();
+  }, [checkedMeals, waterGlasses]);
 
   const toggleMeal = (id: string) => {
     setCheckedMeals((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -484,7 +514,7 @@ export const MealsScreen = ({ navigation }: any) => {
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />
