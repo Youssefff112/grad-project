@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
 import { hasFeatureAccess } from '../utils/planUtils';
 import { BottomNav } from '../components/BottomNav';
 import { Button } from '../components/Button';
@@ -14,6 +15,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [bodyFatInput, setBodyFatInput] = useState('');
   const { isDark, accent } = useTheme();
   const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage } = useUser();
+  const { totalUnread } = useNotifications();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
 
   // Calculate readiness score based on various factors
@@ -363,7 +365,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

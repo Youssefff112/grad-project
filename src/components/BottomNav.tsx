@@ -8,6 +8,7 @@ interface NavItem {
   id: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   label: string;
+  badge?: number; // Optional notification count
 }
 
 interface BottomNavProps {
@@ -33,13 +34,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <TouchableOpacity
             key={item.id}
             onPress={() => onSelect(item.id)}
-            style={tw`flex flex-col items-center gap-1`}
+            style={tw`flex flex-col items-center gap-1 relative`}
           >
-            <MaterialIcons
-              name={item.icon}
-              size={24}
-              color={isActive ? accent : '#94a3b8'}
-            />
+            <View style={tw`relative`}>
+              <MaterialIcons
+                name={item.icon}
+                size={24}
+                color={isActive ? accent : '#94a3b8'}
+              />
+              {item.badge && item.badge > 0 && (
+                <View style={[tw`absolute -top-2 -right-2 rounded-full items-center justify-center w-5 h-5`, { backgroundColor: '#ef4444' }]}>
+                  <Text style={tw`text-white text-xs font-bold`}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text
               style={[
                 tw`text-[10px] font-bold uppercase tracking-tight`,

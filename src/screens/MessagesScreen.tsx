@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
 import { hasFeatureAccess } from '../utils/planUtils';
 import { BottomNav } from '../components/BottomNav';
 
@@ -17,8 +18,17 @@ const CONVERSATIONS = [
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { subscriptionPlan } = useUser();
+  const { conversations, totalUnread, markAsRead } = useNotifications();
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
+
+  // Get unread count for each conversation from context
+  const CONVERSATIONS = [
+    { id: '1', name: 'Vertex Coach', avatar: 'smart-toy', lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.', time: '2m ago', unread: conversations.get('1') || 0, isAI: true, category: 'coaches' },
+    { id: '2', name: 'Dr. Sarah Miller', avatar: 'medical-services', lastMessage: 'Your recovery metrics look good. Cleared for heavy lifting.', time: '1h ago', unread: conversations.get('2') || 0, isAI: false, category: 'people' },
+    { id: '3', name: 'Training Group', avatar: 'group', lastMessage: "Alex: Who's joining leg day tomorrow?", time: '3h ago', unread: conversations.get('3') || 0, isAI: false, category: 'groups' },
+    { id: '4', name: 'Nutrition AI', avatar: 'restaurant', lastMessage: "Your meal plan for tomorrow has been updated based on today's workout.", time: '5h ago', unread: conversations.get('4') || 0, isAI: true, category: 'ai' },
+  ];
 
   // Filter conversations based on search and category
   const filteredConversations = useMemo(() => {
@@ -42,9 +52,7 @@ export const MessagesScreen = ({ navigation }: any) => {
     }
 
     return result;
-  }, [searchText, filter]);
-
-  const totalUnread = CONVERSATIONS.reduce((sum, c) => sum + c.unread, 0);
+  }, [searchText, filter, conversations]);
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -155,6 +163,8 @@ export const MessagesScreen = ({ navigation }: any) => {
                       ]
                     );
                   } else {
+                    // Mark conversation as read
+                    markAsRead(convo.id);
                     navigation.navigate('Chat', { chatName: convo.name, isAI: convo.isAI });
                   }
                 }}
@@ -298,7 +308,7 @@ export const MessagesScreen = ({ navigation }: any) => {
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />
