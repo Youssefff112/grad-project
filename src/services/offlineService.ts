@@ -27,19 +27,27 @@ export interface CachedMessage {
 export const cacheMealLog = async (date: string, mealLog: DailyMealLog) => {
   try {
     const key = `meal_log_${date}`;
-    await AsyncStorage.setItem(key, JSON.stringify(mealLog));
+    await AsyncStorage.setItem(key, JSON.stringify(mealLog)).catch((error) => {
+      console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
+    });
   } catch (error) {
-    console.error('Error caching meal log:', error);
+    console.warn('[OfflineService] Error caching meal log:', error);
   }
 };
 
 export const getCachedMealLog = async (date: string): Promise<DailyMealLog | null> => {
   try {
     const key = `meal_log_${date}`;
-    const cached = await AsyncStorage.getItem(key);
-    return cached ? JSON.parse(cached) : null;
+    const cached = await AsyncStorage.getItem(key).catch(() => null);
+    if (!cached) return null;
+    try {
+      return JSON.parse(cached);
+    } catch (parseError) {
+      console.warn('[OfflineService] Failed to parse meal log:', parseError);
+      return null;
+    }
   } catch (error) {
-    console.error('Error retrieving cached meal log:', error);
+    console.warn('[OfflineService] Error retrieving cached meal log:', error);
     return null;
   }
 };
@@ -47,36 +55,52 @@ export const getCachedMealLog = async (date: string): Promise<DailyMealLog | nul
 // Workout caching
 export const cacheWorkout = async (workout: CachedWorkout) => {
   try {
-    await AsyncStorage.setItem('workout_cache_active', JSON.stringify(workout));
+    await AsyncStorage.setItem('workout_cache_active', JSON.stringify(workout)).catch((error) => {
+      console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
+    });
   } catch (error) {
-    console.error('Error caching active workout:', error);
+    console.warn('[OfflineService] Error caching active workout:', error);
   }
 };
 
 export const getCachedWorkout = async (): Promise<CachedWorkout | null> => {
   try {
-    const cached = await AsyncStorage.getItem('workout_cache_active');
-    return cached ? JSON.parse(cached) : null;
+    const cached = await AsyncStorage.getItem('workout_cache_active').catch(() => null);
+    if (!cached) return null;
+    try {
+      return JSON.parse(cached);
+    } catch (parseError) {
+      console.warn('[OfflineService] Failed to parse active workout:', parseError);
+      return null;
+    }
   } catch (error) {
-    console.error('Error retrieving cached workout:', error);
+    console.warn('[OfflineService] Error retrieving cached workout:', error);
     return null;
   }
 };
 
 export const cacheWorkoutHistory = async (sessions: CachedWorkout[]) => {
   try {
-    await AsyncStorage.setItem('workout_cache_history', JSON.stringify(sessions));
+    await AsyncStorage.setItem('workout_cache_history', JSON.stringify(sessions)).catch((error) => {
+      console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
+    });
   } catch (error) {
-    console.error('Error caching workout history:', error);
+    console.warn('[OfflineService] Error caching workout history:', error);
   }
 };
 
 export const getCachedWorkoutHistory = async (): Promise<CachedWorkout[]> => {
   try {
-    const cached = await AsyncStorage.getItem('workout_cache_history');
-    return cached ? JSON.parse(cached) : [];
+    const cached = await AsyncStorage.getItem('workout_cache_history').catch(() => null);
+    if (!cached) return [];
+    try {
+      return JSON.parse(cached);
+    } catch (parseError) {
+      console.warn('[OfflineService] Failed to parse workout history:', parseError);
+      return [];
+    }
   } catch (error) {
-    console.error('Error retrieving cached workout history:', error);
+    console.warn('[OfflineService] Error retrieving cached workout history:', error);
     return [];
   }
 };
@@ -85,19 +109,27 @@ export const getCachedWorkoutHistory = async (): Promise<CachedWorkout[]> => {
 export const cacheMessages = async (date: string, messages: CachedMessage[]) => {
   try {
     const key = `messages_cache_${date}`;
-    await AsyncStorage.setItem(key, JSON.stringify(messages));
+    await AsyncStorage.setItem(key, JSON.stringify(messages)).catch((error) => {
+      console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
+    });
   } catch (error) {
-    console.error('Error caching messages:', error);
+    console.warn('[OfflineService] Error caching messages:', error);
   }
 };
 
 export const getCachedMessages = async (date: string): Promise<CachedMessage[]> => {
   try {
     const key = `messages_cache_${date}`;
-    const cached = await AsyncStorage.getItem(key);
-    return cached ? JSON.parse(cached) : [];
+    const cached = await AsyncStorage.getItem(key).catch(() => null);
+    if (!cached) return [];
+    try {
+      return JSON.parse(cached);
+    } catch (parseError) {
+      console.warn('[OfflineService] Failed to parse messages:', parseError);
+      return [];
+    }
   } catch (error) {
-    console.error('Error retrieving cached messages:', error);
+    console.warn('[OfflineService] Error retrieving cached messages:', error);
     return [];
   }
 };
@@ -106,23 +138,28 @@ export const getCachedMessages = async (date: string): Promise<CachedMessage[]> 
 export const cacheResponse = async (endpoint: string, data: any) => {
   try {
     const key = `api_cache_${endpoint}`;
-    await AsyncStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+    await AsyncStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() })).catch((error) => {
+      console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
+    });
   } catch (error) {
-    console.error('Error caching response:', error);
+    console.warn('[OfflineService] Error caching response:', error);
   }
 };
 
 export const getCachedResponse = async (endpoint: string): Promise<any | null> => {
   try {
     const key = `api_cache_${endpoint}`;
-    const cached = await AsyncStorage.getItem(key);
-    if (cached) {
+    const cached = await AsyncStorage.getItem(key).catch(() => null);
+    if (!cached) return null;
+    try {
       const { data } = JSON.parse(cached);
       return data;
+    } catch (parseError) {
+      console.warn('[OfflineService] Failed to parse cached response:', parseError);
+      return null;
     }
-    return null;
   } catch (error) {
-    console.error('Error retrieving cached response:', error);
+    console.warn('[OfflineService] Error retrieving cached response:', error);
     return null;
   }
 };
@@ -130,7 +167,9 @@ export const getCachedResponse = async (endpoint: string): Promise<any | null> =
 // Clear all offline cache
 export const clearAllCache = async () => {
   try {
-    const keys = await AsyncStorage.getAllKeys();
+    const keys = await AsyncStorage.getAllKeys().catch(() => []);
+    if (!keys || keys.length === 0) return;
+
     const cacheKeys = keys.filter(
       (key) =>
         key.startsWith('meal_log_') ||
@@ -138,8 +177,13 @@ export const clearAllCache = async () => {
         key.startsWith('messages_cache_') ||
         key.startsWith('api_cache_')
     );
-    await AsyncStorage.multiRemove(cacheKeys);
+
+    if (cacheKeys.length > 0) {
+      await AsyncStorage.multiRemove(cacheKeys).catch((error) => {
+        console.warn('[OfflineService] Error in multiRemove:', error);
+      });
+    }
   } catch (error) {
-    console.error('Error clearing cache:', error);
+    console.warn('[OfflineService] Error clearing cache:', error);
   }
 };

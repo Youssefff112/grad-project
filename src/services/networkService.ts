@@ -15,9 +15,9 @@ const initializeNetworkListener = () => {
   if (subscription) return; // Already initialized
 
   try {
-    subscription = NetInfo.addEventListener((state) => {
+    subscription = NetInfo.addEventListener?.((state: any) => {
       const networkState: NetworkState = {
-        isOnline: state.isConnected ?? false,
+        isOnline: state.isConnected ?? true,
         isConnecting: state.isConnected === false && state.type !== 'none',
         type: state.type,
       };
@@ -43,15 +43,22 @@ export const useNetworkState = () => {
     initializeNetworkListener();
 
     if (!initializedRef.current) {
-      NetInfo.fetch().then((state) => {
-        setNetworkState({
-          isOnline: state.isConnected ?? false,
-          isConnecting: state.isConnected === false && state.type !== 'none',
-          type: state.type,
-        });
-      }).catch((error) => {
-        console.warn('[NetworkService] Failed to fetch network state:', error);
-      });
+      // Try to fetch initial state, but don't fail if it's not available
+      try {
+        if (NetInfo.fetch && typeof NetInfo.fetch === 'function') {
+          NetInfo.fetch().then((state: any) => {
+            setNetworkState({
+              isOnline: state.isConnected ?? true,
+              isConnecting: state.isConnected === false && state.type !== 'none',
+              type: state.type,
+            });
+          }).catch((error: any) => {
+            console.warn('[NetworkService] Failed to fetch network state:', error);
+          });
+        }
+      } catch (error) {
+        console.warn('[NetworkService] NetInfo.fetch not available:', error);
+      }
       initializedRef.current = true;
     }
 
@@ -69,19 +76,22 @@ export const useNetworkState = () => {
 // Get current network state synchronously (best effort)
 export const getCurrentNetworkState = async (): Promise<NetworkState> => {
   try {
-    const state = await NetInfo.fetch();
-    return {
-      isOnline: state.isConnected ?? false,
-      isConnecting: state.isConnected === false && state.type !== 'none',
-      type: state.type,
-    };
+    if (NetInfo.fetch && typeof NetInfo.fetch === 'function') {
+      const state = await NetInfo.fetch();
+      return {
+        isOnline: state.isConnected ?? true,
+        isConnecting: state.isConnected === false && state.type !== 'none',
+        type: state.type,
+      };
+    }
   } catch (error) {
     console.warn('[NetworkService] Failed to fetch network state:', error);
-    return {
-      isOnline: true,
-      isConnecting: false,
-    };
   }
+
+  return {
+    isOnline: true,
+    isConnecting: false,
+  };
 };
 
 // Register callback for when network reconnects
@@ -107,7 +117,11 @@ export const onNetworkReconnect = (callback: () => void) => {
 
 // Cleanup function (call on app unmount if needed)
 export const cleanup = () => {
-  subscription?.unsubscribe?.();
+  try {
+    subscription?.unsubscribe?.();
+  } catch (error) {
+    console.warn('[NetworkService] Error during cleanup:', error);
+  }
   networkStateListeners.clear();
   subscription = null;
 };

@@ -8,8 +8,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -18,36 +17,25 @@ import { useTheme } from '../context/ThemeContext';
 interface Message {
   id: string;
   text: string;
-  sent: boolean;
+  sender: 'user' | 'other';
   timestamp: string;
   delivered?: boolean;
   read?: boolean;
 }
 
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: '1',
-    text: "Good morning! Ready for today's session?",
-    sent: false,
-    timestamp: '9:00 AM',
-    read: true,
-  },
-  {
-    id: '2',
-    text: "Yes! What's the plan?",
-    sent: true,
-    timestamp: '9:01 AM',
-    delivered: true,
-    read: true,
-  },
+const MOCK_MESSAGES: Message[] = [
+  { id: '1', text: "Good morning! Ready for today's session?", sender: 'other', timestamp: '9:00 AM', read: true },
+  { id: '2', text: "Yes! What's the plan?", sender: 'user', timestamp: '9:01 AM', delivered: true, read: true },
   {
     id: '3',
     text: "Today is Push Day - Bench Press, OHP, and accessories. Based on your last session, I've increased your working weight by 2.5kg.",
-    sent: false,
+    sender: 'other',
     timestamp: '9:01 AM',
     read: true,
   },
-  {
+  { id: '4', text: 'Sounds good! Let me get warmed up.', sender: 'user', timestamp: '9:05 AM', delivered: true, read: true },
+  { id: '5', text: 'Perfect! Remember to focus on form over weight today.', sender: 'other', timestamp: '9:05 AM', read: true },
+];
     id: '4',
     text: "Sounds good, let's go",
     sent: true,
@@ -67,17 +55,16 @@ const INITIAL_MESSAGES: Message[] = [
 const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 
 export const ChatScreen = ({ navigation, route }: any) => {
-  const { chatName, isAI } = route.params as { chatName: string; isAI: boolean };
+  const { conversationName = 'Chat' } = route.params || {};
   const { isDark, accent } = useTheme();
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [isTyping, setIsTyping] = useState(false);
+  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages, isTyping]);
+  }, [messages]);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const receivedBubble = isDark ? '#111128' : '#ffffff';
@@ -92,7 +79,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
     const newMessage: Message = {
       id: Date.now().toString(),
       text: inputText.trim(),
-      sent: true,
+      sender: 'user',
       timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
       delivered: true,
       read: false,
@@ -102,20 +89,16 @@ export const ChatScreen = ({ navigation, route }: any) => {
     setInputText('');
 
     // Simulate AI response
-    if (isAI) {
-      setIsTyping(true);
-      setTimeout(() => {
-        const response: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "That's great! Keep up the excellent work. Your consistency will pay off.",
-          sent: false,
-          timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-          read: false,
-        };
-        setMessages((prev) => [...prev, response]);
-        setIsTyping(false);
-      }, 1500);
-    }
+    setTimeout(() => {
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "That's great! Keep up the excellent work. Your consistency will pay off.",
+        sender: 'other',
+        timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        read: false,
+      };
+      setMessages((prev) => [...prev, response]);
+    }, 1500);
   };
 
   const handleQuickReply = (reply: string) => {
@@ -186,12 +169,11 @@ export const ChatScreen = ({ navigation, route }: any) => {
   };
 
   const renderMessage = (message: Message) => {
-    const isSent = message.sent;
+    const isSent = message.sender === 'user';
 
     return (
       <TouchableOpacity
         key={message.id}
-        onLongPress={() => showMessageOptions(message)}
         delayLongPress={300}
         style={[
           tw`mb-3 flex-row max-w-[85%]`,
@@ -199,16 +181,6 @@ export const ChatScreen = ({ navigation, route }: any) => {
           isSent && tw`flex-row-reverse`,
         ]}
       >
-        {/* AI badge for received messages in AI chats */}
-        {!isSent && isAI && (
-          <View style={tw`flex-row items-center gap-1 mb-1 mr-2`}>
-            <MaterialIcons name="smart-toy" size={12} color={accent} />
-            <Text style={{ color: accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>
-              AI
-            </Text>
-          </View>
-        )}
-
         <View
           style={[
             tw`px-4 py-3 rounded-2xl`,
@@ -259,6 +231,16 @@ export const ChatScreen = ({ navigation, route }: any) => {
           },
         ]}
       >
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={24} color={primaryText} />
+        </TouchableOpacity>
+        <Text style={[tw`text-lg font-bold flex-1 ml-4`, { color: primaryText }]}>
+          {conversationName}
+        </Text>
+        <TouchableOpacity onPress={showChatOptions}>
+          <MaterialIcons name="more-vert" size={24} color={primaryText} />
+        </TouchableOpacity>
+      </View>
         <View style={tw`flex-row items-center gap-3 flex-1`}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <MaterialIcons name="arrow-back" size={24} color={accent} />

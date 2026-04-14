@@ -438,7 +438,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

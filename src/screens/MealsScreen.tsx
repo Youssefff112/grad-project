@@ -251,7 +251,7 @@ export const MealsScreen = ({ navigation }: any) => {
               {[
                 { label: 'Eaten', value: `${consumed.calories}`, unit: 'kcal', icon: 'local-fire-department' as const, color: accent },
                 { label: 'Remaining', value: `${Math.max(DAILY_TARGET.calories - consumed.calories, 0)}`, unit: 'kcal', icon: 'flag' as const, color: '#4ade80' },
-                { label: 'Meals Left', value: `${MEALS.length - checkedCount}`, unit: '', icon: 'schedule' as const, color: '#facc15' },
+                { label: 'Meals Left', value: `${mealsToDisplay.length - checkedCount}`, unit: '', icon: 'schedule' as const, color: '#facc15' },
               ].map((stat) => (
                 <View key={stat.label} style={tw`flex-row items-center gap-2`}>
                   <View
@@ -566,7 +566,7 @@ export const MealsScreen = ({ navigation }: any) => {
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

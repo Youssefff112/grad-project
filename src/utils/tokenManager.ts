@@ -24,10 +24,11 @@ export const saveTokens = async (data: TokenData): Promise<void> => {
       [AUTH_TOKEN_KEY, data.accessToken],
       [REFRESH_TOKEN_KEY, data.refreshToken],
       [TOKEN_EXPIRY_KEY, String(data.expiresIn ? Date.now() + data.expiresIn * 1000 : 0)],
-    ]);
+    ]).catch((error) => {
+      console.warn('[TokenManager] Error in multiSet:', error);
+    });
   } catch (error) {
-    console.error('Failed to save tokens:', error);
-    throw error;
+    console.warn('[TokenManager] Failed to save tokens:', error);
   }
 };
 
@@ -36,9 +37,9 @@ export const saveTokens = async (data: TokenData): Promise<void> => {
  */
 export const getAccessToken = async (): Promise<string | null> => {
   try {
-    return await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+    return await AsyncStorage.getItem(AUTH_TOKEN_KEY).catch(() => null);
   } catch (error) {
-    console.error('Failed to get access token:', error);
+    console.warn('[TokenManager] Failed to get access token:', error);
     return null;
   }
 };
@@ -48,9 +49,9 @@ export const getAccessToken = async (): Promise<string | null> => {
  */
 export const getRefreshToken = async (): Promise<string | null> => {
   try {
-    return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+    return await AsyncStorage.getItem(REFRESH_TOKEN_KEY).catch(() => null);
   } catch (error) {
-    console.error('Failed to get refresh token:', error);
+    console.warn('[TokenManager] Failed to get refresh token:', error);
     return null;
   }
 };
@@ -60,13 +61,18 @@ export const getRefreshToken = async (): Promise<string | null> => {
  */
 export const isTokenValid = async (): Promise<boolean> => {
   try {
-    const expiryStr = await AsyncStorage.getItem(TOKEN_EXPIRY_KEY);
+    const expiryStr = await AsyncStorage.getItem(TOKEN_EXPIRY_KEY).catch(() => null);
     if (!expiryStr) return false;
 
-    const expiryTime = parseInt(expiryStr, 10);
-    return expiryTime > Date.now();
+    try {
+      const expiryTime = parseInt(expiryStr, 10);
+      return expiryTime > Date.now();
+    } catch (parseError) {
+      console.warn('[TokenManager] Failed to parse expiry time:', parseError);
+      return false;
+    }
   } catch (error) {
-    console.error('Failed to check token validity:', error);
+    console.warn('[TokenManager] Failed to check token validity:', error);
     return false;
   }
 };
@@ -76,10 +82,11 @@ export const isTokenValid = async (): Promise<boolean> => {
  */
 export const clearTokens = async (): Promise<void> => {
   try {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRY_KEY]);
+    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRY_KEY]).catch((error) => {
+      console.warn('[TokenManager] Error in multiRemove:', error);
+    });
   } catch (error) {
-    console.error('Failed to clear tokens:', error);
-    throw error;
+    console.warn('[TokenManager] Failed to clear tokens:', error);
   }
 };
 
@@ -88,16 +95,16 @@ export const clearTokens = async (): Promise<void> => {
  */
 export const getTokens = async (): Promise<{ accessToken: string | null; refreshToken: string | null }> => {
   try {
-    const [accessToken, refreshToken] = await AsyncStorage.multiGet([
-      AUTH_TOKEN_KEY,
-      REFRESH_TOKEN_KEY,
+    const result = await AsyncStorage.multiGet([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]).catch(() => [
+      [AUTH_TOKEN_KEY, null],
+      [REFRESH_TOKEN_KEY, null],
     ]);
     return {
-      accessToken: accessToken[1],
-      refreshToken: refreshToken[1],
+      accessToken: result[0][1],
+      refreshToken: result[1][1],
     };
   } catch (error) {
-    console.error('Failed to get tokens:', error);
+    console.warn('[TokenManager] Failed to get tokens:', error);
     return { accessToken: null, refreshToken: null };
   }
 };

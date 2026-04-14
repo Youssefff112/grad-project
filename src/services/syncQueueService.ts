@@ -40,12 +40,14 @@ export const enqueueOperation = async (
 
     const queue = await getQueue();
     queue.push(operation);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue)).catch((error) => {
+      console.warn('[SyncQueue] Error in AsyncStorage.setItem:', error);
+    });
 
     console.log(`[SyncQueue] Queued operation: ${operation.id} (${type})`);
     return operation;
   } catch (error) {
-    console.error('Error enqueueing operation:', error);
+    console.warn('[SyncQueue] Error enqueueing operation:', error);
     throw error;
   }
 };
@@ -53,17 +55,26 @@ export const enqueueOperation = async (
 // Get all queued operations sorted by priority
 export const getQueue = async (): Promise<QueuedOperation[]> => {
   try {
-    const queued = await AsyncStorage.getItem(QUEUE_KEY);
-    const operations = queued ? JSON.parse(queued) : [];
-    // Sort by priority (1 first), then by timestamp
-    return operations.sort((a: QueuedOperation, b: QueuedOperation) => {
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority;
-      }
-      return a.timestamp - b.timestamp;
-    });
+    const queued = await AsyncStorage.getItem(QUEUE_KEY).catch(() => null);
+    if (!queued) {
+      return [];
+    }
+
+    try {
+      const operations = JSON.parse(queued);
+      // Sort by priority (1 first), then by timestamp
+      return operations.sort((a: QueuedOperation, b: QueuedOperation) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
+        }
+        return a.timestamp - b.timestamp;
+      });
+    } catch (parseError) {
+      console.warn('[SyncQueue] Failed to parse queue:', parseError);
+      return [];
+    }
   } catch (error) {
-    console.error('Error retrieving queue:', error);
+    console.warn('[SyncQueue] Error retrieving queue:', error);
     return [];
   }
 };
@@ -79,10 +90,12 @@ export const removeFromQueue = async (operationId: string) => {
   try {
     const queue = await getQueue();
     const filtered = queue.filter((op) => op.id !== operationId);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(filtered));
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(filtered)).catch((error) => {
+      console.warn('[SyncQueue] Error in AsyncStorage.setItem:', error);
+    });
     console.log(`[SyncQueue] Removed operation: ${operationId}`);
   } catch (error) {
-    console.error('Error removing from queue:', error);
+    console.warn('[SyncQueue] Error removing from queue:', error);
   }
 };
 
@@ -93,13 +106,15 @@ export const incrementRetry = async (operationId: string) => {
     const operation = queue.find((op) => op.id === operationId);
     if (operation) {
       operation.retries += 1;
-      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue)).catch((error) => {
+        console.warn('[SyncQueue] Error in AsyncStorage.setItem:', error);
+      });
       console.log(
         `[SyncQueue] Incremented retries for ${operationId}: ${operation.retries}/${operation.maxRetries}`
       );
     }
   } catch (error) {
-    console.error('Error incrementing retries:', error);
+    console.warn('[SyncQueue] Error incrementing retries:', error);
   }
 };
 
@@ -121,10 +136,12 @@ export const hasExceededMaxRetries = async (operationId: string): Promise<boolea
 // Clear entire queue
 export const clearQueue = async () => {
   try {
-    await AsyncStorage.removeItem(QUEUE_KEY);
+    await AsyncStorage.removeItem(QUEUE_KEY).catch((error) => {
+      console.warn('[SyncQueue] Error in AsyncStorage.removeItem:', error);
+    });
     console.log('[SyncQueue] Queue cleared');
   } catch (error) {
-    console.error('Error clearing queue:', error);
+    console.warn('[SyncQueue] Error clearing queue:', error);
   }
 };
 

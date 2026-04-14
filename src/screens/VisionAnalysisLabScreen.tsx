@@ -265,7 +265,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

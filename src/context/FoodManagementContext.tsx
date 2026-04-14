@@ -76,23 +76,38 @@ export const FoodManagementProvider: React.FC<{ children: React.ReactNode }> = (
     const loadData = async () => {
       try {
         const [foodsData, mealsData, searchesData] = await Promise.all([
-          AsyncStorage.getItem(FOODS_STORAGE_KEY),
-          AsyncStorage.getItem(MEALS_STORAGE_KEY),
-          AsyncStorage.getItem(RECENT_SEARCHES_KEY),
+          AsyncStorage.getItem(FOODS_STORAGE_KEY).catch(() => null),
+          AsyncStorage.getItem(MEALS_STORAGE_KEY).catch(() => null),
+          AsyncStorage.getItem(RECENT_SEARCHES_KEY).catch(() => null),
         ]);
 
         if (foodsData) {
-          setFoods(JSON.parse(foodsData));
+          try {
+            setFoods(JSON.parse(foodsData));
+          } catch (parseError) {
+            console.warn('[FoodManagement] Failed to parse foods:', parseError);
+          }
         }
+
         if (mealsData) {
-          setCustomMeals(JSON.parse(mealsData));
+          try {
+            setCustomMeals(JSON.parse(mealsData));
+          } catch (parseError) {
+            console.warn('[FoodManagement] Failed to parse meals:', parseError);
+          }
         }
+
         if (searchesData) {
-          setRecentSearches(JSON.parse(searchesData));
+          try {
+            setRecentSearches(JSON.parse(searchesData));
+          } catch (parseError) {
+            console.warn('[FoodManagement] Failed to parse searches:', parseError);
+          }
         }
+
         console.log('[FoodManagement] Data loaded from AsyncStorage');
       } catch (error) {
-        console.error('[FoodManagement] Error loading data:', error);
+        console.warn('[FoodManagement] Error loading data:', error);
       } finally {
         setIsLoading(false);
       }
@@ -105,9 +120,11 @@ export const FoodManagementProvider: React.FC<{ children: React.ReactNode }> = (
   const persistFoods = useCallback(
     async (updatedFoods: Food[]) => {
       try {
-        await AsyncStorage.setItem(FOODS_STORAGE_KEY, JSON.stringify(updatedFoods));
+        await AsyncStorage.setItem(FOODS_STORAGE_KEY, JSON.stringify(updatedFoods)).catch((error) => {
+          console.warn('[FoodManagement] Error saving foods:', error);
+        });
       } catch (error) {
-        console.error('[FoodManagement] Error saving foods:', error);
+        console.warn('[FoodManagement] Unexpected error in persistFoods:', error);
       }
     },
     []
@@ -117,9 +134,11 @@ export const FoodManagementProvider: React.FC<{ children: React.ReactNode }> = (
   const persistMeals = useCallback(
     async (updatedMeals: CustomMeal[]) => {
       try {
-        await AsyncStorage.setItem(MEALS_STORAGE_KEY, JSON.stringify(updatedMeals));
+        await AsyncStorage.setItem(MEALS_STORAGE_KEY, JSON.stringify(updatedMeals)).catch((error) => {
+          console.warn('[FoodManagement] Error saving meals:', error);
+        });
       } catch (error) {
-        console.error('[FoodManagement] Error saving meals:', error);
+        console.warn('[FoodManagement] Unexpected error in persistMeals:', error);
       }
     },
     []
@@ -129,9 +148,11 @@ export const FoodManagementProvider: React.FC<{ children: React.ReactNode }> = (
   const persistSearches = useCallback(
     async (searches: string[]) => {
       try {
-        await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
+        await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches)).catch((error) => {
+          console.warn('[FoodManagement] Error saving searches:', error);
+        });
       } catch (error) {
-        console.error('[FoodManagement] Error saving searches:', error);
+        console.warn('[FoodManagement] Unexpected error in persistSearches:', error);
       }
     },
     []

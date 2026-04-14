@@ -147,10 +147,12 @@ const cacheSearchResults = async (query: string, results: Food[]): Promise<void>
       results,
       timestamp: Date.now(),
     };
-    await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData)).catch((error) => {
+      console.warn('[FoodService] Error in AsyncStorage.setItem:', error);
+    });
     console.log(`[FoodService] Cached results for: ${query}`);
   } catch (error) {
-    console.error('[FoodService] Error caching food search:', error);
+    console.warn('[FoodService] Error caching food search:', error);
   }
 };
 
@@ -160,22 +162,29 @@ const cacheSearchResults = async (query: string, results: Food[]): Promise<void>
 const getCachedFoodSearch = async (query: string): Promise<Food[] | null> => {
   try {
     const cacheKey = `${API_CACHE_PREFIX}${query.toLowerCase()}`;
-    const cached = await AsyncStorage.getItem(cacheKey);
+    const cached = await AsyncStorage.getItem(cacheKey).catch(() => null);
 
     if (!cached) return null;
 
-    const cacheData = JSON.parse(cached);
-    const age = Date.now() - cacheData.timestamp;
+    try {
+      const cacheData = JSON.parse(cached);
+      const age = Date.now() - cacheData.timestamp;
 
-    if (age > CACHE_DURATION) {
-      // Cache expired, remove it
-      await AsyncStorage.removeItem(cacheKey);
+      if (age > CACHE_DURATION) {
+        // Cache expired, remove it
+        await AsyncStorage.removeItem(cacheKey).catch((error) => {
+          console.warn('[FoodService] Error removing expired cache:', error);
+        });
+        return null;
+      }
+
+      return cacheData.results;
+    } catch (parseError) {
+      console.warn('[FoodService] Failed to parse cached food:', parseError);
       return null;
     }
-
-    return cacheData.results;
   } catch (error) {
-    console.error('[FoodService] Error getting cached results:', error);
+    console.warn('[FoodService] Error getting cached results:', error);
     return null;
   }
 };
@@ -249,28 +258,42 @@ export const importFoodFromAPI = (apiFood: Food): Food => {
  */
 export const cleanupOldCache = async (): Promise<void> => {
   try {
-    const keys = await AsyncStorage.getAllKeys();
+    const keys = await AsyncStorage.getAllKeys().catch(() => []);
+    if (!keys || keys.length === 0) return;
+
     const cacheKeys = keys.filter((k) => k.startsWith(API_CACHE_PREFIX));
+    if (cacheKeys.length === 0) return;
 
     const now = Date.now();
     const keysToRemove: string[] = [];
 
     for (const key of cacheKeys) {
-      const cached = await AsyncStorage.getItem(key);
-      if (cached) {
-        const data = JSON.parse(cached);
-        if (now - data.timestamp > CACHE_DURATION) {
-          keysToRemove.push(key);
+      try {
+        const cached = await AsyncStorage.getItem(key).catch(() => null);
+        if (cached) {
+          try {
+            const data = JSON.parse(cached);
+            if (now - data.timestamp > CACHE_DURATION) {
+              keysToRemove.push(key);
+            }
+          } catch (parseError) {
+            console.warn('[FoodService] Failed to parse cache entry:', parseError);
+            keysToRemove.push(key); // Remove unparseable entries
+          }
         }
+      } catch (error) {
+        console.warn('[FoodService] Error processing cache key:', error);
       }
     }
 
     if (keysToRemove.length > 0) {
-      await AsyncStorage.multiRemove(keysToRemove);
+      await AsyncStorage.multiRemove(keysToRemove).catch((error) => {
+        console.warn('[FoodService] Error in multiRemove:', error);
+      });
       console.log(`[FoodService] Cleaned up ${keysToRemove.length} expired cache entries`);
     }
   } catch (error) {
-    console.error('[FoodService] Error cleaning cache:', error);
+    console.warn('[FoodService] Error cleaning cache:', error);
   }
 };
 

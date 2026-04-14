@@ -1,38 +1,84 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
-import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
-import { hasFeatureAccess } from '../utils/planUtils';
 import { BottomNav } from '../components/BottomNav';
 
-const CONVERSATIONS = [
-  { id: '1', name: 'Vertex Coach', avatar: 'smart-toy', lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.', time: '2m ago', unread: 2, isAI: true, category: 'coaches' },
-  { id: '2', name: 'Dr. Sarah Miller', avatar: 'medical-services', lastMessage: 'Your recovery metrics look good. Cleared for heavy lifting.', time: '1h ago', unread: 0, isAI: false, category: 'people' },
-  { id: '3', name: 'Training Group', avatar: 'group', lastMessage: "Alex: Who's joining leg day tomorrow?", time: '3h ago', unread: 5, isAI: false, category: 'groups' },
-  { id: '4', name: 'Nutrition AI', avatar: 'restaurant', lastMessage: "Your meal plan for tomorrow has been updated based on today's workout.", time: '5h ago', unread: 1, isAI: true, category: 'ai' },
+interface Conversation {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  isAI: boolean;
+  category: 'coaches' | 'people' | 'groups' | 'ai';
+}
+
+const MOCK_CONVERSATIONS: Conversation[] = [
+  {
+    id: '1',
+    name: 'Vertex Coach',
+    avatar: 'smart-toy',
+    lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.',
+    time: '2m ago',
+    unread: 2,
+    isAI: true,
+    category: 'coaches',
+  },
+  {
+    id: '2',
+    name: 'Dr. Sarah Miller',
+    avatar: 'medical-services',
+    lastMessage: 'Your recovery metrics look good. Cleared for heavy lifting.',
+    time: '1h ago',
+    unread: 0,
+    isAI: false,
+    category: 'people',
+  },
+  {
+    id: '3',
+    name: 'Training Group',
+    avatar: 'group',
+    lastMessage: "Alex: Who's joining leg day tomorrow?",
+    time: '3h ago',
+    unread: 5,
+    isAI: false,
+    category: 'groups',
+  },
+  {
+    id: '4',
+    name: 'Nutrition AI',
+    avatar: 'restaurant',
+    lastMessage: "Your meal plan for tomorrow has been updated based on today's workout.",
+    time: '5h ago',
+    unread: 1,
+    isAI: true,
+    category: 'ai',
+  },
 ];
 
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { subscriptionPlan } = useUser();
-  const { conversations, totalUnread, markAsRead } = useNotifications();
+  const { totalUnread } = useNotifications();
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
+  const [showNewMessage, setShowNewMessage] = useState(false);
+  const [newMessageText, setNewMessageText] = useState('');
 
-  // Get unread count for each conversation from context
-  const CONVERSATIONS = [
-    { id: '1', name: 'Vertex Coach', avatar: 'smart-toy', lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.', time: '2m ago', unread: conversations.get('1') || 0, isAI: true, category: 'coaches' },
-    { id: '2', name: 'Dr. Sarah Miller', avatar: 'medical-services', lastMessage: 'Your recovery metrics look good. Cleared for heavy lifting.', time: '1h ago', unread: conversations.get('2') || 0, isAI: false, category: 'people' },
-    { id: '3', name: 'Training Group', avatar: 'group', lastMessage: "Alex: Who's joining leg day tomorrow?", time: '3h ago', unread: conversations.get('3') || 0, isAI: false, category: 'groups' },
-    { id: '4', name: 'Nutrition AI', avatar: 'restaurant', lastMessage: "Your meal plan for tomorrow has been updated based on today's workout.", time: '5h ago', unread: conversations.get('4') || 0, isAI: true, category: 'ai' },
-  ];
+  const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
+  const cardBg = isDark ? '#111128' : '#ffffff';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
+  const textSecondary = isDark ? '#94a3b8' : '#64748b';
+  const textMuted = isDark ? '#64748b' : '#94a3b8';
+  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
-  // Filter conversations based on search and category
+  // Filter conversations
   const filteredConversations = useMemo(() => {
-    let result = CONVERSATIONS;
+    let result = MOCK_CONVERSATIONS;
 
     // Apply category filter
     if (filter === 'unread') {
@@ -45,270 +91,227 @@ export const MessagesScreen = ({ navigation }: any) => {
 
     // Apply search filter
     if (searchText.trim()) {
-      result = result.filter((c) =>
-        c.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        c.lastMessage.toLowerCase().includes(searchText.toLowerCase())
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchText.toLowerCase()) ||
+          c.lastMessage.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
     return result;
-  }, [searchText, filter, conversations]);
+  }, [filter, searchText]);
+
+  const handleOpenChat = (conversation: Conversation) => {
+    navigation.navigate('Chat', { conversationId: conversation.id, conversationName: conversation.name });
+  };
+
+  const handleNewMessage = () => {
+    if (newMessageText.trim()) {
+      // Here you would send the message to backend
+      setNewMessageText('');
+      setShowNewMessage(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      {/* Header */}
-      <View style={[tw`flex-row items-center p-4 justify-between gap-3`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center`}>
-          <MaterialIcons name="arrow-back" size={24} color={accent} />
-        </TouchableOpacity>
-        <Text style={[tw`text-lg font-bold tracking-tight flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-          Messages
-        </Text>
-        {totalUnread > 0 && (
-          <View style={[tw`px-2 py-1 rounded-full`, { backgroundColor: accent }]}>
-            <Text style={tw`text-white text-xs font-bold`}>{totalUnread}</Text>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
+      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={tw`px-5 pt-5 pb-4`}>
+          <View style={tw`flex-row items-center justify-between`}>
+            <View>
+              <Text style={[tw`text-sm font-semibold`, { color: accent }]}>Messages</Text>
+              <Text style={[tw`text-2xl font-black mt-1`, { color: textPrimary }]}>Inbox</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowNewMessage(true)}>
+              <View
+                style={[
+                  tw`w-12 h-12 rounded-full items-center justify-center`,
+                  { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
+                ]}
+              >
+                <MaterialIcons name="edit" size={20} color={accent} />
+              </View>
+            </TouchableOpacity>
           </View>
-        )}
-        <TouchableOpacity style={tw`flex size-10 items-center justify-center`} onPress={() => Alert.alert('New Message', 'Start a new conversation with a coach, trainer, or AI assistant')}>
-          <MaterialIcons name="create" size={22} color={accent} />
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {/* Search Bar */}
-      <View style={[tw`mx-4 mt-4 mb-3 rounded-full px-4 py-2.5 flex-row items-center gap-2`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-        <MaterialIcons name="search" size={20} color={isDark ? '#94a3b8' : '#64748b'} />
-        <TextInput
-          style={[tw`flex-1 text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}
-          placeholder="Search messages..."
-          placeholderTextColor={isDark ? '#94a3b8' : '#64748b'}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchText('')}>
-            <MaterialIcons name="close" size={18} color={isDark ? '#94a3b8' : '#64748b'} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Filter Tabs */}
-      <View style={[tw`flex-row gap-2 px-4 py-3`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
-        {[
-          { id: 'all' as const, label: 'All', icon: 'mail' as const },
-          { id: 'unread' as const, label: 'Unread', icon: 'mail-outline' as const },
-          { id: 'ai' as const, label: 'AI', icon: 'smart-toy' as const },
-          { id: 'people' as const, label: 'People', icon: 'person' as const },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            onPress={() => setFilter(tab.id)}
+        {/* Search Bar */}
+        <View style={tw`px-5 mb-4`}>
+          <View
             style={[
-              tw`flex-row items-center gap-1.5 px-3 py-2 rounded-full`,
-              filter === tab.id
-                ? { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent }
-                : { backgroundColor: isDark ? '#111128' : 'transparent' },
+              tw`flex-row items-center px-4 py-3 rounded-xl gap-2`,
+              { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
             ]}
           >
-            <MaterialIcons
-              name={tab.icon}
-              size={16}
-              color={filter === tab.id ? accent : isDark ? '#94a3b8' : '#64748b'}
+            <MaterialIcons name="search" size={20} color={textMuted} />
+            <TextInput
+              style={[tw`flex-1 text-base`, { color: textPrimary }]}
+              placeholder="Search conversations..."
+              placeholderTextColor={textMuted}
+              value={searchText}
+              onChangeText={setSearchText}
             />
-            <Text
+          </View>
+        </View>
+
+        {/* Filter Tabs */}
+        <View style={tw`px-5 mb-5 flex-row gap-2`}>
+          {['all', 'unread', 'ai', 'people'].map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setFilter(tab as any)}
               style={[
-                tw`text-xs font-bold`,
-                { color: filter === tab.id ? accent : isDark ? '#94a3b8' : '#64748b' },
+                tw`px-4 py-2 rounded-full`,
+                {
+                  backgroundColor: filter === tab ? accent : isDark ? '#1e293b' : '#f1f5f9',
+                },
               ]}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`} showsVerticalScrollIndicator={false}>
-        {filteredConversations.length === 0 ? (
-          <View style={tw`flex-1 items-center justify-center py-12`}>
-            <MaterialIcons name="mail-outline" size={48} color={isDark ? '#1e293b' : '#e2e8f0'} />
-            <Text style={[tw`text-sm font-semibold mt-3`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-              {searchText ? 'No messages found' : 'No conversations'}
-            </Text>
-          </View>
-        ) : (
-          filteredConversations.map((convo, index) => {
-            // Determine if this conversation is locked
-            const isAILocked = convo.isAI && convo.name.includes('Vertex Coach') && !hasFeatureAccess(subscriptionPlan, 'hasAIChat');
-            const isCoachLocked = convo.isAI && convo.name.includes('Dr.') && !hasFeatureAccess(subscriptionPlan, 'hasCoachChat');
-
-            return (
-              <TouchableOpacity
-                key={convo.id}
-                onPress={() => {
-                  if (isAILocked) {
-                    Alert.alert(
-                      'Feature Locked',
-                      'AI Chat is only available on Premium and Elite plans. Upgrade now to access AI coaching.',
-                      [
-                        { text: 'Cancel', onPress: () => {} },
-                        { text: 'Upgrade', onPress: () => navigation.navigate('SubscriptionPlans') },
-                      ]
-                    );
-                  } else if (isCoachLocked) {
-                    Alert.alert(
-                      'Feature Locked',
-                      'Coach Chat is only available on Pro Coach and Elite plans. Upgrade now to connect with your dedicated coach.',
-                      [
-                        { text: 'Cancel', onPress: () => {} },
-                        { text: 'Upgrade', onPress: () => navigation.navigate('SubscriptionPlans') },
-                      ]
-                    );
-                  } else {
-                    // Mark conversation as read
-                    markAsRead(convo.id);
-                    navigation.navigate('Chat', { chatName: convo.name, isAI: convo.isAI });
-                  }
-                }}
-                onLongPress={() =>
-                  !isAILocked && !isCoachLocked &&
-                  Alert.alert('Message Options', '', [
-                    { text: 'Mute Notifications', onPress: () => Alert.alert('Muted', `Notifications muted for ${convo.name}`) },
-                    { text: 'Archive', onPress: () => Alert.alert('Archived', `${convo.name} archived`) },
-                    { text: 'Pin Conversation', onPress: () => Alert.alert('Pinned', `${convo.name} pinned to top`) },
-                    { text: 'Delete', style: 'destructive', onPress: () => Alert.alert('Deleted', `${convo.name} conversation deleted`) },
-                    { text: 'Cancel', style: 'cancel' },
-                  ])
-                }
-                delayLongPress={400}
+              <Text
                 style={[
-                  tw`flex-row items-center gap-3 px-4 py-3.5`,
-                  {
-                    backgroundColor:
-                      convo.unread > 0 ? (isDark ? '#1a1a2e' : accent + '08') : 'transparent',
+                  tw`text-xs font-bold capitalize`,
+                  { color: filter === tab ? '#ffffff' : textSecondary },
+                ]}
+              >
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Conversations List */}
+        <View style={tw`px-5`}>
+          {filteredConversations.length > 0 ? (
+            filteredConversations.map((conversation, index) => (
+              <TouchableOpacity
+                key={conversation.id}
+                onPress={() => handleOpenChat(conversation)}
+                style={[
+                  tw`flex-row items-center gap-3 py-4`,
+                  index < filteredConversations.length - 1 && {
                     borderBottomWidth: 1,
-                    borderColor:
-                      index < filteredConversations.length - 1
-                        ? isDark
-                          ? 'rgba(255,255,255,0.04)'
-                          : 'rgba(0,0,0,0.03)'
-                        : 'transparent',
-                    opacity: isAILocked || isCoachLocked ? 0.6 : 1,
+                    borderColor: dividerColor,
                   },
                 ]}
               >
                 {/* Avatar */}
                 <View
                   style={[
-                    tw`relative h-12 w-12 rounded-full items-center justify-center flex-shrink-0`,
-                    {
-                      backgroundColor: convo.isAI ? accent + '20' : isDark ? '#1e293b' : '#f1f5f9',
-                      borderWidth: convo.isAI ? 1 : 0,
-                      borderColor: accent + '40',
-                    },
+                    tw`w-14 h-14 rounded-full items-center justify-center flex-shrink-0`,
+                    { backgroundColor: accent + '18', borderWidth: 2, borderColor: accent + '28' },
                   ]}
                 >
-                  <MaterialIcons
-                    name={convo.avatar as any}
-                    size={24}
-                    color={convo.isAI ? accent : isDark ? '#94a3b8' : '#64748b'}
-                  />
-                  {(isAILocked || isCoachLocked) && (
-                    <View style={[tw`absolute inset-0 rounded-full items-center justify-center`, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-                      <MaterialIcons name="lock" size={16} color="white" />
-                    </View>
-                  )}
-                  {convo.unread > 0 && !isAILocked && !isCoachLocked && (
-                    <View
-                      style={[
-                        tw`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2`,
-                        { backgroundColor: accent, borderColor: isDark ? '#0a0a12' : '#f8f7f5' },
-                      ]}
-                    />
-                  )}
+                  <MaterialIcons name={conversation.avatar as any} size={24} color={accent} />
                 </View>
 
                 {/* Content */}
-                <View style={tw`flex-1 min-w-0`}>
-                  <View style={tw`flex-row items-center justify-between mb-1.5`}>
-                    <View style={tw`flex-row items-center gap-2 flex-1`}>
-                      <Text
-                        style={[
-                          tw`font-bold flex-1`,
-                          {
-                            color: convo.unread > 0 ? (isDark ? '#f1f5f9' : '#1e293b') : isDark ? '#cbd5e1' : '#475569',
-                            fontSize: convo.unread > 0 ? 15 : 14,
-                          },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {convo.name}
-                      </Text>
-                      {convo.isAI && (
-                        <View style={[tw`px-1.5 py-0.5 rounded`, { backgroundColor: accent + '20' }]}>
-                          <Text style={[tw`text-[9px] font-bold uppercase`, { color: accent }]}>
-                            {isAILocked || isCoachLocked ? 'Locked' : 'AI'}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text
-                      style={[
-                        tw`text-xs`,
-                        { color: convo.unread > 0 ? accent : '#94a3b8' },
-                      ]}
-                    >
-                      {convo.time}
-                    </Text>
+                <View style={tw`flex-1`}>
+                  <View style={tw`flex-row items-center justify-between mb-1`}>
+                    <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>{conversation.name}</Text>
+                    <Text style={[tw`text-xs`, { color: textMuted }]}>{conversation.time}</Text>
                   </View>
-
-                  {/* Message Preview */}
-                  <View style={tw`flex-row items-center justify-between gap-2`}>
-                    <Text
-                      style={[
-                        tw`text-sm flex-1`,
-                        {
-                          color: convo.unread > 0 ? (isDark ? '#cbd5e1' : '#475569') : '#94a3b8',
-                          fontWeight: convo.unread > 0 ? '600' : '400',
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {isAILocked || isCoachLocked ? '🔒 Upgrade to unlock' : convo.lastMessage}
-                    </Text>
-
-                    {/* Unread Badge */}
-                    {convo.unread > 0 && !isAILocked && !isCoachLocked && (
-                      <View
-                        style={[
-                          tw`min-w-[20px] h-5 rounded-full items-center justify-center px-1.5 flex-shrink-0`,
-                          { backgroundColor: accent },
-                        ]}
-                      >
-                        <Text style={tw`text-white text-[10px] font-bold`}>
-                          {convo.unread > 99 ? '99+' : convo.unread}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                  <Text
+                    style={[tw`text-sm`, { color: textSecondary }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {conversation.lastMessage}
+                  </Text>
                 </View>
+
+                {/* Unread Badge */}
+                {conversation.unread > 0 && (
+                  <View
+                    style={[
+                      tw`w-6 h-6 rounded-full items-center justify-center flex-shrink-0`,
+                      { backgroundColor: accent },
+                    ]}
+                  >
+                    <Text style={tw`text-white text-xs font-bold`}>
+                      {conversation.unread > 99 ? '99+' : conversation.unread}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
-            );
-          })
-        )}
+            ))
+          ) : (
+            <View style={tw`items-center justify-center py-12`}>
+              <MaterialIcons name="mail-outline" size={48} color={textMuted} />
+              <Text style={[tw`text-base font-semibold mt-4`, { color: textPrimary }]}>No conversations</Text>
+              <Text style={[tw`text-sm mt-2`, { color: textMuted }]}>Try searching or creating a new message</Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
 
+      {/* New Message Modal */}
+      {showNewMessage && (
+        <View
+          style={[
+            tw`absolute bottom-0 left-0 right-0 rounded-t-3xl p-5`,
+            { backgroundColor: cardBg, borderTopWidth: 1, borderColor: cardBorder },
+          ]}
+        >
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>New Message</Text>
+            <TouchableOpacity onPress={() => setShowNewMessage(false)}>
+              <MaterialIcons name="close" size={24} color={textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          <TextInput
+            style={[
+              tw`rounded-xl p-4 text-base mb-4`,
+              {
+                backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                color: textPrimary,
+                borderWidth: 1,
+                borderColor: cardBorder,
+                minHeight: 100,
+              },
+            ]}
+            placeholder="Type your message..."
+            placeholderTextColor={textMuted}
+            value={newMessageText}
+            onChangeText={setNewMessageText}
+            multiline
+            numberOfLines={4}
+          />
+
+          <View style={tw`flex-row gap-3`}>
+            <TouchableOpacity
+              style={[tw`flex-1 py-3 rounded-xl items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+              onPress={() => setShowNewMessage(false)}
+            >
+              <Text style={[tw`font-bold`, { color: textPrimary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[tw`flex-1 py-3 rounded-xl items-center justify-center`, { backgroundColor: accent }]}
+              onPress={handleNewMessage}
+            >
+              <Text style={[tw`font-bold text-white`]}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Bottom Navigation */}
       <BottomNav
         activeId="messages"
         onSelect={(id) => {
           if (id === 'home') navigation.navigate('TraineeCommandCenter');
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
+          if (id === 'track') navigation.navigate('DailyTracker');
           if (id === 'meals') navigation.navigate('Meals');
           if (id === 'profile') navigation.navigate('Profile');
         }}
         items={[
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
+          { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

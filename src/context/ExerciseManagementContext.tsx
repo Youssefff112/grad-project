@@ -44,63 +44,75 @@ export const ExerciseManagementProvider: React.FC<{ children: React.ReactNode }>
   const [workouts, setWorkouts] = useState<CustomWorkout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load exercises from AsyncStorage on mount
+  // Load all data from AsyncStorage on mount
   useEffect(() => {
-    const loadExercises = async () => {
+    const loadData = async () => {
       try {
-        const stored = await AsyncStorage.getItem('exercises');
-        if (stored) {
-          setExercises(JSON.parse(stored));
+        const [exercisesData, workoutsData] = await Promise.all([
+          AsyncStorage.getItem('exercises').catch(() => null),
+          AsyncStorage.getItem('workouts').catch(() => null),
+        ]);
+
+        if (exercisesData) {
+          try {
+            setExercises(JSON.parse(exercisesData));
+          } catch (parseError) {
+            console.warn('[ExerciseContext] Failed to parse exercises:', parseError);
+          }
         }
+
+        if (workoutsData) {
+          try {
+            setWorkouts(JSON.parse(workoutsData));
+          } catch (parseError) {
+            console.warn('[ExerciseContext] Failed to parse workouts:', parseError);
+          }
+        }
+
+        console.log('[ExerciseContext] Data loaded from AsyncStorage');
       } catch (error) {
-        console.error('[ExerciseContext] Error loading exercises:', error);
+        console.warn('[ExerciseContext] Error loading data:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    loadExercises();
+
+    loadData();
   }, []);
 
-  // Load workouts from AsyncStorage on mount
+  // Save exercises to AsyncStorage (with debounce via dependency array)
   useEffect(() => {
-    const loadWorkouts = async () => {
-      try {
-        const stored = await AsyncStorage.getItem('workouts');
-        if (stored) {
-          setWorkouts(JSON.parse(stored));
-        }
-      } catch (error) {
-        console.error('[ExerciseContext] Error loading workouts:', error);
-      }
-    };
-    loadWorkouts();
-  }, []);
+    if (isLoading) return; // Don't save while loading
 
-  // Save exercises to AsyncStorage whenever they change
-  useEffect(() => {
     const saveExercises = async () => {
       try {
-        await AsyncStorage.setItem('exercises', JSON.stringify(exercises));
+        await AsyncStorage.setItem('exercises', JSON.stringify(exercises)).catch((error) => {
+          console.warn('[ExerciseContext] Error saving exercises:', error);
+        });
       } catch (error) {
-        console.error('[ExerciseContext] Error saving exercises:', error);
+        console.warn('[ExerciseContext] Unexpected error in saveExercises:', error);
       }
     };
-    if (!isLoading) {
-      saveExercises();
-    }
+
+    saveExercises();
   }, [exercises, isLoading]);
 
-  // Save workouts to AsyncStorage whenever they change
+  // Save workouts to AsyncStorage (with debounce via dependency array)
   useEffect(() => {
+    if (isLoading) return; // Don't save while loading
+
     const saveWorkouts = async () => {
       try {
-        await AsyncStorage.setItem('workouts', JSON.stringify(workouts));
+        await AsyncStorage.setItem('workouts', JSON.stringify(workouts)).catch((error) => {
+          console.warn('[ExerciseContext] Error saving workouts:', error);
+        });
       } catch (error) {
-        console.error('[ExerciseContext] Error saving workouts:', error);
+        console.warn('[ExerciseContext] Unexpected error in saveWorkouts:', error);
       }
     };
+
     saveWorkouts();
-  }, [workouts]);
+  }, [workouts, isLoading]);
 
   const addExercise = useCallback(async (exercise: Omit<Exercise, 'id' | 'createdAt'>) => {
     const id = Date.now().toString();

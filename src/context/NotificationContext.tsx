@@ -33,15 +33,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     const loadPersistedNotifications = async () => {
       try {
-        const cached = await AsyncStorage.getItem(NOTIFICATIONS_CACHE_KEY);
+        const cached = await AsyncStorage.getItem(NOTIFICATIONS_CACHE_KEY).catch(() => null);
         if (cached) {
-          const entries = JSON.parse(cached);
-          const newMap = new Map(entries);
-          setConversations(newMap);
-          console.log('[Notifications] Loaded persisted notifications');
+          try {
+            const entries = JSON.parse(cached);
+            const newMap = new Map(entries);
+            setConversations(newMap);
+            console.log('[Notifications] Loaded persisted notifications');
+          } catch (parseError) {
+            console.warn('[Notifications] Failed to parse cached notifications:', parseError);
+          }
         }
       } catch (error) {
-        console.error('Error loading persisted notifications:', error);
+        console.warn('[Notifications] Error loading persisted notifications:', error);
       }
     };
 
@@ -54,9 +58,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const persistNotifications = useCallback(async (map: Map<string, number>) => {
     try {
       const entries = Array.from(map.entries());
-      await AsyncStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(entries));
+      await AsyncStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(entries)).catch((error) => {
+        console.warn('[Notifications] Error in AsyncStorage.setItem:', error);
+      });
     } catch (error) {
-      console.error('Error persisting notifications:', error);
+      console.warn('[Notifications] Error persisting notifications:', error);
     }
   }, []);
 

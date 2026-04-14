@@ -120,38 +120,72 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // Load user profile data
-        const savedName = await AsyncStorage.getItem('user_fullname');
-        const savedEmail = await AsyncStorage.getItem('user_email');
-        const savedWeight = await AsyncStorage.getItem('user_weight');
-        const savedBodyFat = await AsyncStorage.getItem('user_body_fat_percentage');
-        const savedMode = await AsyncStorage.getItem('user_mode') as UserMode | null;
-        const savedPlan = await AsyncStorage.getItem('user_subscription_plan') as SubscriptionPlan | null;
-        const savedExperience = await AsyncStorage.getItem('user_experience_level') as ExperienceLevel | null;
-        const savedDiet = await AsyncStorage.getItem('user_diet_preferences');
-        const savedCoachId = await AsyncStorage.getItem('user_coach_id');
-        const savedCoachName = await AsyncStorage.getItem('user_coach_name');
-        const savedCV = await AsyncStorage.getItem('user_cv_enabled');
-        const savedAI = await AsyncStorage.getItem('user_ai_enabled');
-        const savedReviewDate = await AsyncStorage.getItem('user_last_plan_review');
-        const savedUserId = await AsyncStorage.getItem('user_id');
+        // Load user profile data with defensive error handling
+        const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId] =
+          await Promise.all([
+            AsyncStorage.getItem('user_fullname').catch(() => null),
+            AsyncStorage.getItem('user_email').catch(() => null),
+            AsyncStorage.getItem('user_weight').catch(() => null),
+            AsyncStorage.getItem('user_body_fat_percentage').catch(() => null),
+            AsyncStorage.getItem('user_mode').catch(() => null),
+            AsyncStorage.getItem('user_subscription_plan').catch(() => null),
+            AsyncStorage.getItem('user_experience_level').catch(() => null),
+            AsyncStorage.getItem('user_diet_preferences').catch(() => null),
+            AsyncStorage.getItem('user_coach_id').catch(() => null),
+            AsyncStorage.getItem('user_coach_name').catch(() => null),
+            AsyncStorage.getItem('user_cv_enabled').catch(() => null),
+            AsyncStorage.getItem('user_ai_enabled').catch(() => null),
+            AsyncStorage.getItem('user_last_plan_review').catch(() => null),
+            AsyncStorage.getItem('user_id').catch(() => null),
+          ]);
 
         // Load authentication data
         const tokens = await tokenManager.getTokens();
         const isTokenValid = await tokenManager.isTokenValid();
 
+        // Set profile data with safe parsing
         if (savedName) setFullNameState(savedName);
         if (savedEmail) setEmailState(savedEmail);
-        if (savedWeight) setWeightState(parseFloat(savedWeight));
-        if (savedBodyFat) setBodyFatPercentageState(parseFloat(savedBodyFat));
-        if (savedMode) setUserModeState(savedMode);
-        if (savedPlan) setSubscriptionPlanState(savedPlan);
-        if (savedExperience) setExperienceLevelState(savedExperience);
-        if (savedDiet) setDietPreferencesState(JSON.parse(savedDiet));
+        if (savedWeight) {
+          try {
+            setWeightState(parseFloat(savedWeight));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse weight:', e);
+          }
+        }
+        if (savedBodyFat) {
+          try {
+            setBodyFatPercentageState(parseFloat(savedBodyFat));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse body fat:', e);
+          }
+        }
+        if (savedMode) setUserModeState(savedMode as UserMode);
+        if (savedPlan) setSubscriptionPlanState(savedPlan as SubscriptionPlan);
+        if (savedExperience) setExperienceLevelState(savedExperience as ExperienceLevel);
+        if (savedDiet) {
+          try {
+            setDietPreferencesState(JSON.parse(savedDiet));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse diet preferences:', e);
+          }
+        }
         if (savedCoachId) setCoachIdState(savedCoachId);
         if (savedCoachName) setCoachNameState(savedCoachName);
-        if (savedCV) setCanUseComputerVisionState(JSON.parse(savedCV));
-        if (savedAI) setCanUseAIAssistantState(JSON.parse(savedAI));
+        if (savedCV) {
+          try {
+            setCanUseComputerVisionState(JSON.parse(savedCV));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse CV setting:', e);
+          }
+        }
+        if (savedAI) {
+          try {
+            setCanUseAIAssistantState(JSON.parse(savedAI));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse AI setting:', e);
+          }
+        }
         if (savedReviewDate) setLastPlanReviewDateState(savedReviewDate);
 
         // Set authentication state if tokens are valid
