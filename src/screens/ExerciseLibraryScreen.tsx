@@ -32,9 +32,15 @@ export const ExerciseLibraryScreen = ({ navigation }: any) => {
   // Get unique muscle groups from exercises
   const uniqueMuscleGroups = useMemo(() => {
     const muscles = new Set<string>();
-    exercises.forEach((ex) => {
-      ex.muscleGroups.forEach((m) => muscles.add(m));
-    });
+    if (Array.isArray(exercises) && exercises.length > 0) {
+      exercises.forEach((ex) => {
+        if (ex && Array.isArray(ex.muscleGroups)) {
+          ex.muscleGroups.forEach((m) => {
+            if (m) muscles.add(m);
+          });
+        }
+      });
+    }
     return Array.from(muscles).sort();
   }, [exercises]);
 

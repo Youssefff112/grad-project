@@ -13,11 +13,15 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { FormInput } from '../components/FormInput';
+import { apiPost } from '../services/api';
 
 export const CodeVerificationScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
-  const { email } = route.params || {};
+  const { email, resetToken } = route.params || {};
   const [codes, setCodes] = useState(['', '', '', '', '', '']);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -63,7 +67,7 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const fullCode = codes.join('');
 
     if (fullCode.length !== 6) {
@@ -71,15 +75,35 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
       return;
     }
 
+    if (!newPassword || newPassword.length < 8) {
+      Alert.alert('Validation', 'New password must be at least 8 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Validation', 'Passwords do not match');
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate API verification
-    setTimeout(() => {
-      setIsLoading(false);
-      // Navigate to password reset screen
-      Alert.alert('Success', 'Code verified! You can now reset your password.');
+    try {
+      if (resetToken) {
+        // Use the reset token from the forgot-password response
+        await apiPost(`/auth/reset-password/${resetToken}`, {
+          password: newPassword,
+          confirmPassword: confirmPassword,
+        });
+      }
+
+      Alert.alert('Success', 'Password reset successfully! Please sign in with your new password.');
       navigation.navigate('SignIn');
-    }, 1500);
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Failed to reset password. Please try again.';
+      Alert.alert('Error', msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResendCode = () => {
@@ -185,6 +209,28 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
               </Text>
             </View>
           </Card>
+
+          {/* New Password Fields */}
+          <FormInput
+            label="New Password"
+            placeholder="Min. 8 characters"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            isPassword
+            autoCapitalize="none"
+            autoComplete="new-password"
+            disabled={isLoading}
+          />
+
+          <FormInput
+            label="Confirm New Password"
+            placeholder="Repeat new password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            isPassword
+            autoCapitalize="none"
+            disabled={isLoading}
+          />
         </View>
       </ScrollView>
 
@@ -193,7 +239,7 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
           title={isLoading ? "Verifying..." : "Verify Code"}
           size="lg"
           onPress={handleVerify}
-          disabled={isLoading || codes.join('').length !== 6}
+          disabled={isLoading || codes.join('').length !== 6 || !newPassword || newPassword !== confirmPassword}
           icon={!isLoading && <MaterialIcons name="check-circle" size={20} color="white" style={tw`ml-2`} />}
         />
         <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.goBack()}>

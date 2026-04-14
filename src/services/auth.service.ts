@@ -3,7 +3,7 @@
  * Handles authentication API calls (login, register, refresh, logout)
  */
 
-import { apiPost } from './api';
+import { apiGet, apiPost, apiPatch } from './api';
 import * as tokenManager from '../utils/tokenManager';
 
 export interface LoginRequest {
@@ -109,7 +109,7 @@ export const register = async (userData: RegisterRequest): Promise<RegisterRespo
  * Get current user profile
  */
 export const getProfile = async (): Promise<ProfileResponse> => {
-  return apiPost<ProfileResponse>('/users/profile');
+  return apiGet<ProfileResponse>('/users/profile');
 };
 
 /**
@@ -131,7 +131,7 @@ export const logout = async (): Promise<void> => {
  * Update user profile
  */
 export const updateProfile = async (updates: Partial<User>): Promise<ProfileResponse> => {
-  return apiPost<ProfileResponse>('/users/profile', updates);
+  return apiPatch<ProfileResponse>('/users/profile', updates);
 };
 
 /**

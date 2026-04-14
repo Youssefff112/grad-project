@@ -410,7 +410,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                     Sample Day
                   </Text>
                   <View style={tw`gap-3`}>
-                    {generatedMeal.meals.map((meal, mealIdx) => (
+                    {generatedMeal?.meals && Array.isArray(generatedMeal.meals) ? generatedMeal.meals.map((meal, mealIdx) => (
                       <View key={mealIdx} style={[tw`rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                         <View style={tw`flex-row items-center justify-between mb-3`}>
                           <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
@@ -421,7 +421,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                           </Text>
                         </View>
                         <View style={tw`gap-2`}>
-                          {meal.items.map((item, itemIdx) => (
+                          {meal?.items && Array.isArray(meal.items) ? meal.items.map((item, itemIdx) => (
                             <View key={itemIdx} style={tw`flex-row items-center justify-between py-2`}>
                               <View style={tw`flex-1`}>
                                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
@@ -443,10 +443,10 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                                 <MaterialIcons name="edit" size={14} color={accent} />
                               </TouchableOpacity>
                             </View>
-                          ))}
+                          )) : null}
                         </View>
                       </View>
-                    ))}
+                    )) : null}
                   </View>
                 </View>
               </>

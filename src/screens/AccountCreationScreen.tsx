@@ -14,10 +14,11 @@ import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
+import * as authService from '../services/auth.service';
 
 export const AccountCreationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail } = useUser();
+  const { setFullName, setEmail: saveEmail, setAuthTokens } = useUser();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +56,7 @@ export const AccountCreationScreen = ({ navigation }: any) => {
     return newErrors;
   };
 
-  const handleCreateAccount = () => {
+  const handleCreateAccount = async () => {
     const formErrors = validateForm();
     if (Object.keys(formErrors).length > 0) {
       setErrors(formErrors);
@@ -65,11 +66,47 @@ export const AccountCreationScreen = ({ navigation }: any) => {
 
     setIsLoading(true);
     try {
-      setFullName(name);
-      saveEmail(email);
-      navigation.navigate('SubscriptionSelection');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to create account. Please try again.');
+      // Split full name into firstName and lastName for the backend
+      const nameParts = name.trim().split(/\s+/);
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || firstName;
+
+      // Call backend registration API
+      const response = await authService.register({
+        firstName,
+        lastName,
+        email,
+        password,
+        userType: 'offline',
+        role: 'client',
+      });
+
+      if (response.success && response.data?.token) {
+        // Save auth tokens
+        await setAuthTokens(response.data.token, response.data.refreshToken);
+
+        // Save user info locally
+        setFullName(name);
+        saveEmail(email);
+
+        navigation.navigate('SubscriptionSelection');
+      }
+    } catch (error: any) {
+      let errorMessage = 'Failed to create account. Please try again.';
+
+      if (error.response?.status === 400) {
+        const msg = error.response?.data?.message;
+        errorMessage = msg || 'Invalid registration data. Please check your inputs.';
+      } else if (error.message === 'Network Error' || !error.response) {
+        // Fallback: allow local-only account creation when backend is unavailable
+        console.log('Backend unavailable, creating local-only account...');
+        setFullName(name);
+        saveEmail(email);
+        navigation.navigate('SubscriptionSelection');
+        return;
+      }
+
+      Alert.alert('Registration Error', errorMessage);
       console.error('Account creation error:', error);
     } finally {
       setIsLoading(false);

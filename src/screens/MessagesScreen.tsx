@@ -123,16 +123,40 @@ export const MessagesScreen = ({ navigation }: any) => {
               <Text style={[tw`text-sm font-semibold`, { color: accent }]}>Messages</Text>
               <Text style={[tw`text-2xl font-black mt-1`, { color: textPrimary }]}>Inbox</Text>
             </View>
-            <TouchableOpacity onPress={() => setShowNewMessage(true)}>
-              <View
-                style={[
-                  tw`w-12 h-12 rounded-full items-center justify-center`,
-                  { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
-                ]}
-              >
-                <MaterialIcons name="edit" size={20} color={accent} />
-              </View>
-            </TouchableOpacity>
+            <View style={tw`flex-row items-center gap-3`}>
+              <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+                <View
+                  style={[
+                    tw`w-12 h-12 rounded-full items-center justify-center relative`,
+                    { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
+                  ]}
+                >
+                  <MaterialIcons name="notifications" size={20} color={accent} />
+                  {totalUnread > 0 && (
+                    <View
+                      style={[
+                        tw`absolute -top-1 -right-1 w-5 h-5 rounded-full items-center justify-center`,
+                        { backgroundColor: accent },
+                      ]}
+                    >
+                      <Text style={tw`text-white text-xs font-bold`}>
+                        {totalUnread > 99 ? '99+' : totalUnread}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowNewMessage(true)}>
+                <View
+                  style={[
+                    tw`w-12 h-12 rounded-full items-center justify-center`,
+                    { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
+                  ]}
+                >
+                  <MaterialIcons name="edit" size={20} color={accent} />
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

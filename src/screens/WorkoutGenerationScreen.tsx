@@ -384,7 +384,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                     Exercises
                   </Text>
                   <View style={tw`gap-2`}>
-                    {generatedWorkout.exercises.map((exercise, idx) => (
+                    {generatedWorkout?.exercises && Array.isArray(generatedWorkout.exercises) ? generatedWorkout.exercises.map((exercise, idx) => (
                       <View key={idx} style={[tw`rounded-xl p-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                         <View style={tw`flex-row items-start justify-between mb-2`}>
                           <Text style={[tw`font-bold text-sm flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
@@ -406,7 +406,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                           </Text>
                         </View>
                       </View>
-                    ))}
+                    )) : null}
                   </View>
                 </View>
               </>

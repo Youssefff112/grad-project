@@ -36,21 +36,6 @@ const MOCK_MESSAGES: Message[] = [
   { id: '4', text: 'Sounds good! Let me get warmed up.', sender: 'user', timestamp: '9:05 AM', delivered: true, read: true },
   { id: '5', text: 'Perfect! Remember to focus on form over weight today.', sender: 'other', timestamp: '9:05 AM', read: true },
 ];
-    id: '4',
-    text: "Sounds good, let's go",
-    sent: true,
-    timestamp: '9:02 AM',
-    delivered: true,
-    read: true,
-  },
-  {
-    id: '5',
-    text: 'Remember to focus on controlled eccentric phase. Your tempo was slightly fast last session.',
-    sent: false,
-    timestamp: '9:02 AM',
-    read: true,
-  },
-];
 
 const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 

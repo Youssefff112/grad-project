@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
+import { apiPost } from '../services/api';
 
 export const ForgotPasswordScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -32,7 +33,7 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
     return '';
   };
 
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
     const validationError = validateEmail();
     if (validationError) {
       setError(validationError);
@@ -42,12 +43,23 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
 
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await apiPost('/auth/forgot-password', { email });
+      // Pass email and resetToken (if returned in dev mode) to verification screen
+      navigation.navigate('CodeVerification', { 
+        email,
+        resetToken: response?.data?.resetToken || null,
+      });
+    } catch (error: any) {
+      if (error.message === 'Network Error' || !error.response) {
+        Alert.alert('Error', 'Unable to connect to the server. Please check your connection.');
+      } else {
+        // Always show success message for security (don't reveal if email exists)
+        navigation.navigate('CodeVerification', { email, resetToken: null });
+      }
+    } finally {
       setIsLoading(false);
-      // Pass email to verification screen
-      navigation.navigate('CodeVerification', { email });
-    }, 1500);
+    }
   };
 
   return (

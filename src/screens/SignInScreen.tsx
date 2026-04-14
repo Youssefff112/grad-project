@@ -80,7 +80,7 @@ export const SignInScreen = ({ navigation }: any) => {
     } catch (error: any) {
       let errorMessage = 'Sign in failed. Please try again.';
 
-      if (error.response?.status === 400) {
+      if (error.response?.status === 401) {
         errorMessage = 'Invalid email or password';
       } else if (error.response?.status === 429) {
         errorMessage = 'Too many login attempts. Please try again later.';

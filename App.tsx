@@ -47,6 +47,7 @@ import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
 import { WorkoutBuilderScreen } from './src/screens/WorkoutBuilderScreen';
 import { DailyTrackerScreen } from './src/screens/DailyTrackerScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -93,6 +94,7 @@ function AppNavigator() {
       <Stack.Screen name="DailyTracker" component={DailyTrackerScreen} />
       <Stack.Screen name="ProgressScreen" component={ProgressScreen} />
       <Stack.Screen name="Messages" component={MessagesScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
