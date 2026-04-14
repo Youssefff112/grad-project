@@ -75,13 +75,16 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
 
   // Calculate consumed macros from checked custom meals
   const consumedMacros = useMemo(() => {
+    if (!meals || !Array.isArray(meals)) {
+      return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    }
     return meals.reduce(
       (acc, meal) => {
         if (checkedMeals[meal.id]) {
-          acc.calories += meal.totalCalories;
-          acc.protein += meal.totalMacros.protein;
-          acc.carbs += meal.totalMacros.carbs;
-          acc.fats += meal.totalMacros.fats;
+          acc.calories += meal.totalCalories || 0;
+          acc.protein += meal.totalMacros?.protein || 0;
+          acc.carbs += meal.totalMacros?.carbs || 0;
+          acc.fats += meal.totalMacros?.fats || 0;
         }
         return acc;
       },
@@ -438,7 +441,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
           { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

@@ -241,35 +241,6 @@ export const ChatScreen = ({ navigation, route }: any) => {
           <MaterialIcons name="more-vert" size={24} color={primaryText} />
         </TouchableOpacity>
       </View>
-        <View style={tw`flex-row items-center gap-3 flex-1`}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <MaterialIcons name="arrow-back" size={24} color={accent} />
-          </TouchableOpacity>
-
-          <View style={tw`flex-1 flex-row items-center gap-2`}>
-            <View
-              style={[
-                tw`h-10 w-10 rounded-full items-center justify-center`,
-                { backgroundColor: accent + '20' },
-              ]}
-            >
-              <MaterialIcons name={isAI ? 'smart-toy' : 'person'} size={22} color={accent} />
-            </View>
-            <View style={tw`flex-1`}>
-              <Text style={{ color: primaryText, fontSize: 16, fontWeight: '700' }}>
-                {chatName}
-              </Text>
-              <Text style={{ color: secondaryText, fontSize: 11 }}>
-                {isAI ? 'Online' : 'Active now'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity onPress={() => showChatOptions()} style={tw`p-2`}>
-          <MaterialIcons name="more-vert" size={24} color={secondaryText} />
-        </TouchableOpacity>
-      </View>
 
       {/* Messages */}
       <KeyboardAvoidingView
