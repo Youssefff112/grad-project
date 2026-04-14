@@ -6,6 +6,8 @@ import { UserProvider, useUser } from './src/context/UserContext';
 import { LoadingProvider } from './src/context/LoadingContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import { OfflineProvider } from './src/context/OfflineContext';
+import { FoodManagementProvider } from './src/context/FoodManagementContext';
+import { ExerciseManagementProvider } from './src/context/ExerciseManagementContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
@@ -36,6 +38,15 @@ import { MealGenerationScreen } from './src/screens/MealGenerationScreen';
 import { CoachAssignmentScreen } from './src/screens/CoachAssignmentScreen';
 import { EditExperienceScreen } from './src/screens/EditExperienceScreen';
 import { EditDietScreen } from './src/screens/EditDietScreen';
+import { AddFoodScreen } from './src/screens/AddFoodScreen';
+import { FoodLibraryScreen } from './src/screens/FoodLibraryScreen';
+import { FoodSearchScreen } from './src/screens/FoodSearchScreen';
+import { MealBuilderScreen } from './src/screens/MealBuilderScreen';
+import { AddExerciseScreen } from './src/screens/AddExerciseScreen';
+import { ExerciseLibraryScreen } from './src/screens/ExerciseLibraryScreen';
+import { WorkoutBuilderScreen } from './src/screens/WorkoutBuilderScreen';
+import { DailyTrackerScreen } from './src/screens/DailyTrackerScreen';
+import { ProgressScreen } from './src/screens/ProgressScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -72,6 +83,15 @@ function AppNavigator() {
       <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
       <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
       <Stack.Screen name="Meals" component={MealsScreen} />
+      <Stack.Screen name="AddFood" component={AddFoodScreen} />
+      <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
+      <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
+      <Stack.Screen name="MealBuilder" component={MealBuilderScreen} />
+      <Stack.Screen name="AddExercise" component={AddExerciseScreen} />
+      <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
+      <Stack.Screen name="WorkoutBuilder" component={WorkoutBuilderScreen} />
+      <Stack.Screen name="DailyTracker" component={DailyTrackerScreen} />
+      <Stack.Screen name="ProgressScreen" component={ProgressScreen} />
       <Stack.Screen name="Messages" component={MessagesScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -95,13 +115,17 @@ export default function App() {
       <ThemeProvider>
         <UserProvider>
           <OfflineProvider>
-            <NotificationProvider>
-              <LoadingProvider>
-                <NavigationContainer>
-                  <AppNavigator />
-                </NavigationContainer>
-              </LoadingProvider>
-            </NotificationProvider>
+            <FoodManagementProvider>
+              <ExerciseManagementProvider>
+                <NotificationProvider>
+                  <LoadingProvider>
+                    <NavigationContainer>
+                      <AppNavigator />
+                    </NavigationContainer>
+                  </LoadingProvider>
+                </NotificationProvider>
+              </ExerciseManagementProvider>
+            </FoodManagementProvider>
           </OfflineProvider>
         </UserProvider>
       </ThemeProvider>

@@ -6,10 +6,12 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useFoodManagement } from '../context/FoodManagementContext';
 import * as offlineService from '../services/offlineService';
 import { BottomNav } from '../components/BottomNav';
 
-const MEALS = [
+// Default meal templates if no custom meals exist
+const DEFAULT_MEALS = [
   { id: 'breakfast', meal: 'Breakfast', time: '7:30 AM', icon: 'wb-sunny' as const, items: ['4 Egg Whites + 1 Whole', 'Oatmeal (80g)', 'Blueberries (100g)'], calories: 420, protein: 35, carbs: 52, fats: 12 },
   { id: 'lunch', meal: 'Lunch', time: '12:30 PM', icon: 'restaurant' as const, items: ['Grilled Chicken (200g)', 'Brown Rice (150g)', 'Broccoli & Spinach'], calories: 620, protein: 52, carbs: 65, fats: 14 },
   { id: 'preworkout', meal: 'Pre-Workout', time: '4:00 PM', icon: 'bolt' as const, items: ['Banana', 'Whey Protein Shake', 'Rice Cakes (2)'], calories: 310, protein: 28, carbs: 48, fats: 4 },
@@ -22,15 +24,37 @@ export const MealsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName } = useUser();
   const { totalUnread } = useNotifications();
+  const { meals } = useFoodManagement();
 
-  const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({
-    breakfast: false,
-    lunch: false,
-    preworkout: false,
-    dinner: false,
-  });
-
+  const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({});
   const [waterGlasses, setWaterGlasses] = useState(3);
+
+  // Use custom meals if available, otherwise use defaults with IDs
+  const mealsToDisplay = meals.length > 0
+    ? meals.map((meal) => ({
+        id: meal.id,
+        meal: meal.name,
+        time: meal.mealType === 'breakfast' ? '7:30 AM' : meal.mealType === 'lunch' ? '12:30 PM' : meal.mealType === 'dinner' ? '7:30 PM' : '4:00 PM',
+        icon: (meal.mealType === 'breakfast' ? 'wb-sunny' : meal.mealType === 'lunch' ? 'restaurant' : meal.mealType === 'dinner' ? 'nightlight-round' : 'bolt') as const,
+        items: meal.foods.map((f) => {
+          const food = meals.length > 0 ? undefined : null;
+          return `Item ${f.foodId}`;
+        }),
+        calories: meal.totalCalories,
+        protein: meal.totalMacros.protein,
+        carbs: meal.totalMacros.carbs,
+        fats: meal.totalMacros.fats,
+      }))
+    : DEFAULT_MEALS;
+
+  // Initialize checkedMeals based on meals
+  useEffect(() => {
+    const initialChecked: Record<string, boolean> = {};
+    mealsToDisplay.forEach((meal) => {
+      initialChecked[meal.id] = false;
+    });
+    setCheckedMeals(initialChecked);
+  }, [mealsToDisplay]);
 
   // Load cached meal data on mount
   useEffect(() => {
@@ -64,7 +88,7 @@ export const MealsScreen = ({ navigation }: any) => {
   };
 
   // Calculate consumed totals from checked meals
-  const consumed = MEALS.reduce(
+  const consumed = mealsToDisplay.reduce(
     (acc, meal) => {
       if (checkedMeals[meal.id]) {
         acc.calories += meal.calories;
@@ -114,38 +138,66 @@ export const MealsScreen = ({ navigation }: any) => {
             Hey {firstName}, let's fuel up!
           </Text>
           <Text style={[tw`text-sm mt-1`, { color: textSecondary }]}>
-            {checkedCount} of {MEALS.length} meals logged today
+            {checkedCount} of {mealsToDisplay.length} meals logged today
           </Text>
         </View>
 
-        {/* Generate Meal Button */}
-        <TouchableOpacity
-          onPress={() => navigation.navigate('MealGeneration')}
-          style={[
-            tw`mx-5 mt-4 rounded-2xl p-4 flex-row items-center justify-between`,
-            { backgroundColor: accent + '14' }
-          ]}
-        >
-          <View style={tw`flex-row items-center gap-3`}>
-            <View
-              style={[
-                tw`w-10 h-10 rounded-lg items-center justify-center`,
-                { backgroundColor: accent + '28' }
-              ]}
-            >
-              <MaterialIcons name="restaurant" size={20} color={accent} />
+        {/* Action Buttons Row */}
+        <View style={tw`px-5 mt-4 flex-row gap-2`}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('MealGeneration')}
+            style={[
+              tw`flex-1 rounded-2xl p-4 flex-row items-center justify-between`,
+              { backgroundColor: accent + '14' }
+            ]}
+          >
+            <View style={tw`flex-row items-center gap-3 flex-1`}>
+              <View
+                style={[
+                  tw`w-10 h-10 rounded-lg items-center justify-center`,
+                  { backgroundColor: accent + '28' }
+                ]}
+              >
+                <MaterialIcons name="restaurant" size={20} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                  Generate
+                </Text>
+                <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                  AI-powered
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
-                Generate Meals
-              </Text>
-              <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                AI-powered meal plans
-              </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('MealBuilder')}
+            style={[
+              tw`flex-1 rounded-2xl p-4 flex-row items-center justify-between`,
+              { backgroundColor: accent + '14' }
+            ]}
+          >
+            <View style={tw`flex-row items-center gap-3 flex-1`}>
+              <View
+                style={[
+                  tw`w-10 h-10 rounded-lg items-center justify-center`,
+                  { backgroundColor: accent + '28' }
+                ]}
+              >
+                <MaterialIcons name="add" size={20} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                  Create
+                </Text>
+                <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                  Custom meal
+                </Text>
+              </View>
             </View>
-          </View>
-          <MaterialIcons name="arrow-forward" size={20} color={accent} />
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
 
         {/* Calorie Ring + Macros Section */}
         <View
@@ -267,7 +319,7 @@ export const MealsScreen = ({ navigation }: any) => {
             Today's Meals
           </Text>
 
-          {MEALS.map((meal) => {
+          {mealsToDisplay.map((meal) => {
             const isChecked = checkedMeals[meal.id];
             return (
               <TouchableOpacity

@@ -5,6 +5,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useExerciseManagement } from '../context/ExerciseManagementContext';
 import * as offlineService from '../services/offlineService';
 import { hasFeatureAccess } from '../utils/planUtils';
 import { FeatureLocked } from '../components/FeatureLocked';
@@ -14,6 +15,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { subscriptionPlan } = useUser();
   const { totalUnread } = useNotifications();
+  const { workouts } = useExerciseManagement();
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
   const [cachedHistory, setCachedHistory] = useState<Array<{
     date: string;
@@ -112,6 +114,70 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
               <MaterialIcons name="arrow-forward" size={20} color={accent} />
             </TouchableOpacity>
           </View>
+
+          {/* Custom Workouts Section */}
+          {workouts.length > 0 && (
+            <View style={tw`px-4 pt-3 pb-2 gap-2`}>
+              <View style={tw`flex-row items-center justify-between`}>
+                <Text style={[tw`text-sm font-bold uppercase tracking-wider`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                  My Workouts ({workouts.length})
+                </Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('WorkoutBuilder')}
+                  style={tw`px-2 py-1`}
+                >
+                  <MaterialIcons name="add" size={18} color={accent} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 px-4`}>
+                <View style={tw`flex-row gap-2`}>
+                  {workouts.map((workout) => (
+                    <TouchableOpacity
+                      key={workout.id}
+                      onPress={() => navigation.navigate('Calibration', { workout })}
+                      style={[
+                        tw`rounded-xl p-4 min-w-[160px]`,
+                        { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }
+                      ]}
+                    >
+                      <View style={tw`flex-row items-center justify-between mb-2`}>
+                        <Text style={[tw`text-xs font-bold px-2 py-1 rounded-full`, { backgroundColor: accent + '20', color: accent }]}>
+                          {workout.difficulty}
+                        </Text>
+                      </View>
+                      <Text style={[tw`text-sm font-bold mb-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]} numberOfLines={2}>
+                        {workout.name}
+                      </Text>
+                      <View style={tw`gap-1 mt-2 pt-2 border-t`, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                        <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                          {workout.totalExercises} exercises
+                        </Text>
+                        <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                          ~{workout.estimatedDuration} mins
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+          {/* Button to Create Workout if none exist */}
+          {workouts.length === 0 && (
+            <View style={tw`px-4 pt-2 pb-2`}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('WorkoutBuilder')}
+                style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: (isDark ? '#1e293b' : '#f1f5f9'), borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+              >
+                <MaterialIcons name="add-circle" size={24} color={accent} />
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`font-bold text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Create Custom Workout</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Build your own routine</Text>
+                </View>
+                <MaterialIcons name="arrow-forward" size={20} color={isDark ? '#cbd5e1' : '#475569'} />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Camera Viewport - Empty for CV */}
           <View style={[tw`mx-4 mt-4 mb-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', minHeight: 280 }]}>
