@@ -1,21 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { useUser, NotificationSettings } from '../context/UserContext';
 
 export const NotificationsSettingsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const [settings, setSettings] = useState({
-    workoutReminders: true,
-    mealReminders: true,
-    coachMessages: true,
-    weeklyReport: false,
-    formAlerts: true,
-    restTimer: true });
+  const { notificationSettings, setNotificationSettings } = useUser();
 
-  const toggle = (key: keyof typeof settings) => setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (key: keyof NotificationSettings) => {
+    setNotificationSettings({
+      ...notificationSettings,
+      [key]: !notificationSettings[key]
+    });
+  };
 
   const SECTIONS = [
     { title: 'Training', items: [
@@ -63,7 +63,7 @@ export const NotificationsSettingsScreen = ({ navigation }: any) => {
               {section.items.map((item, i) => (
                 <TouchableOpacity
                   key={item.key}
-                  onPress={() => toggle(item.key)}
+                  onPress={() => toggle(item.key as keyof NotificationSettings)}
                   style={[tw`flex-row items-center justify-between px-4 py-4`, i < section.items.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}
                 >
                   <View style={tw`flex-row items-center gap-3 flex-1`}>
@@ -75,8 +75,8 @@ export const NotificationsSettingsScreen = ({ navigation }: any) => {
                       <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{item.desc}</Text>
                     </View>
                   </View>
-                  <View style={[tw`w-12 h-7 rounded-full justify-center px-0.5`, { backgroundColor: settings[item.key] ? accent : isDark ? '#334155' : '#cbd5e1' }]}>
-                    <View style={[tw`w-6 h-6 rounded-full bg-white shadow`, { alignSelf: settings[item.key] ? 'flex-end' : 'flex-start' }]} />
+                  <View style={[tw`w-12 h-7 rounded-full justify-center px-0.5`, { backgroundColor: notificationSettings[item.key as keyof NotificationSettings] ? accent : isDark ? '#334155' : '#cbd5e1' }]}>
+                    <View style={[tw`w-6 h-6 rounded-full bg-white shadow`, { alignSelf: notificationSettings[item.key as keyof NotificationSettings] ? 'flex-end' : 'flex-start' }]} />
                   </View>
                 </TouchableOpacity>
               ))}

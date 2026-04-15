@@ -58,6 +58,10 @@ export interface User {
     experienceLevel?: string;
     dietaryPreferences?: string[];
     allergies?: string[];
+    notificationSettings?: any;
+    bodyFat?: number;
+    canUseComputerVision?: boolean;
+    canUseAIAssistant?: boolean;
   };
 }
 

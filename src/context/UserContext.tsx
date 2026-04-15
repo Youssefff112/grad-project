@@ -1,11 +1,21 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as tokenManager from '../utils/tokenManager';
+import authService from '../services/auth.service';
 
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
 export type SubscriptionPlan = 'Free' | 'Standard' | 'Premium' | 'ProCoach' | 'Elite';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type DietPreference = 'omnivore' | 'vegetarian' | 'vegan' | 'keto' | 'paleo' | 'gluten-free' | 'pescatarian' | 'dairy-free' | 'nut-free' | 'low-carb' | 'mediterranean' | 'other';
+
+export interface NotificationSettings {
+  workoutReminders: boolean;
+  mealReminders: boolean;
+  coachMessages: boolean;
+  weeklyReport: boolean;
+  formAlerts: boolean;
+  restTimer: boolean;
+}
 
 interface UserContextType {
   fullName: string;
@@ -21,6 +31,7 @@ interface UserContextType {
   canUseComputerVision: boolean;
   canUseAIAssistant: boolean;
   lastPlanReviewDate: string | null;
+  notificationSettings: NotificationSettings;
 
   // Authentication fields
   authToken: string | null;
@@ -41,6 +52,7 @@ interface UserContextType {
   setComputerVisionEnabled: (enabled: boolean) => void;
   setAIAssistantEnabled: (enabled: boolean) => void;
   updateLastPlanReview: () => void;
+  setNotificationSettings: (settings: NotificationSettings) => void;
 
   // Authentication methods
   setAuthTokens: (accessToken: string, refreshToken: string) => Promise<void>;
@@ -64,6 +76,14 @@ const UserContext = createContext<UserContextType>({
   canUseComputerVision: false,
   canUseAIAssistant: false,
   lastPlanReviewDate: null,
+  notificationSettings: {
+    workoutReminders: true,
+    mealReminders: true,
+    coachMessages: true,
+    weeklyReport: false,
+    formAlerts: true,
+    restTimer: true
+  },
 
   // Authentication defaults
   authToken: null,
@@ -84,6 +104,7 @@ const UserContext = createContext<UserContextType>({
   setComputerVisionEnabled: () => {},
   setAIAssistantEnabled: () => {},
   updateLastPlanReview: () => {},
+  setNotificationSettings: () => {},
 
   // Authentication methods defaults
   setAuthTokens: async () => {},
@@ -107,6 +128,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [canUseComputerVision, setCanUseComputerVisionState] = useState(false);
   const [canUseAIAssistant, setCanUseAIAssistantState] = useState(false);
   const [lastPlanReviewDate, setLastPlanReviewDateState] = useState<string | null>(null);
+  const [notificationSettings, setNotificationSettingsState] = useState<NotificationSettings>({
+    workoutReminders: true,
+    mealReminders: true,
+    coachMessages: true,
+    weeklyReport: false,
+    formAlerts: true,
+    restTimer: true
+  });
 
   // Authentication state
   const [authToken, setAuthTokenState] = useState<string | null>(null);
@@ -121,7 +150,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadUserData = async () => {
       try {
         // Load user profile data with defensive error handling
-        const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId] =
+        const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId, savedNotifs] =
           await Promise.all([
             AsyncStorage.getItem('user_fullname').catch(() => null),
             AsyncStorage.getItem('user_email').catch(() => null),
@@ -137,6 +166,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             AsyncStorage.getItem('user_ai_enabled').catch(() => null),
             AsyncStorage.getItem('user_last_plan_review').catch(() => null),
             AsyncStorage.getItem('user_id').catch(() => null),
+            AsyncStorage.getItem('user_notification_settings').catch(() => null),
           ]);
 
         // Load authentication data
@@ -187,6 +217,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
         if (savedReviewDate) setLastPlanReviewDateState(savedReviewDate);
+        if (savedNotifs) {
+          try {
+            setNotificationSettingsState(JSON.parse(savedNotifs));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse notification settings:', e);
+          }
+        }
 
         // Set authentication state if tokens are valid
         if (tokens.accessToken && isTokenValid) {
@@ -208,11 +245,21 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUserData();
   }, []);
 
+  const setNotificationSettings = useCallback((settings: NotificationSettings) => {
+    setNotificationSettingsState(settings);
+    AsyncStorage.setItem('user_notification_settings', JSON.stringify(settings)).catch((error) =>
+      console.log('Failed to save notification settings:', error)
+    );
+    authService.updateProfile({ profile: { notificationSettings: settings } }).catch(console.error);
+  }, []);
+
   const setFullName = useCallback((name: string) => {
     setFullNameState(name);
     AsyncStorage.setItem('user_fullname', name).catch((error) =>
       console.log('Failed to save fullname:', error)
     );
+    const parts = name.split(' ');
+    authService.updateProfile({ firstName: parts[0], lastName: parts.slice(1).join(' ') }).catch(console.error);
   }, []);
 
   const setEmail = useCallback((email: string) => {
@@ -227,6 +274,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_weight', w.toString()).catch((error) =>
       console.log('Failed to save weight:', error)
     );
+    authService.updateProfile({ profile: { currentWeight: w } }).catch(console.error);
   }, []);
 
   const setBodyFatPercentage = useCallback((percentage: number) => {
@@ -234,6 +282,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_body_fat_percentage', percentage.toString()).catch((error) =>
       console.log('Failed to save body fat percentage:', error)
     );
+    authService.updateProfile({ profile: { bodyFat: percentage } }).catch(console.error);
   }, []);
 
   const setUserMode = useCallback((mode: UserMode) => {
@@ -255,6 +304,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_experience_level', level).catch((error) =>
       console.log('Failed to save experience level:', error)
     );
+    authService.updateProfile({ profile: { experienceLevel: level } }).catch(console.error);
   }, []);
 
   const setDietPreferences = useCallback((preferences: DietPreference[]) => {
@@ -262,6 +312,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_diet_preferences', JSON.stringify(preferences)).catch((error) =>
       console.log('Failed to save diet preferences:', error)
     );
+    authService.updateProfile({ profile: { dietaryPreferences: preferences } }).catch(console.error);
   }, []);
 
   const setCoach = useCallback((id: string, name: string) => {
@@ -295,6 +346,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_cv_enabled', JSON.stringify(enabled)).catch((error) =>
       console.log('Failed to save CV setting:', error)
     );
+    authService.updateProfile({ profile: { canUseComputerVision: enabled } }).catch(console.error);
   }, []);
 
   const setAIAssistantEnabled = useCallback((enabled: boolean) => {
@@ -302,6 +354,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_ai_enabled', JSON.stringify(enabled)).catch((error) =>
       console.log('Failed to save AI setting:', error)
     );
+    authService.updateProfile({ profile: { canUseAIAssistant: enabled } }).catch(console.error);
   }, []);
 
   const updateLastPlanReview = useCallback(() => {
@@ -402,6 +455,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       canUseComputerVision,
       canUseAIAssistant,
       lastPlanReviewDate,
+      notificationSettings,
 
       // Authentication fields
       authToken,
@@ -422,6 +476,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setComputerVisionEnabled,
       setAIAssistantEnabled,
       updateLastPlanReview,
+      setNotificationSettings,
 
       // Authentication methods
       setAuthTokens,
