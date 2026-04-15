@@ -8,43 +8,73 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'other';
-  timestamp: string;
-  delivered?: boolean;
-  read?: boolean;
-}
-
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', text: "Good morning! Ready for today's session?", sender: 'other', timestamp: '9:00 AM', read: true },
-  { id: '2', text: "Yes! What's the plan?", sender: 'user', timestamp: '9:01 AM', delivered: true, read: true },
-  {
-    id: '3',
-    text: "Today is Push Day - Bench Press, OHP, and accessories. Based on your last session, I've increased your working weight by 2.5kg.",
-    sender: 'other',
-    timestamp: '9:01 AM',
-    read: true,
-  },
-  { id: '4', text: 'Sounds good! Let me get warmed up.', sender: 'user', timestamp: '9:05 AM', delivered: true, read: true },
-  { id: '5', text: 'Perfect! Remember to focus on form over weight today.', sender: 'other', timestamp: '9:05 AM', read: true },
-];
+import { useUser } from '../context/UserContext';
+import { io, Socket } from 'socket.io-client';
+import { environment } from '../config/environment';
+import { getMessages, sendMessage, ChatMessage } from '../services/messaging.service';
+import tokenManager from '../utils/tokenManager';
 
 const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 
 export const ChatScreen = ({ navigation, route }: any) => {
-  const { conversationName = 'Chat' } = route.params || {};
+  const { conversationName = 'Chat', conversationId = null, receiverId = null } = route.params || {};
   const { isDark, accent } = useTheme();
+  const { userId } = useUser();
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationId);
   const scrollViewRef = useRef<ScrollView>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  // Initialize Socket and fetch messages
+  useEffect(() => {
+    let activeConvId = activeConversationId;
+    const initData = async () => {
+      // Fetch existing messages if conversationId is known
+      if (activeConvId) {
+        try {
+          const res = await getMessages(activeConvId);
+          setMessages(res.messages);
+        } catch (error) {
+          console.error('Error fetching messages:', error);
+        }
+      }
+
+      // Initialize Socket connection
+      const token = await tokenManager.getAccessToken();
+      const userIdStr = userId;
+      if (!userIdStr) return;
+
+      socketRef.current = io(environment.BACKEND_URL, {
+        auth: { token }
+      });
+
+      socketRef.current.on('connect', () => {
+        socketRef.current?.emit('join_room', userIdStr);
+      });
+
+      socketRef.current.on('new_message', (msg: ChatMessage) => {
+        setMessages((prev) => [...prev, msg]);
+        if (!activeConvId) {
+          setActiveConversationId(msg.conversationId);
+          activeConvId = msg.conversationId;
+        }
+      });
+    };
+
+    initData();
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
+  }, [activeConversationId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -58,32 +88,20 @@ export const ChatScreen = ({ navigation, route }: any) => {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const inputBg = isDark ? '#111128' : '#ffffff';
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: 'user',
-      timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      delivered: true,
-      read: false,
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    const textPayload = inputText.trim();
     setInputText('');
 
-    // Simulate AI response
-    setTimeout(() => {
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "That's great! Keep up the excellent work. Your consistency will pay off.",
-        sender: 'other',
-        timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-        read: false,
-      };
-      setMessages((prev) => [...prev, response]);
-    }, 1500);
+    try {
+      const msg = await sendMessage(activeConversationId, receiverId, textPayload);
+      setMessages((prev) => [...prev, msg]);
+      if (!activeConversationId) setActiveConversationId(msg.conversationId);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      Alert.alert('Error', 'Failed to send message.');
+    }
   };
 
   const handleQuickReply = (reply: string) => {
@@ -91,11 +109,11 @@ export const ChatScreen = ({ navigation, route }: any) => {
     setTimeout(() => handleSend(), 300);
   };
 
-  const showMessageOptions = (message: Message) => {
+  const showMessageOptions = (message: ChatMessage) => {
     const options = [
       { text: 'Copy', onPress: () => handleCopy(message.text) },
-      ...(message.sent ? [{ text: 'Edit', onPress: () => handleEdit(message) }] : []),
-      ...(message.sent ? [{ text: 'Delete', onPress: () => handleDelete(message.id) }] : []),
+      ...(currentUserIdRef.current === String(message.senderId) ? [{ text: 'Edit', onPress: () => handleEdit(message) }] : []),
+      ...(currentUserIdRef.current === String(message.senderId) ? [{ text: 'Delete', onPress: () => handleDelete(message.id) }] : []),
       { text: 'Reply', onPress: () => handleReply(message) },
       { text: 'Cancel', onPress: () => {}, style: 'cancel' as const },
     ];
@@ -107,7 +125,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
     Alert.alert('Copied', 'Message copied to clipboard');
   };
 
-  const handleEdit = (message: Message) => {
+  const handleEdit = (message: ChatMessage) => {
     setInputText(message.text);
     setMessages((prev) => prev.filter((m) => m.id !== message.id));
     Alert.alert('Edit Mode', 'Editing message. Update and send when ready.');
@@ -126,7 +144,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
     ]);
   };
 
-  const handleReply = (message: Message) => {
+  const handleReply = (message: ChatMessage) => {
     setInputText(`> ${message.text}\n\n`);
   };
 
@@ -153,8 +171,18 @@ export const ChatScreen = ({ navigation, route }: any) => {
     ]);
   };
 
-  const renderMessage = (message: Message) => {
-    const isSent = message.sender === 'user';
+  const currentUserIdRef = useRef<string | null>(userId);
+
+  useEffect(() => {
+    currentUserIdRef.current = userId;
+  }, [userId]);
+
+  const renderMessage = (message: ChatMessage) => {
+    const isSent = currentUserIdRef.current === String(message.senderId);
+
+    // Format timestamp nicely
+    const dateObj = new Date(message.createdAt || new Date());
+    const displayTime = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
     return (
       <TouchableOpacity
@@ -188,7 +216,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
           </Text>
           <View style={[tw`flex-row items-center gap-1 mt-1 justify-end`]}>
             <Text style={{ color: isSent ? 'rgba(255,255,255,0.7)' : secondaryText, fontSize: 11 }}>
-              {message.timestamp}
+              {displayTime}
             </Text>
             {isSent && (
               <MaterialIcons

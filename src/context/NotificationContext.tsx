@@ -37,7 +37,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (cached) {
           try {
             const entries = JSON.parse(cached);
-            const newMap = new Map(entries);
+            const newMap = new Map<string, number>(entries);
             setConversations(newMap);
             console.log('[Notifications] Loaded persisted notifications');
           } catch (parseError) {

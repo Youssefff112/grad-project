@@ -311,15 +311,30 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 Profile
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Messages')}
-              style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <MaterialIcons name="chat-bubble" size={24} color={accent} style={tw`mb-2`} />
-              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                Coaching
-              </Text>
-            </TouchableOpacity>
+            {hasFeatureAccess(subscriptionPlan, 'hasAIChat') || hasFeatureAccess(subscriptionPlan, 'hasCoachChat') ? (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Messages')}
+                style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+              >
+                <MaterialIcons name="chat-bubble" size={24} color={accent} style={tw`mb-2`} />
+                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  Coaching
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('SubscriptionPlans')}
+                style={[tw`flex-1 rounded-xl p-4 min-w-32 opacity-70`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+              >
+                <MaterialIcons name="chat-bubble" size={24} color={isDark ? '#cbd5e1' : '#64748b'} style={tw`mb-2`} />
+                <View style={tw`flex-row items-center gap-1`}>
+                  <Text style={[tw`font-bold text-sm`, { color: isDark ? '#cbd5e1' : '#64748b' }]}>
+                    Coaching
+                  </Text>
+                  <MaterialIcons name="lock" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

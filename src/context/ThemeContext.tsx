@@ -50,6 +50,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Sync twrnc dark mode with our manual override
   useEffect(() => {
+    // @ts-ignore
     tw.setColorScheme(theme);
   }, [theme]);
 

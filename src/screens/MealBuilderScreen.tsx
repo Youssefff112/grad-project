@@ -28,7 +28,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | 'custom'>(
     isEditing?.mealType || 'breakfast'
   );
-  const [selectedFoods, setSelectedFoods] = useState<Array<{ foodId: string; quantity: number }>>(
+  const [selectedFoods, setSelectedFoods] = useState<Array<{ foodId: string; quantity: number; quantityUnit: 'grams' | 'servings' }>>(
     isEditing?.foods || []
   );
   const [showFoodPicker, setShowFoodPicker] = useState(false);
@@ -64,6 +64,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
       {
         foodId: food.id,
         quantity,
+        quantityUnit: 'servings',
       },
     ]);
   };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, TouchableOpacityProps, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, TouchableOpacityProps, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 
@@ -10,6 +10,7 @@ interface ButtonProps extends TouchableOpacityProps {
   containerStyle?: ViewStyle | Record<string, any>[];
   textStyle?: TextStyle | Record<string, any>[];
   icon?: React.ReactNode;
+  loading?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -19,6 +20,7 @@ export const Button: React.FC<ButtonProps> = ({
   containerStyle,
   textStyle,
   icon,
+  loading = false,
   ...props
 }) => {
   const { isDark, accent } = useTheme();
@@ -65,10 +67,16 @@ export const Button: React.FC<ButtonProps> = ({
       style={[tw`${baseContainerTw} ${sizeContainerTw}`, variantStyle, containerStyle]}
       {...props}
     >
-      <Text style={[tw`font-bold ${sizeTextTw}`, { color: variantTextColor }, textStyle]}>
-        {title}
-      </Text>
-      {icon && icon}
+      {loading ? (
+        <ActivityIndicator color={variantTextColor} />
+      ) : (
+        <>
+          <Text style={[tw`font-bold ${sizeTextTw}`, { color: variantTextColor }, textStyle]}>
+            {title}
+          </Text>
+          {icon && icon}
+        </>
+      )}
     </TouchableOpacity>
   );
 };

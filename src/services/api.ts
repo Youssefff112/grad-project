@@ -67,14 +67,15 @@ apiClient.interceptors.response.use(
 
     // Handle network errors (no response) for write operations
     if (!error.response && method && ['POST', 'PUT', 'PATCH'].includes(method)) {
+      const writeMethod = method as 'POST' | 'PUT' | 'PATCH';
       const networkState = await getCurrentNetworkState();
       if (!networkState.isOnline) {
-        console.log(`[Offline] Queuing ${method} request: ${originalRequest.url}`);
+        console.log(`[Offline] Queuing ${writeMethod} request: ${originalRequest.url}`);
         // Queue the operation for later sync
         await syncQueueService.enqueueOperation(
           'message', // default type, can be overridden
           originalRequest.url || '',
-          method,
+          writeMethod,
           originalRequest.data ? JSON.parse(typeof originalRequest.data === 'string' ? originalRequest.data : JSON.stringify(originalRequest.data)) : {},
           2 // priority
         );

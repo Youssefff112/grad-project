@@ -60,7 +60,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
           >
             {/* Camera Ready Indicator */}
             {cameraReady && (
-              <View style={tw`absolute top-4 right-4 flex-row items-center gap-2 px-3 py-1.5 rounded-full`, { backgroundColor: 'rgba(0,0,0,0.6)' }}>
+              <View style={[tw`absolute top-4 right-4 flex-row items-center gap-2 px-3 py-1.5 rounded-full`, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
                 <View style={tw`h-2 w-2 bg-green-500 rounded-full`} />
                 <Text style={tw`text-xs font-bold text-white uppercase`}>Ready</Text>
               </View>
@@ -68,7 +68,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
 
             {/* Crosshair Overlay */}
             <View style={tw`absolute inset-0 items-center justify-center`}>
-              <View style={tw`w-32 h-32 border-2 border-dashed rounded-2xl`, { borderColor: accent + '80' }} />
+              <View style={[tw`w-32 h-32 border-2 border-dashed rounded-2xl`, { borderColor: accent + '80' }]} />
             </View>
           </CameraView>
         ) : (
