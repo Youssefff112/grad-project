@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
   View,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Text,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';

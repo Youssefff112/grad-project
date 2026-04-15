@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -89,14 +90,12 @@ export const AddFoodScreen = ({ navigation, route }: any) => {
         protein: parseFloat(protein),
         carbs: parseFloat(carbs),
         fats: parseFloat(fats),
-        source: 'user',
-      });
+        source: 'user' });
 
       Alert.alert('Success', 'Food added to your library!', [
         {
           text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
+          onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
       Alert.alert('Error', 'Failed to add food. Please try again.');

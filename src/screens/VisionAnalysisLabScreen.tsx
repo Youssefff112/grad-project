@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -86,8 +87,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
             style={[
               tw`flex-1 flex-row items-center justify-center gap-2 py-3 rounded-xl`,
               {
-                backgroundColor: activeTab === tab.id ? accent : isDark ? '#1e293b' : '#f1f5f9',
-              },
+                backgroundColor: activeTab === tab.id ? accent : isDark ? '#1e293b' : '#f1f5f9' },
             ]}
           >
             <MaterialIcons name={tab.icon as any} size={18} color={activeTab === tab.id ? '#ffffff' : isDark ? '#94a3b8' : '#64748b'} />
@@ -148,7 +148,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
                       <Text style={[tw`text-sm font-bold mb-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]} numberOfLines={2}>
                         {workout.name}
                       </Text>
-                      <View style={tw`gap-1 mt-2 pt-2 border-t`, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                      <View style={[tw`gap-1 mt-2 pt-2 border-t`, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
                         <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
                           {workout.totalExercises} exercises
                         </Text>
@@ -257,6 +257,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
         activeId="workouts"
         onSelect={(id) => {
           if (id === 'home') navigation.navigate('TraineeCommandCenter');
+          if (id === 'track') navigation.navigate('DailyTracker');
           if (id === 'meals') navigation.navigate('Meals');
           if (id === 'messages') navigation.navigate('Messages');
           if (id === 'profile') navigation.navigate('Profile');
@@ -264,6 +265,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
         items={[
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
+          { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
           { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },

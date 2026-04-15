@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -25,8 +26,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     icon: 'fitness-center',
     color: '#f87171',
     read: false,
-    type: 'workout',
-  },
+    type: 'workout' },
   {
     id: '2',
     title: 'Meal Logged',
@@ -35,8 +35,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     icon: 'restaurant',
     color: '#4ade80',
     read: false,
-    type: 'meal',
-  },
+    type: 'meal' },
   {
     id: '3',
     title: 'New Message',
@@ -45,8 +44,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     icon: 'chat-bubble',
     color: '#3b82f6',
     read: true,
-    type: 'message',
-  },
+    type: 'message' },
   {
     id: '4',
     title: 'Achievement Unlocked!',
@@ -55,8 +53,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     icon: 'local-fire-department',
     color: '#facc15',
     read: true,
-    type: 'achievement',
-  },
+    type: 'achievement' },
   {
     id: '5',
     title: 'System Update',
@@ -65,8 +62,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     icon: 'notifications',
     color: '#8b5cf6',
     read: true,
-    type: 'system',
-  },
+    type: 'system' },
 ];
 
 export const NotificationsScreen = ({ navigation }: any) => {
@@ -120,8 +116,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
             style={[
               tw`px-4 py-2 rounded-full`,
               {
-                backgroundColor: filter === tab ? accent : isDark ? '#1e293b' : '#f1f5f9',
-              },
+                backgroundColor: filter === tab ? accent : isDark ? '#1e293b' : '#f1f5f9' },
             ]}
           >
             <Text
@@ -148,8 +143,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
                 {
                   backgroundColor: notification.read ? isDark ? '#1e293b' : '#f1f5f9' : cardBg,
                   borderWidth: 1,
-                  borderColor: notification.read ? 'transparent' : accent + '40',
-                },
+                  borderColor: notification.read ? 'transparent' : accent + '40' },
               ]}
             >
               {/* Icon */}

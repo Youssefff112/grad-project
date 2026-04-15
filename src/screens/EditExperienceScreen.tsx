@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -53,8 +54,7 @@ export const EditExperienceScreen = ({ navigation }: any) => {
                 tw`rounded-xl p-4 flex-row items-center gap-4 border-2`,
                 {
                   backgroundColor: selected === option.id ? accent + '15' : isDark ? '#111128' : '#ffffff',
-                  borderColor: selected === option.id ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                },
+                  borderColor: selected === option.id ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
               ]}
             >
               <View style={[tw`w-12 h-12 rounded-lg items-center justify-center`, { backgroundColor: accent + '20' }]}>

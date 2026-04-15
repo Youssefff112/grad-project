@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -55,7 +56,7 @@ export const ProfileScreen = ({ navigation }: any) => {
         navigation.navigate('EditDiet');
         break;
       case 'goals':
-        navigation.navigate('Goals');
+        navigation.navigate('Goals', { fromSettings: true });
         break;
     }
   };
@@ -67,32 +68,28 @@ export const ProfileScreen = ({ navigation }: any) => {
         { id: 'experience', icon: 'fitness-center', label: 'Fitness Level' },
         { id: 'diet', icon: 'restaurant', label: 'Diet Preferences' },
         { id: 'goals', icon: 'track-changes', label: 'Goals' },
-      ],
-    },
+      ] },
     {
       title: 'Preferences',
       items: [
         { id: 'dark-mode', icon: isDark ? 'light-mode' : 'dark-mode', label: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode', isToggle: true },
         { id: 'notifications', icon: 'notifications', label: 'Notifications' },
         { id: 'units', icon: 'straighten', label: 'Units & Measurements' },
-      ],
-    },
+      ] },
     {
       title: 'Account',
       items: [
         { id: 'edit-profile', icon: 'edit', label: 'Edit Profile' },
         { id: 'privacy', icon: 'lock', label: 'Privacy & Security' },
         { id: 'subscription', icon: 'card-membership', label: 'Subscription' },
-      ],
-    },
+      ] },
     {
       title: 'Support',
       items: [
         { id: 'help', icon: 'help-outline', label: 'Help Center' },
         { id: 'feedback', icon: 'rate-review', label: 'Send Feedback' },
         { id: 'about', icon: 'info-outline', label: 'About Vertex' },
-      ],
-    },
+      ] },
   ];
 
   return (
@@ -182,12 +179,14 @@ export const ProfileScreen = ({ navigation }: any) => {
         onSelect={(id) => {
           if (id === 'home') navigation.navigate('TraineeCommandCenter');
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
+          if (id === 'track') navigation.navigate('DailyTracker');
           if (id === 'meals') navigation.navigate('Meals');
           if (id === 'messages') navigation.navigate('Messages');
         }}
         items={[
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
+          { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
           { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },

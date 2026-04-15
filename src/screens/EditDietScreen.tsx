@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -67,8 +68,7 @@ export const EditDietScreen = ({ navigation }: any) => {
                 tw`rounded-xl px-3 py-3 flex-row items-center gap-2 border`,
                 {
                   backgroundColor: selected.includes(option.id) ? accent + '20' : isDark ? '#111128' : '#ffffff',
-                  borderColor: selected.includes(option.id) ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                },
+                  borderColor: selected.includes(option.id) ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
               ]}
             >
               <MaterialIcons

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import NetInfo from 'react-native-netinfo';
+import * as Network from 'expo-network';
 
 type NetworkState = {
   isOnline: boolean;
@@ -8,26 +8,25 @@ type NetworkState = {
 };
 
 let networkStateListeners: Set<(state: NetworkState) => void> = new Set();
-let subscription: any = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
-// Initialize network listener lazily (on first use)
-const initializeNetworkListener = () => {
-  if (subscription) return; // Already initialized
+// Poll network state since expo-network doesn't have addEventListener
+const startPolling = () => {
+  if (pollingInterval) return;
 
-  try {
-    subscription = NetInfo.addEventListener?.((state: any) => {
-      const networkState: NetworkState = {
-        isOnline: state.isConnected ?? true,
-        isConnecting: state.isConnected === false && state.type !== 'none',
-        type: state.type,
+  pollingInterval = setInterval(async () => {
+    try {
+      const networkState = await Network.getNetworkStateAsync();
+      const state: NetworkState = {
+        isOnline: networkState.isConnected ?? true,
+        isConnecting: false,
+        type: networkState.type,
       };
-
-      // Notify all listeners
-      networkStateListeners.forEach((listener) => listener(networkState));
-    });
-  } catch (error) {
-    console.warn('[NetworkService] Failed to initialize network listener:', error);
-  }
+      networkStateListeners.forEach((listener) => listener(state));
+    } catch (error) {
+      // Silently fail - assume online
+    }
+  }, 5000); // Poll every 5 seconds
 };
 
 // Hook to use network state in components
@@ -39,28 +38,24 @@ export const useNetworkState = () => {
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Initialize network listener on first use
-    initializeNetworkListener();
-
     if (!initializedRef.current) {
-      // Try to fetch initial state, but don't fail if it's not available
-      try {
-        if (NetInfo.fetch && typeof NetInfo.fetch === 'function') {
-          NetInfo.fetch().then((state: any) => {
-            setNetworkState({
-              isOnline: state.isConnected ?? true,
-              isConnecting: state.isConnected === false && state.type !== 'none',
-              type: state.type,
-            });
-          }).catch((error: any) => {
-            console.warn('[NetworkService] Failed to fetch network state:', error);
+      // Fetch initial state
+      Network.getNetworkStateAsync()
+        .then((state) => {
+          setNetworkState({
+            isOnline: state.isConnected ?? true,
+            isConnecting: false,
+            type: state.type,
           });
-        }
-      } catch (error) {
-        console.warn('[NetworkService] NetInfo.fetch not available:', error);
-      }
+        })
+        .catch(() => {
+          // Silently fail - assume online
+        });
       initializedRef.current = true;
     }
+
+    // Start polling for changes
+    startPolling();
 
     const listener = (state: NetworkState) => setNetworkState(state);
     networkStateListeners.add(listener);
@@ -73,19 +68,17 @@ export const useNetworkState = () => {
   return networkState;
 };
 
-// Get current network state synchronously (best effort)
+// Get current network state
 export const getCurrentNetworkState = async (): Promise<NetworkState> => {
   try {
-    if (NetInfo.fetch && typeof NetInfo.fetch === 'function') {
-      const state = await NetInfo.fetch();
-      return {
-        isOnline: state.isConnected ?? true,
-        isConnecting: state.isConnected === false && state.type !== 'none',
-        type: state.type,
-      };
-    }
+    const state = await Network.getNetworkStateAsync();
+    return {
+      isOnline: state.isConnected ?? true,
+      isConnecting: false,
+      type: state.type,
+    };
   } catch (error) {
-    console.warn('[NetworkService] Failed to fetch network state:', error);
+    // Silently fail - assume online
   }
 
   return {
@@ -96,10 +89,9 @@ export const getCurrentNetworkState = async (): Promise<NetworkState> => {
 
 // Register callback for when network reconnects
 export const onNetworkReconnect = (callback: () => void) => {
-  // Initialize network listener on first use
-  initializeNetworkListener();
+  startPolling();
 
-  let wasOnline = false;
+  let wasOnline = true;
 
   const listener = (state: NetworkState) => {
     if (state.isOnline && !wasOnline) {
@@ -115,13 +107,11 @@ export const onNetworkReconnect = (callback: () => void) => {
   };
 };
 
-// Cleanup function (call on app unmount if needed)
+// Cleanup function
 export const cleanup = () => {
-  try {
-    subscription?.unsubscribe?.();
-  } catch (error) {
-    console.warn('[NetworkService] Error during cleanup:', error);
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
   }
   networkStateListeners.clear();
-  subscription = null;
 };

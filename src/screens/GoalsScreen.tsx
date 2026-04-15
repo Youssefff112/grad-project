@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -14,9 +15,10 @@ const GOALS = [
   { id: 'longevity', label: 'Longevity', description: 'Long-term health & vitality', icon: 'favorite' as const, lightColors: ['#fff3ea', '#ffe5cc'] as const, darkColors: ['#1a0f00', '#2a1800'] as const },
 ];
 
-export const GoalsScreen = ({ navigation }: any) => {
+export const GoalsScreen = ({ navigation, route }: any) => {
   const [selectedGoal, setSelectedGoal] = useState<string>('');
   const { isDark, accent } = useTheme();
+  const fromSettings = route?.params?.fromSettings === true;
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -29,7 +31,9 @@ export const GoalsScreen = ({ navigation }: any) => {
         </Text>
       </View>
 
-      <ProgressBar progress={83.33} label="Your Progress" stepText="Step 5 of 6" containerStyle={tw`px-4`} />
+      {!fromSettings && (
+        <ProgressBar progress={83.33} label="Your Progress" stepText="Step 5 of 6" containerStyle={tw`px-4`} />
+      )}
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-6`}>
         <View style={tw`px-4 pb-4 pt-2`}>
@@ -75,7 +79,12 @@ export const GoalsScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <View style={[tw`p-4`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-        <Button title="Continue" size="lg" onPress={() => navigation.navigate('TraineeCommandCenter')} icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />} />
+        <Button
+          title={fromSettings ? "Save" : "Continue"}
+          size="lg"
+          onPress={() => fromSettings ? navigation.goBack() : navigation.navigate('TraineeCommandCenter')}
+          icon={<MaterialIcons name={fromSettings ? "check" : "arrow-forward"} size={20} color="white" style={tw`ml-2`} />}
+        />
       </View>
     </SafeAreaView>
   );

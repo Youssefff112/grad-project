@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -21,8 +22,7 @@ export const MeasurementsSettingsScreen = ({ navigation }: any) => {
             style={[tw`flex-1 py-4 rounded-xl items-center justify-center`, {
               backgroundColor: value === opt.id ? accent : isDark ? '#111128' : '#ffffff',
               borderWidth: 1,
-              borderColor: value === opt.id ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-            }]}
+              borderColor: value === opt.id ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
           >
             <Text style={[tw`text-base font-bold`, { color: value === opt.id ? '#ffffff' : isDark ? '#f1f5f9' : '#1e293b' }]}>{opt.label}</Text>
           </TouchableOpacity>

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -105,8 +106,7 @@ export const CalibrationScreen = ({ navigation }: any) => {
               borderColor: accent + '50',
               shadowColor: accent,
               shadowOpacity: 0.4,
-              shadowRadius: 12,
-            },
+              shadowRadius: 12 },
           ]}
           onPress={handleCameraPress}
           disabled={!cameraReady}

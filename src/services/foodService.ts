@@ -287,9 +287,11 @@ export const cleanupOldCache = async (): Promise<void> => {
     }
 
     if (keysToRemove.length > 0) {
-      await AsyncStorage.multiRemove(keysToRemove).catch((error) => {
-        console.warn('[FoodService] Error in multiRemove:', error);
-      });
+      await Promise.all(
+        keysToRemove.map((key) => AsyncStorage.removeItem(key).catch((error) => {
+          console.warn('[FoodService] Error removing cache key:', error);
+        }))
+      );
       console.log(`[FoodService] Cleaned up ${keysToRemove.length} expired cache entries`);
     }
   } catch (error) {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import tw from '../tw';
@@ -25,8 +26,7 @@ export const EditProfileScreen = ({ navigation }: any) => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 1,
-      });
+        quality: 1 });
 
       if (!result.canceled && result.assets[0]) {
         setPhotoUri(result.assets[0].uri);
@@ -42,8 +42,7 @@ export const EditProfileScreen = ({ navigation }: any) => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 1,
-      });
+        quality: 1 });
 
       if (!result.canceled && result.assets[0]) {
         setPhotoUri(result.assets[0].uri);

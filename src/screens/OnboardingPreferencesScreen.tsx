@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -20,20 +21,17 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
       level: 'beginner',
       label: 'Beginner',
       description: 'Just starting your fitness journey',
-      icon: 'trending-up',
-    },
+      icon: 'trending-up' },
     {
       level: 'intermediate',
       label: 'Intermediate',
       description: 'Training regularly with some experience',
-      icon: 'bar-chart',
-    },
+      icon: 'bar-chart' },
     {
       level: 'advanced',
       label: 'Advanced',
       description: 'Experienced athlete pursuing specific goals',
-      icon: 'trending-up',
-    },
+      icon: 'trending-up' },
   ];
 
   const dietOptions: { value: DietPreference; label: string; icon: string }[] = [
@@ -108,8 +106,7 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
                     ? { backgroundColor: accent + '14', borderColor: accent }
                     : {
                         backgroundColor: isDark ? '#111128' : '#ffffff',
-                        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                      },
+                        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
                 ]}
               >
                 <View
@@ -161,8 +158,7 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
                     ? { backgroundColor: accent + '14', borderColor: accent }
                     : {
                         backgroundColor: isDark ? '#111128' : '#ffffff',
-                        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                      },
+                        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
                 ]}
               >
                 <MaterialIcons
@@ -204,8 +200,7 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
           tw`p-6 border-t gap-3`,
           {
             backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
-            borderColor: accent + '0D',
-          },
+            borderColor: accent + '0D' },
         ]}
       >
         <Button

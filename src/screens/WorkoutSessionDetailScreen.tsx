@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -17,8 +18,7 @@ export const WorkoutSessionDetailScreen = ({ navigation, route }: any) => {
     totalVolume: '12,450 kg',
     avgFormScore: '94%',
     maxHeartRate: '167 bpm',
-    calories: 487,
-  };
+    calories: 487 };
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -129,8 +129,7 @@ export const WorkoutSessionDetailScreen = ({ navigation, route }: any) => {
                       tw`h-full rounded-full`,
                       {
                         backgroundColor: accent,
-                        width: exercise.score.slice(0, -1) + '%',
-                      },
+                        width: exercise.score.slice(0, -1) + '%' },
                     ]}
                   />
                 </View>

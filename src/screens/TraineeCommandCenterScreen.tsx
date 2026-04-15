@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, SafeAreaView, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -322,6 +323,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {hasFeatureAccess(subscriptionPlan, 'hasComputerVision') ? (
         <View style={tw`px-4 mt-8`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
             <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
@@ -377,6 +379,26 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
             ))}
           </View>
         </View>
+        ) : (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('SubscriptionPlans')}
+          style={[tw`mx-4 mt-8 rounded-2xl p-5`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+        >
+          <View style={tw`flex-row items-center gap-3 mb-3`}>
+            <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
+              <MaterialIcons name="lock" size={24} color={accent} />
+            </View>
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Workout Anchor</Text>
+              <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#94a3b8' : '#64748b' }]}>CV-powered form tracking & guided sessions</Text>
+            </View>
+          </View>
+          <View style={[tw`flex-row items-center justify-center gap-2 py-3 rounded-xl`, { backgroundColor: accent + '14' }]}>
+            <MaterialIcons name="arrow-upward" size={16} color={accent} />
+            <Text style={[tw`text-sm font-bold`, { color: accent }]}>Upgrade to Premium+</Text>
+          </View>
+        </TouchableOpacity>
+        )}
       </ScrollView>
 
       <BottomNav
@@ -384,6 +406,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         onSelect={(id) => {
           setActiveTab(id);
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
+          if (id === 'track') navigation.navigate('DailyTracker');
           if (id === 'meals') navigation.navigate('Meals');
           if (id === 'messages') navigation.navigate('Messages');
           if (id === 'profile') navigation.navigate('Profile');
@@ -391,6 +414,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         items={[
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
+          { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
           { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },

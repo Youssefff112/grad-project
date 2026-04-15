@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle } from 'react-native-svg';
 import tw from '../tw';
@@ -30,8 +30,10 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName } = useUser();
   const { totalUnread } = useNotifications();
-  const { meals } = useFoodManagement();
-  const { workouts } = useExerciseManagement();
+  const { customMeals } = useFoodManagement();
+  const meals = customMeals || [];
+  const { workouts: customWorkouts } = useExerciseManagement();
+  const workouts = customWorkouts || [];
 
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({});
   const [waterGlasses, setWaterGlasses] = useState(0);
@@ -224,7 +226,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
               {[
                 { label: 'Consumed', value: `${Math.round(consumedMacros.calories)}`, icon: 'local-fire-department' },
                 { label: 'Remaining', value: `${Math.max(DAILY_TARGETS.calories - consumedMacros.calories, 0)}`, icon: 'flag' },
-                { label: 'Meals', value: `${mealCount}/${meals.length}`, icon: 'restaurant' },
+                { label: 'Meals', value: `${mealCount}/${(meals || []).length}`, icon: 'restaurant' },
               ].map((stat) => (
                 <View key={stat.label} style={tw`flex-row items-center gap-2`}>
                   <MaterialIcons name={stat.icon as any} size={16} color={accent} />
@@ -370,7 +372,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
         </View>
 
         {/* Today's Meals Summary */}
-        {meals.length > 0 && (
+        {meals && meals.length > 0 && (
           <View style={tw`px-5 mt-6`}>
             <View style={tw`flex-row items-center justify-between mb-3`}>
               <Text style={[tw`text-sm font-bold uppercase tracking-wider`, { color: textSecondary }]}>

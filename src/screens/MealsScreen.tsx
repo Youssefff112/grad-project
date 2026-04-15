@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle } from 'react-native-svg';
 import tw from '../tw';
@@ -24,7 +25,8 @@ export const MealsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName } = useUser();
   const { totalUnread } = useNotifications();
-  const { meals } = useFoodManagement();
+  const { customMeals } = useFoodManagement();
+  const meals = customMeals || [];
 
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({});
   const [waterGlasses, setWaterGlasses] = useState(3);
@@ -35,7 +37,7 @@ export const MealsScreen = ({ navigation }: any) => {
         id: meal.id,
         meal: meal.name,
         time: meal.mealType === 'breakfast' ? '7:30 AM' : meal.mealType === 'lunch' ? '12:30 PM' : meal.mealType === 'dinner' ? '7:30 PM' : '4:00 PM',
-        icon: (meal.mealType === 'breakfast' ? 'wb-sunny' : meal.mealType === 'lunch' ? 'restaurant' : meal.mealType === 'dinner' ? 'nightlight-round' : 'bolt') as const,
+        icon: (meal.mealType === 'breakfast' ? 'wb-sunny' : meal.mealType === 'lunch' ? 'restaurant' : meal.mealType === 'dinner' ? 'nightlight-round' : 'bolt') as keyof typeof import('@expo/vector-icons').MaterialIcons.glyphMap,
         items: meal.foods.map((f) => {
           const food = meals.length > 0 ? undefined : null;
           return `Item ${f.foodId}`;
@@ -43,8 +45,7 @@ export const MealsScreen = ({ navigation }: any) => {
         calories: meal.totalCalories,
         protein: meal.totalMacros.protein,
         carbs: meal.totalMacros.carbs,
-        fats: meal.totalMacros.fats,
-      }))
+        fats: meal.totalMacros.fats }))
     : DEFAULT_MEALS;
 
   // Initialize checkedMeals based on meals
@@ -77,8 +78,7 @@ export const MealsScreen = ({ navigation }: any) => {
       await offlineService.cacheMealLog(today, {
         checkedMeals,
         waterGlasses,
-        date: today,
-      });
+        date: today });
     };
     cacheMealData();
   }, [checkedMeals, waterGlasses]);
@@ -332,8 +332,7 @@ export const MealsScreen = ({ navigation }: any) => {
                     backgroundColor: cardBg,
                     borderWidth: 1,
                     borderColor: isChecked ? accent + '40' : cardBorder,
-                    opacity: isChecked ? 0.65 : 1,
-                  },
+                    opacity: isChecked ? 0.65 : 1 },
                 ]}
               >
                 {/* Meal Header */}
@@ -343,8 +342,7 @@ export const MealsScreen = ({ navigation }: any) => {
                       style={[
                         tw`w-11 h-11 rounded-xl items-center justify-center`,
                         {
-                          backgroundColor: isChecked ? '#4ade80' + '20' : accent + '18',
-                        },
+                          backgroundColor: isChecked ? '#4ade80' + '20' : accent + '18' },
                       ]}
                     >
                       {isChecked ? (
@@ -359,8 +357,7 @@ export const MealsScreen = ({ navigation }: any) => {
                           tw`text-base font-bold`,
                           {
                             color: isChecked ? textMuted : textPrimary,
-                            textDecorationLine: isChecked ? 'line-through' : 'none',
-                          },
+                            textDecorationLine: isChecked ? 'line-through' : 'none' },
                         ]}
                       >
                         {meal.meal}
@@ -396,8 +393,7 @@ export const MealsScreen = ({ navigation }: any) => {
                           tw`text-sm`,
                           {
                             color: isChecked ? textMuted : textSecondary,
-                            textDecorationLine: isChecked ? 'line-through' : 'none',
-                          },
+                            textDecorationLine: isChecked ? 'line-through' : 'none' },
                         ]}
                       >
                         {item}
@@ -488,8 +484,7 @@ export const MealsScreen = ({ navigation }: any) => {
                   tw`h-full rounded-full`,
                   {
                     width: `${Math.min((waterGlasses / 8) * 100, 100)}%`,
-                    backgroundColor: '#38bdf8',
-                  },
+                    backgroundColor: '#38bdf8' },
                 ]}
               />
             </View>
@@ -502,8 +497,7 @@ export const MealsScreen = ({ navigation }: any) => {
                   style={[
                     tw`w-8 h-8 rounded-lg items-center justify-center`,
                     {
-                      backgroundColor: i < waterGlasses ? '#38bdf8' + '20' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                    },
+                      backgroundColor: i < waterGlasses ? '#38bdf8' + '20' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)') },
                   ]}
                 >
                   <MaterialIcons
@@ -524,8 +518,7 @@ export const MealsScreen = ({ navigation }: any) => {
                   {
                     backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
                     borderWidth: 1,
-                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                  },
+                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
                 ]}
               >
                 <MaterialIcons name="remove" size={24} color={textSecondary} />
@@ -542,8 +535,7 @@ export const MealsScreen = ({ navigation }: any) => {
                   {
                     backgroundColor: '#38bdf8' + '18',
                     borderWidth: 1,
-                    borderColor: '#38bdf8' + '30',
-                  },
+                    borderColor: '#38bdf8' + '30' },
                 ]}
               >
                 <MaterialIcons name="add" size={24} color="#38bdf8" />
@@ -559,14 +551,16 @@ export const MealsScreen = ({ navigation }: any) => {
         onSelect={(id) => {
           if (id === 'home') navigation.navigate('TraineeCommandCenter');
           if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
+          if (id === 'track') navigation.navigate('DailyTracker');
           if (id === 'messages') navigation.navigate('Messages');
           if (id === 'profile') navigation.navigate('Profile');
         }}
         items={[
           { id: 'home', icon: 'home', label: 'Home' },
           { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
+          { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages' },
+          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />

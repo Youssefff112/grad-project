@@ -179,9 +179,11 @@ export const clearAllCache = async () => {
     );
 
     if (cacheKeys.length > 0) {
-      await AsyncStorage.multiRemove(cacheKeys).catch((error) => {
-        console.warn('[OfflineService] Error in multiRemove:', error);
-      });
+      await Promise.all(
+        cacheKeys.map((key) => AsyncStorage.removeItem(key).catch((error) => {
+          console.warn('[OfflineService] Error removing cache key:', error);
+        }))
+      );
     }
   } catch (error) {
     console.warn('[OfflineService] Error clearing cache:', error);

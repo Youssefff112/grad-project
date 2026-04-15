@@ -3,12 +3,11 @@ import {
   View,
   Text,
   Modal,
-  SafeAreaView,
+import { SafeAreaView } from 'react-native-safe-area-context';
   ScrollView,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-} from 'react-native';
+  KeyboardAvoidingView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -30,8 +29,7 @@ export const FoodPickerModal: React.FC<FoodPickerModalProps> = ({
   onSelect,
   onClose,
   isDark: forcedDark,
-  accent: forcedAccent,
-}) => {
+  accent: forcedAccent }) => {
   const { isDark, accent } = useTheme();
   const actualDark = forcedDark !== undefined ? forcedDark : isDark;
   const actualAccent = forcedAccent || accent;

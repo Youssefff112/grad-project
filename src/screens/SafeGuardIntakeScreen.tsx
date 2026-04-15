@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -14,8 +15,7 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
   const [conditions, setConditions] = useState({
     heart: false,
     hypertension: false,
-    diabetes: true,
-  });
+    diabetes: true });
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>

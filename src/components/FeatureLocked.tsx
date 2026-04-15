@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -20,8 +21,7 @@ export const FeatureLocked: React.FC<FeatureLockedProps> = ({
   description,
   upgradePlans,
   onUpgradePress,
-  onBackPress,
-}) => {
+  onBackPress }) => {
   const { isDark, accent } = useTheme();
 
   return (

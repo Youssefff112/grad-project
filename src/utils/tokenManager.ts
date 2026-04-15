@@ -20,13 +20,11 @@ export interface TokenData {
  */
 export const saveTokens = async (data: TokenData): Promise<void> => {
   try {
-    await AsyncStorage.multiSet([
-      [AUTH_TOKEN_KEY, data.accessToken],
-      [REFRESH_TOKEN_KEY, data.refreshToken],
-      [TOKEN_EXPIRY_KEY, String(data.expiresIn ? Date.now() + data.expiresIn * 1000 : 0)],
-    ]).catch((error) => {
-      console.warn('[TokenManager] Error in multiSet:', error);
-    });
+    await Promise.all([
+      AsyncStorage.setItem(AUTH_TOKEN_KEY, data.accessToken),
+      AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken),
+      AsyncStorage.setItem(TOKEN_EXPIRY_KEY, String(data.expiresIn ? Date.now() + data.expiresIn * 1000 : 0)),
+    ]);
   } catch (error) {
     console.warn('[TokenManager] Failed to save tokens:', error);
   }
@@ -82,9 +80,11 @@ export const isTokenValid = async (): Promise<boolean> => {
  */
 export const clearTokens = async (): Promise<void> => {
   try {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRY_KEY]).catch((error) => {
-      console.warn('[TokenManager] Error in multiRemove:', error);
-    });
+    await Promise.all([
+      AsyncStorage.removeItem(AUTH_TOKEN_KEY),
+      AsyncStorage.removeItem(REFRESH_TOKEN_KEY),
+      AsyncStorage.removeItem(TOKEN_EXPIRY_KEY),
+    ]);
   } catch (error) {
     console.warn('[TokenManager] Failed to clear tokens:', error);
   }
@@ -95,14 +95,11 @@ export const clearTokens = async (): Promise<void> => {
  */
 export const getTokens = async (): Promise<{ accessToken: string | null; refreshToken: string | null }> => {
   try {
-    const result = await AsyncStorage.multiGet([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY]).catch(() => [
-      [AUTH_TOKEN_KEY, null],
-      [REFRESH_TOKEN_KEY, null],
+    const [accessToken, refreshToken] = await Promise.all([
+      AsyncStorage.getItem(AUTH_TOKEN_KEY).catch(() => null),
+      AsyncStorage.getItem(REFRESH_TOKEN_KEY).catch(() => null),
     ]);
-    return {
-      accessToken: result[0][1],
-      refreshToken: result[1][1],
-    };
+    return { accessToken, refreshToken };
   } catch (error) {
     console.warn('[TokenManager] Failed to get tokens:', error);
     return { accessToken: null, refreshToken: null };

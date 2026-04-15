@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -62,8 +63,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
                       ? { backgroundColor: accent, borderColor: accent }
                       : {
                           backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                          borderColor: accent + '1A',
-                        },
+                          borderColor: accent + '1A' },
                   ]}
                 >
                   <Text
@@ -128,8 +128,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
           tw`p-6 border-t`,
           {
             backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
-            borderColor: accent + '0D',
-          },
+            borderColor: accent + '0D' },
         ]}
       >
         <Button

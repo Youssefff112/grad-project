@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, SafeAreaView, Animated } from 'react-native';
+import { View, Text, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -71,8 +72,7 @@ export const SplashScreen = ({ navigation }: any) => {
                     shadowOffset: { width: 0, height: 8 },
                     shadowOpacity: 0.35,
                     shadowRadius: 20,
-                    elevation: 12,
-                  },
+                    elevation: 12 },
                 ]}
               >
                 <MaterialIcons name="bolt" size={68} color="white" />
@@ -85,8 +85,7 @@ export const SplashScreen = ({ navigation }: any) => {
                 transform: [{ translateY: titleY }],
                 opacity: titleOpacity,
                 alignItems: 'center',
-                marginBottom: 2,
-              }}
+                marginBottom: 2 }}
             >
               <Text
                 style={[
@@ -135,8 +134,7 @@ export const SplashScreen = ({ navigation }: any) => {
             style={{
               transform: [{ translateY: pillsY }],
               opacity: pillsOpacity,
-              marginBottom: 32,
-            }}
+              marginBottom: 32 }}
           >
             <View style={tw`flex-row gap-3`}>
               {[
@@ -151,8 +149,7 @@ export const SplashScreen = ({ navigation }: any) => {
                     {
                       backgroundColor: accent + '14',
                       borderWidth: 1,
-                      borderColor: accent + '28',
-                    },
+                      borderColor: accent + '28' },
                   ]}
                 >
                   <View
@@ -188,8 +185,7 @@ export const SplashScreen = ({ navigation }: any) => {
           <Animated.View
             style={{
               transform: [{ translateY: ctaY }],
-              opacity: ctaOpacity,
-            }}
+              opacity: ctaOpacity }}
           >
             <View style={tw`gap-3`}>
               <Button

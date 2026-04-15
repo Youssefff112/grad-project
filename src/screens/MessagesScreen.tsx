@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -26,8 +27,7 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     time: '2m ago',
     unread: 2,
     isAI: true,
-    category: 'coaches',
-  },
+    category: 'coaches' },
   {
     id: '2',
     name: 'Dr. Sarah Miller',
@@ -36,8 +36,7 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     time: '1h ago',
     unread: 0,
     isAI: false,
-    category: 'people',
-  },
+    category: 'people' },
   {
     id: '3',
     name: 'Training Group',
@@ -46,8 +45,7 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     time: '3h ago',
     unread: 5,
     isAI: false,
-    category: 'groups',
-  },
+    category: 'groups' },
   {
     id: '4',
     name: 'Nutrition AI',
@@ -56,8 +54,7 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     time: '5h ago',
     unread: 1,
     isAI: true,
-    category: 'ai',
-  },
+    category: 'ai' },
 ];
 
 export const MessagesScreen = ({ navigation }: any) => {
@@ -188,8 +185,7 @@ export const MessagesScreen = ({ navigation }: any) => {
               style={[
                 tw`px-4 py-2 rounded-full`,
                 {
-                  backgroundColor: filter === tab ? accent : isDark ? '#1e293b' : '#f1f5f9',
-                },
+                  backgroundColor: filter === tab ? accent : isDark ? '#1e293b' : '#f1f5f9' },
               ]}
             >
               <Text
@@ -215,8 +211,7 @@ export const MessagesScreen = ({ navigation }: any) => {
                   tw`flex-row items-center gap-3 py-4`,
                   index < filteredConversations.length - 1 && {
                     borderBottomWidth: 1,
-                    borderColor: dividerColor,
-                  },
+                    borderColor: dividerColor },
                 ]}
               >
                 {/* Avatar */}
@@ -292,8 +287,7 @@ export const MessagesScreen = ({ navigation }: any) => {
                 color: textPrimary,
                 borderWidth: 1,
                 borderColor: cardBorder,
-                minHeight: 100,
-              },
+                minHeight: 100 },
             ]}
             placeholder="Type your message..."
             placeholderTextColor={textMuted}

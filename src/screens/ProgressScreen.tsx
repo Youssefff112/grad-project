@@ -2,10 +2,10 @@ import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -27,7 +27,8 @@ export const ProgressScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName } = useUser();
   const { totalUnread } = useNotifications();
-  const { meals } = useFoodManagement();
+  const { customMeals } = useFoodManagement();
+  const meals = customMeals || [];
   const { workouts } = useExerciseManagement();
 
   const [timeframe, setTimeframe] = useState<'week' | 'month' | 'all'>('week');
@@ -232,7 +233,7 @@ export const ProgressScreen = ({ navigation }: any) => {
             </View>
 
             {/* Stats for selected day */}
-            <View style={tw`gap-2 pt-2 border-t`, { borderColor: cardBorder }}>
+            <View style={[tw`gap-2 pt-2 border-t`, { borderColor: cardBorder }]}>
               {[
                 {
                   label: 'Calories',

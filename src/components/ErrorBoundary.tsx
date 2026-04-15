@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, SafeAreaView } from 'react-native';
+import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ErrorState } from './ErrorState';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -45,8 +46,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             message={this.state.error?.message || 'An unexpected error occurred. Please try again.'}
             retryAction={{
               label: 'Try Again',
-              onPress: this.handleRetry,
-            }}
+              onPress: this.handleRetry }}
             showIcon={true}
           />
         </SafeAreaView>
