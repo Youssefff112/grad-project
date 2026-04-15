@@ -13,6 +13,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
+import authService, { User } from '../services/auth.service';
 
 interface Coach {
   id: string;
@@ -33,53 +34,36 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
   const [showCoachDetails, setShowCoachDetails] = useState(false);
 
-  // Mock coaches data
-  const availableCoaches: Coach[] = [
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      specialty: 'Strength Training',
-      bio: 'Expert in progressive overload and hypertrophy programming. Specializes in beginners to intermediate lifters.',
-      rating: 4.9,
-      reviewCount: 156,
-      yearsExperience: 8,
-      responseTime: '2-4 hours',
-      sessionRate: 49.99,
-    },
-    {
-      id: '2',
-      name: 'Marcus Chen',
-      specialty: 'HIIT & Conditioning',
-      bio: 'Performance coach focused on metabolic conditioning and cardio efficiency. Great for fitness enthusiasts.',
-      rating: 4.8,
-      reviewCount: 128,
-      yearsExperience: 6,
-      responseTime: '1-2 hours',
-      sessionRate: 59.99,
-    },
-    {
-      id: '3',
-      name: 'Emma Wilson',
-      specialty: 'Nutrition & Recovery',
-      bio: 'Registered dietitian coach. Helps clients optimize nutrition and recovery strategies for all fitness levels.',
-      rating: 4.95,
-      reviewCount: 201,
-      yearsExperience: 10,
-      responseTime: '3-5 hours',
-      sessionRate: 69.99,
-    },
-    {
-      id: '4',
-      name: 'Alex Rodriguez',
-      specialty: 'Sports Performance',
-      bio: 'Certified sports performance specialist. Train like an athlete regardless of your current fitness level.',
-      rating: 4.85,
-      reviewCount: 174,
-      yearsExperience: 12,
-      responseTime: '1-3 hours',
-      sessionRate: 79.99,
-    },
-  ];
+  const [availableCoaches, setAvailableCoaches] = useState<Coach[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchCoaches = async () => {
+      try {
+        const response = await authService.getCoaches();
+        if (response.success && response.data?.coaches) {
+          const apiCoaches = response.data.coaches;
+          const mappedCoaches: Coach[] = apiCoaches.map((c: User) => ({
+            id: String(c.id),
+            name: `${c.firstName} ${c.lastName}`.trim(),
+            specialty: c.profile?.experienceLevel ? `${c.profile.experienceLevel} Coach` : 'General Fitness Coach',
+            bio: c.profile?.goal || 'Expert coach ready to help you hit your peak performance.',
+            rating: 5.0, // Default for now
+            reviewCount: 0,
+            yearsExperience: 5,
+            responseTime: '24 hours',
+            sessionRate: 49.99,
+          }));
+          setAvailableCoaches(mappedCoaches);
+        }
+      } catch (error) {
+        console.error('Failed to fetch coaches:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCoaches();
+  }, []);
 
   const handleSelectCoach = (coach: Coach) => {
     setSelectedCoach(coach);
@@ -218,7 +202,23 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
             Available Coaches
           </Text>
           <View style={tw`gap-4`}>
-            {availableCoaches.map((coach) => (
+            {isLoading ? (
+              <View style={tw`py-10 items-center justify-center`}>
+                <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Searching for coaches...</Text>
+              </View>
+            ) : availableCoaches.length === 0 ? (
+              <View style={[tw`rounded-xl p-4 flex-row gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+                <MaterialIcons name="search-off" size={20} color={accent} />
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                    No Coaches Found
+                  </Text>
+                  <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                    Check back later for newly joined professionals.
+                  </Text>
+                </View>
+              </View>
+            ) : availableCoaches.map((coach) => (
               <TouchableOpacity
                 key={coach.id}
                 onPress={() => handleSelectCoach(coach)}

@@ -1,0 +1,29 @@
+import { apiGet, apiPatch } from './api';
+
+export interface AppNotification {
+  id: number;
+  userId: number;
+  title: string;
+  message: string;
+  icon: string;
+  color: string;
+  type: 'message' | 'workout' | 'meal' | 'achievement' | 'system';
+  read: boolean;
+  scheduledAt: string;
+  createdAt: string;
+}
+
+export const getNotifications = async (): Promise<AppNotification[]> => {
+  const response: any = await apiGet('/notifications');
+  return response.data.notifications || [];
+};
+
+export const markNotificationAsRead = async (id: number): Promise<boolean> => {
+  try {
+    await apiPatch(`/notifications/${id}/read`, {});
+    return true;
+  } catch (error) {
+    console.error('Failed to mark notification as read:', error);
+    return false;
+  }
+};

@@ -1,13 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useUser } from '../context/UserContext';
 import { BottomNav } from '../components/BottomNav';
+import { getConversations, Conversation as ApiConversation } from '../services/messaging.service';
 
-interface Conversation {
+// We map the backend schema to this UI schema on load
+interface UIConversation {
   id: string;
   name: string;
   avatar: string;
@@ -18,50 +22,14 @@ interface Conversation {
   category: 'coaches' | 'people' | 'groups' | 'ai';
 }
 
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: '1',
-    name: 'Vertex Coach',
-    avatar: 'smart-toy',
-    lastMessage: 'Great session today! Your squat form improved by 12%. Keep it up.',
-    time: '2m ago',
-    unread: 2,
-    isAI: true,
-    category: 'coaches' },
-  {
-    id: '2',
-    name: 'Dr. Sarah Miller',
-    avatar: 'medical-services',
-    lastMessage: 'Your recovery metrics look good. Cleared for heavy lifting.',
-    time: '1h ago',
-    unread: 0,
-    isAI: false,
-    category: 'people' },
-  {
-    id: '3',
-    name: 'Training Group',
-    avatar: 'group',
-    lastMessage: "Alex: Who's joining leg day tomorrow?",
-    time: '3h ago',
-    unread: 5,
-    isAI: false,
-    category: 'groups' },
-  {
-    id: '4',
-    name: 'Nutrition AI',
-    avatar: 'restaurant',
-    lastMessage: "Your meal plan for tomorrow has been updated based on today's workout.",
-    time: '5h ago',
-    unread: 1,
-    isAI: true,
-    category: 'ai' },
-];
-
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { totalUnread } = useNotifications();
+  const { userId, userMode } = useUser();
+  const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
+  const [isLoading, setIsLoading] = useState(true);
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [newMessageText, setNewMessageText] = useState('');
 
@@ -73,9 +41,61 @@ export const MessagesScreen = ({ navigation }: any) => {
   const textMuted = isDark ? '#64748b' : '#94a3b8';
   const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
+  useFocusEffect(
+    useCallback(() => {
+      const fetchConversations = async () => {
+        try {
+          const apiConvs = await getConversations();
+          
+          let mapped: UIConversation[] = apiConvs.map(conv => {
+            // Determine if the *other* party in this conversation is a coach or client
+            const isMeCoach = String(userId) === String(conv.coachId);
+            const otherParty = isMeCoach ? conv.client : conv.coach;
+            
+            const otherName = otherParty ? `${otherParty.firstName} ${otherParty.lastName}`.trim() : 'Unknown User';
+            
+            // Format time correctly
+            let timeStr = '';
+            if (conv.lastMessageAt) {
+              const d = new Date(conv.lastMessageAt);
+              timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            const lastMsg = (conv.messages && conv.messages.length > 0) 
+              ? conv.messages[0].text 
+              : 'New conversation started';
+
+            // Determine read status if checking backend counts, defaulting to 0 for now as we haven't implemented unread counters on the backend
+            const unreadCount = 0; 
+
+            return {
+              id: conv.id,
+              name: otherName,
+              avatar: isMeCoach ? 'person' : 'fitness-center', // icon logic
+              lastMessage: lastMsg,
+              time: timeStr,
+              unread: unreadCount,
+              isAI: false, // Wait, is AI coach supported?
+              category: 'coaches'
+            };
+          });
+
+          // Also inject some AI modules if they are using them? Let's just push their DB convos.
+          setConversations(mapped);
+        } catch (error) {
+          console.error('Error fetching conversations:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchConversations();
+    }, [userId])
+  );
+
   // Filter conversations
   const filteredConversations = useMemo(() => {
-    let result = MOCK_CONVERSATIONS;
+    let result = conversations;
 
     // Apply category filter
     if (filter === 'unread') {
@@ -98,7 +118,7 @@ export const MessagesScreen = ({ navigation }: any) => {
     return result;
   }, [filter, searchText]);
 
-  const handleOpenChat = (conversation: Conversation) => {
+  const handleOpenChat = (conversation: UIConversation) => {
     navigation.navigate('Chat', { conversationId: conversation.id, conversationName: conversation.name });
   };
 
@@ -202,7 +222,11 @@ export const MessagesScreen = ({ navigation }: any) => {
 
         {/* Conversations List */}
         <View style={tw`px-5`}>
-          {filteredConversations.length > 0 ? (
+          {isLoading ? (
+            <View style={tw`py-10 items-center justify-center`}>
+              <Text style={[tw`text-sm font-semibold`, { color: textMuted }]}>Loading conversations...</Text>
+            </View>
+          ) : filteredConversations.length > 0 ? (
             filteredConversations.map((conversation, index) => (
               <TouchableOpacity
                 key={conversation.id}

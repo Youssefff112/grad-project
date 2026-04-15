@@ -5,71 +5,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: string;
-  icon: string;
-  color: string;
-  read: boolean;
-  type: 'message' | 'workout' | 'meal' | 'achievement' | 'system';
-}
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    title: 'Great Workout!',
-    message: 'You completed your Push Day workout. +250 streak points!',
-    timestamp: '5m ago',
-    icon: 'fitness-center',
-    color: '#f87171',
-    read: false,
-    type: 'workout' },
-  {
-    id: '2',
-    title: 'Meal Logged',
-    message: 'Your lunch has been logged. Protein goals: 45/160g',
-    timestamp: '2h ago',
-    icon: 'restaurant',
-    color: '#4ade80',
-    read: false,
-    type: 'meal' },
-  {
-    id: '3',
-    title: 'New Message',
-    message: 'Coach Sarah: Keep up the great form on those squats!',
-    timestamp: '4h ago',
-    icon: 'chat-bubble',
-    color: '#3b82f6',
-    read: true,
-    type: 'message' },
-  {
-    id: '4',
-    title: 'Achievement Unlocked!',
-    message: '7-Day Streak! You\'re on fire 🔥',
-    timestamp: '1d ago',
-    icon: 'local-fire-department',
-    color: '#facc15',
-    read: true,
-    type: 'achievement' },
-  {
-    id: '5',
-    title: 'System Update',
-    message: 'New exercises added to library. Check them out!',
-    timestamp: '2d ago',
-    icon: 'notifications',
-    color: '#8b5cf6',
-    read: true,
-    type: 'system' },
-];
+import { useFocusEffect } from '@react-navigation/native';
+import { getNotifications, markNotificationAsRead, AppNotification } from '../services/notification.service';
 
 export const NotificationsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { totalUnread } = useNotifications();
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  // We use totalUnread from context for Chat, but we can compute internal Notification unreads here too
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [isLoading, setIsLoading] = useState(true);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -79,14 +23,43 @@ export const NotificationsScreen = ({ navigation }: any) => {
   const textMuted = isDark ? '#64748b' : '#94a3b8';
   const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
-  const filteredNotifications = filter === 'unread' ? notifications.filter((n) => !n.read) : notifications;
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchNotifications = async () => {
+        try {
+          const apiNotifications = await getNotifications();
+          setNotifications(apiNotifications);
+        } catch (error) {
+          console.error('Error fetching notifications:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchNotifications();
+    }, [])
+  );
 
-  const handleMarkAsRead = (id: string) => {
+  const filteredNotifications = filter === 'unread' ? notifications.filter((n) => !n.read) : notifications;
+  // Calculate specific push notification unread counts
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleMarkAsRead = async (id: number) => {
+    // Optimistic UI update
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    // Backend sync
+    await markNotificationAsRead(id);
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+    // Optimistic update
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    
+    // Background sync all
+    for (const id of unreadIds) {
+      await markNotificationAsRead(id);
+    }
   };
 
   return (
@@ -125,7 +98,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
                 { color: filter === tab ? '#ffffff' : textSecondary },
               ]}
             >
-              {tab} {tab === 'unread' && totalUnread > 0 ? `(${totalUnread})` : ''}
+              {tab} {tab === 'unread' && unreadCount > 0 ? `(${unreadCount})` : ''}
             </Text>
           </TouchableOpacity>
         ))}
@@ -133,7 +106,11 @@ export const NotificationsScreen = ({ navigation }: any) => {
 
       {/* Notifications List */}
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 pb-10`} showsVerticalScrollIndicator={false}>
-        {filteredNotifications.length > 0 ? (
+        {isLoading ? (
+          <View style={tw`py-16 items-center justify-center`}>
+            <Text style={[tw`text-sm font-semibold mt-4`, { color: textMuted }]}>Loading alerts...</Text>
+          </View>
+        ) : filteredNotifications.length > 0 ? (
           filteredNotifications.map((notification, index) => (
             <TouchableOpacity
               key={notification.id}
@@ -160,7 +137,9 @@ export const NotificationsScreen = ({ navigation }: any) => {
               <View style={tw`flex-1`}>
                 <View style={tw`flex-row items-center justify-between mb-1`}>
                   <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>{notification.title}</Text>
-                  <Text style={[tw`text-xs`, { color: textMuted }]}>{notification.timestamp}</Text>
+                  <Text style={[tw`text-xs`, { color: textMuted }]}>
+                    {notification.scheduledAt ? new Date(notification.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                  </Text>
                 </View>
                 <Text style={[tw`text-sm`, { color: textSecondary }]}>{notification.message}</Text>
               </View>
