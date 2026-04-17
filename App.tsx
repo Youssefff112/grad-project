@@ -35,7 +35,6 @@ import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
 import { WorkoutSessionDetailScreen } from './src/screens/WorkoutSessionDetailScreen';
 import { WorkoutGenerationScreen } from './src/screens/WorkoutGenerationScreen';
 import { MealGenerationScreen } from './src/screens/MealGenerationScreen';
-import { CoachAssignmentScreen } from './src/screens/CoachAssignmentScreen';
 import { EditExperienceScreen } from './src/screens/EditExperienceScreen';
 import { EditDietScreen } from './src/screens/EditDietScreen';
 import { AddFoodScreen } from './src/screens/AddFoodScreen';
@@ -50,16 +49,16 @@ import { ProgressScreen } from './src/screens/ProgressScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { CoachBrowsingScreen } from './src/screens/CoachBrowsingScreen';
 import { CoachProfileDetailScreen } from './src/screens/CoachProfileDetailScreen';
-import { CoachProfileEditScreen } from './src/screens/CoachProfileEditScreen';
+import { CoachCommandCenterScreen } from './src/screens/CoachCommandCenterScreen';
 
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
   const { isDark } = useTheme();
-  const { fullName, isLoading } = useUser();
+  const { fullName, isLoading, subscriptionPlan } = useUser();
   
   // Determine initial route based on login status
-  const initialRouteName = isLoading ? 'Splash' : (fullName ? 'TraineeCommandCenter' : 'Splash');
+  const initialRouteName = isLoading ? 'Splash' : (fullName ? (subscriptionPlan === 'ProCoach' ? 'CoachCommandCenter' : 'TraineeCommandCenter') : 'Splash');
 
   return (
     <Stack.Navigator
@@ -82,6 +81,7 @@ function AppNavigator() {
       <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
       <Stack.Screen name="Goals" component={GoalsScreen} />
       <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
+      <Stack.Screen name="CoachCommandCenter" component={CoachCommandCenterScreen} />
       <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <Stack.Screen name="Calibration" component={CalibrationScreen} />
       <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
@@ -107,10 +107,8 @@ function AppNavigator() {
       <Stack.Screen name="WorkoutSessionDetail" component={WorkoutSessionDetailScreen} />
       <Stack.Screen name="WorkoutGeneration" component={WorkoutGenerationScreen} />
       <Stack.Screen name="MealGeneration" component={MealGenerationScreen} />
-      <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
       <Stack.Screen name="CoachBrowsingScreen" component={CoachBrowsingScreen} />
       <Stack.Screen name="CoachProfileDetail" component={CoachProfileDetailScreen} />
-      <Stack.Screen name="CoachProfileEdit" component={CoachProfileEditScreen} />
       <Stack.Screen name="EditExperience" component={EditExperienceScreen} />
       <Stack.Screen name="EditDiet" component={EditDietScreen} />
     </Stack.Navigator>

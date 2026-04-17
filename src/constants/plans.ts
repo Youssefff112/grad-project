@@ -4,6 +4,7 @@ export interface PlanFeatures {
   plan: SubscriptionPlan;
   name: string;
   price: number;
+  isCoachAccount: boolean;
   hasFoodTracking: boolean;
   hasWaterTracking: boolean;
   hasExerciseLogging: boolean;
@@ -22,6 +23,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     plan: 'Free',
     name: 'Free Plan',
     price: 0,
+    isCoachAccount: false,
     hasFoodTracking: true,
     hasWaterTracking: true,
     hasExerciseLogging: true,
@@ -36,24 +38,9 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
   },
   Standard: {
     plan: 'Standard',
-    name: 'Standard Plan',
+    name: 'Standard (AI Plan)',
     price: 9.99,
-    hasFoodTracking: true,
-    hasWaterTracking: true,
-    hasExerciseLogging: true,
-    hasExerciseVideos: true,
-    hasAIChat: false,
-    hasAIWorkoutGeneration: false,
-    hasAIMealPlanGeneration: false,
-    hasComputerVision: false,
-    hasCoachChat: false,
-    hasSharedDashboard: false,
-    hasProgressTracking: false,
-  },
-  Premium: {
-    plan: 'Premium',
-    name: 'Premium (AI Plan)',
-    price: 19.99,
+    isCoachAccount: false,
     hasFoodTracking: true,
     hasWaterTracking: true,
     hasExerciseLogging: true,
@@ -66,10 +53,11 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasSharedDashboard: false,
     hasProgressTracking: false,
   },
-  ProCoach: {
-    plan: 'ProCoach',
-    name: 'Pro Coach Plan',
-    price: 49.99,
+  Premium: {
+    plan: 'Premium',
+    name: 'Premium (Coach Plan)',
+    price: 19.99,
+    isCoachAccount: false,
     hasFoodTracking: true,
     hasWaterTracking: true,
     hasExerciseLogging: true,
@@ -82,10 +70,28 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasSharedDashboard: true,
     hasProgressTracking: true,
   },
+  ProCoach: {
+    plan: 'ProCoach',
+    name: 'Pro Coach Account',
+    price: 49.99,
+    isCoachAccount: true,
+    hasFoodTracking: false,
+    hasWaterTracking: false,
+    hasExerciseLogging: false,
+    hasExerciseVideos: false,
+    hasAIChat: false,
+    hasAIWorkoutGeneration: false,
+    hasAIMealPlanGeneration: false,
+    hasComputerVision: false,
+    hasCoachChat: false,
+    hasSharedDashboard: false,
+    hasProgressTracking: false,
+  },
   Elite: {
     plan: 'Elite',
     name: 'Elite Plan',
     price: 99.99,
+    isCoachAccount: false,
     hasFoodTracking: true,
     hasWaterTracking: true,
     hasExerciseLogging: true,

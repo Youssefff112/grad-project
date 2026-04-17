@@ -433,8 +433,8 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
           { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          ...((subscriptionPlan === 'ProCoach' || subscriptionPlan === 'Elite') ? [{ id: 'coaches', icon: 'person-add', label: 'Coaches' }] : []),
-          { id: 'profile', icon: 'person', label: 'Profile' },
+          ...((subscriptionPlan === 'Premium' || subscriptionPlan === 'Elite') ? [{ id: 'coaches', icon: 'person-add' as const, label: 'Coaches' }] : []),
+          { id: 'profile', icon: 'person' as const, label: 'Profile' },
         ]}
       />
     </SafeAreaView>

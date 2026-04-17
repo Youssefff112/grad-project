@@ -1,23 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   TextInput,
-  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
-  RefreshControl,
-  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
-import { useUser } from '../context/UserContext';
 import { CoachCard } from '../components/CoachCard';
-import * as coachService from '../services/coachService';
+import { getMockCoaches, MockCoach } from '../data/mockCoaches';
 
 interface FilterState {
   specialty?: string;
@@ -26,83 +21,54 @@ interface FilterState {
 
 export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isDark } = useTheme();
-  const { coachId } = useUser();
-  const [coaches, setCoaches] = useState<coachService.Coach[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({});
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState('');
 
-  const specialtyOptions = ['Strength', 'Cardio', 'Weight Loss', 'Nutrition', 'Flexibility', 'CrossFit'];
+  const specialtyOptions = ['Strength', 'Cardio', 'Weight Loss', 'Nutrition', 'Flexibility', 'CrossFit', 'HIIT', 'Yoga', 'Pilates'];
 
-  const loadCoaches = useCallback(async (pageNum = 1) => {
-    try {
-      setError('');
-      setLoading(pageNum === 1);
-      const response = await coachService.getCoaches({
-        specialty: filters.specialty,
-        minRating: filters.minRating,
-        page: pageNum,
-        limit: 20
-      });
+  // Filter coaches from mock data
+  const coaches = useMemo(() => {
+    let result = getMockCoaches({
+      specialty: filters.specialty,
+      minRating: filters.minRating,
+    });
 
-      if (pageNum === 1) {
-        setCoaches(response.coaches || []);
-      } else {
-        setCoaches(prev => [...prev, ...(response.coaches || [])]);
-      }
-
-      setHasMore((response.coaches?.length || 0) === 20);
-      setPage(pageNum);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load coaches');
-      console.error('Error loading coaches:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    // Client-side search by name or specialty
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      result = result.filter(
+        c => c.name.toLowerCase().includes(q) ||
+             c.specialties.some(s => s.toLowerCase().includes(q)) ||
+             c.bio.toLowerCase().includes(q)
+      );
     }
-  }, [filters]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadCoaches(1);
-    }, [loadCoaches])
-  );
+    return result;
+  }, [filters, searchText]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadCoaches(1);
-  };
-
-  const handleLoadMore = () => {
-    if (hasMore && !loading) {
-      loadCoaches(page + 1);
-    }
-  };
-
-  const handleCoachPress = (coach: coachService.Coach) => {
+  const handleCoachPress = (coach: MockCoach) => {
     navigation.navigate('CoachProfileDetail', { coachId: coach.id });
-  };
-
-  const handleApplyFilters = () => {
-    setPage(1);
-    setShowFilters(false);
-    loadCoaches(1);
   };
 
   const handleClearFilters = () => {
     setFilters({});
-    setPage(1);
-    setShowFilters(false);
-    loadCoaches(1);
   };
 
-  const renderCoachItem = ({ item }: { item: coachService.Coach }) => (
-    <CoachCard coach={item} onPress={() => handleCoachPress(item)} />
+  const renderCoachItem = ({ item }: { item: MockCoach }) => (
+    <CoachCard
+      coach={{
+        id: item.id,
+        userId: item.id,
+        bio: item.bio,
+        specialties: item.specialties,
+        experienceYears: item.experienceYears,
+        rating: item.rating,
+        ratingCount: item.ratingCount,
+        profilePicture: item.profilePicture,
+      }}
+      onPress={() => handleCoachPress(item)}
+    />
   );
 
   const renderHeader = () => (
@@ -117,7 +83,7 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
           />
         </TouchableOpacity>
         <Text style={tw`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          {coachId ? 'Find New Coach' : 'Browse Coaches'}
+          Browse Coaches
         </Text>
       </View>
 
@@ -139,7 +105,6 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
           placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
           value={searchText}
           onChangeText={setSearchText}
-          editable={!loading}
         />
       </View>
 
@@ -218,23 +183,15 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
         ))}
       </View>
 
-      {/* Apply Filters */}
-      <View style={tw`flex-row gap-2`}>
-        <TouchableOpacity
-          onPress={handleClearFilters}
-          style={tw`flex-1 py-2 px-4 rounded-lg border ${isDark ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100'}`}
-        >
-          <Text style={tw`text-center font-semibold ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-            Clear
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleApplyFilters}
-          style={tw`flex-1 py-2 px-4 rounded-lg ${isDark ? 'bg-blue-600' : 'bg-orange-500'}`}
-        >
-          <Text style={tw`text-center font-semibold text-white`}>Apply</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Clear Filters */}
+      <TouchableOpacity
+        onPress={handleClearFilters}
+        style={tw`py-2 px-4 rounded-lg border ${isDark ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100'}`}
+      >
+        <Text style={tw`text-center font-semibold ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+          Clear Filters
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -244,27 +201,7 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
 
       {showFilters && renderFilters()}
 
-      {error && (
-        <View style={tw`px-4 py-3 mx-4 mt-4 rounded-lg bg-red-100 bg-opacity-50 flex-row items-center`}>
-          <MaterialIcons name="error" size={16} color="#dc2626" />
-          <Text style={tw`text-red-700 text-sm ml-2 flex-1`}>{error}</Text>
-          <TouchableOpacity onPress={() => setError('')}>
-            <MaterialIcons name="close" size={16} color="#dc2626" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {loading && coaches.length === 0 ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator
-            size="large"
-            color={isDark ? '#3b82f6' : '#ff6a00'}
-          />
-          <Text style={tw`mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Loading coaches...
-          </Text>
-        </View>
-      ) : coaches.length === 0 ? (
+      {coaches.length === 0 ? (
         <View style={tw`flex-1 items-center justify-center px-4`}>
           <MaterialIcons
             name="person-search"
@@ -282,26 +219,12 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
         <FlatList
           data={coaches}
           renderItem={renderCoachItem}
-          keyExtractor={coach => `${coach.userId}-${coach.id}`}
+          keyExtractor={coach => `coach-${coach.id}`}
           contentContainerStyle={tw`px-4 pb-4`}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[isDark ? '#3b82f6' : '#ff6a00']}
-            />
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            hasMore && loading ? (
-              <View style={tw`items-center py-4`}>
-                <ActivityIndicator
-                  size="small"
-                  color={isDark ? '#3b82f6' : '#ff6a00'}
-                />
-              </View>
-            ) : null
+          ListHeaderComponent={
+            <Text style={tw`text-sm font-medium py-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              {coaches.length} coach{coaches.length !== 1 ? 'es' : ''} available
+            </Text>
           }
         />
       )}
