@@ -48,6 +48,9 @@ import { WorkoutBuilderScreen } from './src/screens/WorkoutBuilderScreen';
 import { DailyTrackerScreen } from './src/screens/DailyTrackerScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { CoachBrowsingScreen } from './src/screens/CoachBrowsingScreen';
+import { CoachProfileDetailScreen } from './src/screens/CoachProfileDetailScreen';
+import { CoachProfileEditScreen } from './src/screens/CoachProfileEditScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -105,6 +108,9 @@ function AppNavigator() {
       <Stack.Screen name="WorkoutGeneration" component={WorkoutGenerationScreen} />
       <Stack.Screen name="MealGeneration" component={MealGenerationScreen} />
       <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
+      <Stack.Screen name="CoachBrowsingScreen" component={CoachBrowsingScreen} />
+      <Stack.Screen name="CoachProfileDetail" component={CoachProfileDetailScreen} />
+      <Stack.Screen name="CoachProfileEdit" component={CoachProfileEditScreen} />
       <Stack.Screen name="EditExperience" component={EditExperienceScreen} />
       <Stack.Screen name="EditDiet" component={EditDietScreen} />
     </Stack.Navigator>

@@ -424,6 +424,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           if (id === 'track') navigation.navigate('DailyTracker');
           if (id === 'meals') navigation.navigate('Meals');
           if (id === 'messages') navigation.navigate('Messages');
+          if (id === 'coaches') navigation.navigate('CoachBrowsingScreen');
           if (id === 'profile') navigation.navigate('Profile');
         }}
         items={[
@@ -432,6 +433,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           { id: 'track', icon: 'trending-up', label: 'Track' },
           { id: 'meals', icon: 'restaurant', label: 'Meals' },
           { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
+          { id: 'coaches', icon: 'person-add', label: 'Coaches' },
           { id: 'profile', icon: 'person', label: 'Profile' },
         ]}
       />
