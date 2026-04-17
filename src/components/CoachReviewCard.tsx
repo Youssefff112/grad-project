@@ -60,7 +60,7 @@ export const CoachReviewCard: React.FC<CoachReviewCardProps> = ({ review }) => {
 
       {/* Author */}
       <Text style={tw`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
-        {review.isAnonymous ? 'Anonymous Reviewer' : 'Coach'}
+        {review.isAnonymous ? 'Anonymous Reviewer' : (review.authorName || 'Client Review')}
       </Text>
 
       {/* Comment */}

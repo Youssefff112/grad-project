@@ -87,11 +87,13 @@ export const getCoaches = async (filters?: {
 
   const queryString = params.toString();
   const url = queryString ? `/coach?${queryString}` : '/coach';
-  return apiGet(url);
+  const response = await apiGet(url);
+  return { coaches: response.data?.coaches || [] };
 };
 
 export const getCoachDetail = async (coachId: number): Promise<{ coach: CoachDetail }> => {
-  return apiGet(`/coach/${coachId}/detail`);
+  const response = await apiGet(`/coach/${coachId}/detail`);
+  return { coach: response.data?.coach || {} };
 };
 
 // Reviews
@@ -108,71 +110,91 @@ export const getCoachReviews = async (
 
   const queryString = params.toString();
   const url = queryString ? `/coach/${coachId}/reviews?${queryString}` : `/coach/${coachId}/reviews`;
-  return apiGet(url);
+  const response = await apiGet(url);
+  return {
+    reviews: response.data?.reviews || [],
+    pagination: response.pagination
+  };
 };
 
 export const submitReview = async (
   coachId: number,
   review: ReviewSubmission
 ): Promise<{ review: Review }> => {
-  return apiPost(`/coach/${coachId}/reviews`, review);
+  const response = await apiPost(`/coach/${coachId}/reviews`, review);
+  return { review: response.data?.review || {} };
 };
 
 export const deleteReview = async (coachId: number, reviewId: number): Promise<void> => {
-  return apiDelete(`/coach/${coachId}/reviews/${reviewId}`);
+  await apiDelete(`/coach/${coachId}/reviews/${reviewId}`);
 };
 
 export const checkReviewEligibility = async (
   coachId: number
 ): Promise<{ eligible: boolean; reason?: string; hasExistingReview?: boolean; existingReviewId?: number }> => {
-  return apiGet(`/coach/${coachId}/eligibility`);
+  const response = await apiGet(`/coach/${coachId}/eligibility`);
+  return response.data || { eligible: false };
 };
 
 // Coach profile management (coaches only)
 export const getMyCoachProfile = async (): Promise<{ profile: Coach }> => {
-  return apiGet('/coach/profile');
+  const response = await apiGet('/coach/profile');
+  return { profile: response.data?.profile || {} };
 };
 
 export const updateCoachProfile = async (updates: Partial<Coach>): Promise<{ profile: Coach }> => {
-  return apiPatch('/coach/profile', updates);
+  const response = await apiPatch('/coach/profile', updates);
+  return { profile: response.data?.profile || {} };
 };
 
 export const uploadProfilePicture = async (imageFile: FormData): Promise<{ imageUrl: string; profile: Coach }> => {
-  // Create a custom request with FormData to avoid JSON serialization
-  return apiPost('/coach/profile-picture', imageFile, {
+  const response = await apiPost('/coach/profile-picture', imageFile, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
+  return {
+    imageUrl: response.data?.imageUrl || '',
+    profile: response.data?.profile || {}
+  };
 };
 
 export const addTransformation = async (formData: FormData): Promise<{ transformation: Transformation; profile: Coach }> => {
-  return apiPost('/coach/transformations', formData, {
+  const response = await apiPost('/coach/transformations', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
+  return {
+    transformation: response.data?.transformation || {},
+    profile: response.data?.profile || {}
+  };
 };
 
 export const updateTransformation = async (
   transformId: string,
   updates: Partial<Transformation>
 ): Promise<{ transformation: Transformation }> => {
-  return apiPatch(`/coach/transformations/${transformId}`, updates);
+  const response = await apiPatch(`/coach/transformations/${transformId}`, updates);
+  return { transformation: response.data?.transformation || {} };
 };
 
 export const deleteTransformation = async (transformId: string): Promise<void> => {
-  return apiDelete(`/coach/transformations/${transformId}`);
+  await apiDelete(`/coach/transformations/${transformId}`);
 };
 
 export const addCertification = async (formData: FormData): Promise<{ certification: Certification; profile: Coach }> => {
-  return apiPost('/coach/certifications', formData, {
+  const response = await apiPost('/coach/certifications', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
+  return {
+    certification: response.data?.certification || {},
+    profile: response.data?.profile || {}
+  };
 };
 
 export const deleteCertification = async (certId: string): Promise<void> => {
-  return apiDelete(`/coach/certifications/${certId}`);
+  await apiDelete(`/coach/certifications/${certId}`);
 };

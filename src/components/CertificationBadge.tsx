@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tw } from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -41,13 +41,13 @@ export const CertificationBadge: React.FC<CertificationBadgeProps> = ({
       </View>
 
       {editable && onDelete && (
-        <MaterialIcons
-          name="close"
-          size={20}
-          color={isDark ? '#ef4444' : '#dc2626'}
-          onPress={() => onDelete(certification.id)}
-          style={tw`ml-2`}
-        />
+        <TouchableOpacity onPress={() => onDelete(certification.id)} style={tw`ml-2`}>
+          <MaterialIcons
+            name="close"
+            size={20}
+            color={isDark ? '#ef4444' : '#dc2626'}
+          />
+        </TouchableOpacity>
       )}
     </View>
   );

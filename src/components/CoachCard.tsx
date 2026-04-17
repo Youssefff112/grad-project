@@ -27,7 +27,6 @@ export const CoachCard: React.FC<CoachCardProps> = ({ coach, onPress }) => {
             <Image
               source={{ uri: coach.profilePicture }}
               style={tw`w-full h-full`}
-              defaultSource={require('../assets/coach-placeholder.png')}
             />
           ) : (
             <View style={tw`w-full h-full items-center justify-center bg-gray-400`}>

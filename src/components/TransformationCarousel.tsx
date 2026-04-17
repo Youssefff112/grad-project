@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, Dimensions, PanResponder, GestureResponderEvent } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tw } from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -34,6 +34,12 @@ export const TransformationCarousel: React.FC<TransformationCarouselProps> = ({
 
   const transformation = transformations[currentIndex];
   const imageContainerWidth = width - 32; // Account for padding
+
+  const handleSliderPress = (event: GestureResponderEvent) => {
+    const { locationX } = event.nativeEvent;
+    const newPosition = Math.max(0, Math.min(1, locationX / imageContainerWidth));
+    setSliderPosition(newPosition);
+  };
 
   const renderBeforeAfterSlider = () => {
     return (
@@ -75,54 +81,61 @@ export const TransformationCarousel: React.FC<TransformationCarouselProps> = ({
           />
         </View>
 
-        {/* Slider line and labels */}
-        <TouchableOpacity
+        {/* Slider line and labels - now properly interactive */}
+        <View
           style={{
             position: 'absolute',
-            left: `${sliderPosition * 100}%`,
+            left: 0,
             top: 0,
-            width: 3,
-            height: '100%',
-            backgroundColor: 'white',
-            marginLeft: -1.5
+            width: '100%',
+            height: '100%'
           }}
-          onPress={(e) => {
-            const touch = e.nativeEvent.locationX;
-            setSliderPosition(Math.max(0, Math.min(1, touch / imageContainerWidth)));
-          }}
-          activeOpacity={1}
+          onStartShouldSetResponder={() => true}
+          onResponderMove={handleSliderPress}
         >
           <View
             style={{
               position: 'absolute',
-              left: -20,
-              top: 10,
-              width: 40,
-              height: 20,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              borderRadius: 4,
-              alignItems: 'center',
-              justifyContent: 'center'
+              left: `${sliderPosition * 100}%`,
+              top: 0,
+              width: 3,
+              height: '100%',
+              backgroundColor: 'white',
+              marginLeft: -1.5
             }}
           >
-            <Text style={tw`text-white text-xs font-bold`}>BEFORE</Text>
+            <View
+              style={{
+                position: 'absolute',
+                left: -20,
+                top: 10,
+                width: 40,
+                height: 20,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                borderRadius: 4,
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Text style={tw`text-white text-xs font-bold`}>BEFORE</Text>
+            </View>
+            <View
+              style={{
+                position: 'absolute',
+                right: -15,
+                top: 10,
+                width: 40,
+                height: 20,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                borderRadius: 4,
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Text style={tw`text-white text-xs font-bold`}>AFTER</Text>
+            </View>
           </View>
-          <View
-            style={{
-              position: 'absolute',
-              right: -15,
-              top: 10,
-              width: 40,
-              height: 20,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              borderRadius: 4,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Text style={tw`text-white text-xs font-bold`}>AFTER</Text>
-          </View>
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };

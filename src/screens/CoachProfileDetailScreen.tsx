@@ -4,12 +4,12 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   FlatList,
   Alert,
   Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tw } from '../tw';
 import { useTheme } from '../context/ThemeContext';
@@ -366,27 +366,27 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
         </View>
       </ScrollView>
 
-      {/* Assign Coach Button */}
-      {!userContext.coachId && (
-        <View style={tw`px-4 py-4 border-t ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-          <TouchableOpacity
-            onPress={handleAssignCoach}
-            disabled={assigning}
-            style={tw`py-4 px-6 rounded-lg ${
-              isDark ? 'bg-blue-600' : 'bg-orange-500'
-            } flex-row items-center justify-center`}
-          >
-            {assigning ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <>
-                <MaterialIcons name="check-circle" size={20} color="white" style={tw`mr-2`} />
-                <Text style={tw`text-white font-bold text-lg`}>Assign as Coach</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Assign/Change Coach Button */}
+      <View style={tw`px-4 py-4 border-t ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
+        <TouchableOpacity
+          onPress={handleAssignCoach}
+          disabled={assigning}
+          style={tw`py-4 px-6 rounded-lg ${
+            isDark ? 'bg-blue-600' : 'bg-orange-500'
+          } flex-row items-center justify-center`}
+        >
+          {assigning ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <>
+              <MaterialIcons name="check-circle" size={20} color="white" style={tw`mr-2`} />
+              <Text style={tw`text-white font-bold text-lg`}>
+                {userContext.coachId ? 'Change Coach' : 'Assign as Coach'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
 
       {/* Review Modal */}
       <ReviewSubmissionModal
