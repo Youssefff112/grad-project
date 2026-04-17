@@ -20,13 +20,7 @@ const NOTIFICATIONS_CACHE_KEY = 'notifications_cache';
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [conversations, setConversations] = useState<Map<string, number>>(() => {
-    const map = new Map();
-    // Initialize with sample unread counts
-    map.set('1', 2);
-    map.set('2', 0);
-    map.set('3', 5);
-    map.set('4', 1);
-    return map;
+    return new Map();
   });
 
   // Load persisted notifications on mount
@@ -51,6 +45,37 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     loadPersistedNotifications();
   }, []);
+
+  // Make unread count real-time using Socket
+  useEffect(() => {
+    let socket: any = null;
+    const initSocket = async () => {
+      try {
+        const io = require('socket.io-client').io;
+        const environment = require('../config/environment').environment;
+        const tokenManager = require('../utils/tokenManager');
+        
+        const token = await tokenManager.getAccessToken();
+        if (!token) return;
+        
+        socket = io(environment.BACKEND_URL, { auth: { token } });
+        
+        socket.on('new_message', (msg: any) => {
+          if (msg && msg.conversationId) {
+             addNotification(msg.conversationId);
+          }
+        });
+      } catch (err) {
+        console.log('Socket real-time initialization failed gracefully');
+      }
+    };
+    
+    initSocket();
+    
+    return () => {
+      if (socket) socket.disconnect();
+    }
+  }, [addNotification]);
 
   const totalUnread = Array.from(conversations.values()).reduce((sum, count) => sum + count, 0);
 
