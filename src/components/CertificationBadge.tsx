@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tw } from '../tw';
+import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Certification } from '../services/coachService';
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, Dimensions, PanResponder, GestureResponderEvent } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tw } from '../tw';
+import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Transformation } from '../services/coachService';
 

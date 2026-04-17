@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tw } from '../tw';
+import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { CoachCard } from '../components/CoachCard';
@@ -26,7 +26,7 @@ interface FilterState {
 
 export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isDark } = useTheme();
-  const { userContext } = useUser();
+  const { coachId } = useUser();
   const [coaches, setCoaches] = useState<coachService.Coach[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -117,7 +117,7 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
           />
         </TouchableOpacity>
         <Text style={tw`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          {userContext.coachId ? 'Find New Coach' : 'Browse Coaches'}
+          {coachId ? 'Find New Coach' : 'Browse Coaches'}
         </Text>
       </View>
 

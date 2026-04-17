@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tw } from '../tw';
+import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import * as coachService from '../services/coachService';
@@ -22,7 +22,6 @@ import { CertificationBadge } from '../components/CertificationBadge';
 
 export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isDark } = useTheme();
-  const { userContext } = useUser();
   const [profile, setProfile] = useState<coachService.Coach | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tw } from '../tw';
+import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import * as coachService from '../services/coachService';
@@ -26,7 +26,7 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
   route
 }) => {
   const { isDark } = useTheme();
-  const { userContext } = useUser();
+  const { userId, coachId: assignedCoachId, setCoach: assignCoach } = useUser();
   const { coachId } = route.params;
 
   const [coach, setCoach] = useState<coachService.CoachDetail | null>(null);
@@ -43,7 +43,7 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
   useEffect(() => {
     loadCoachDetail();
     loadReviews();
-    if (userContext.userId) {
+    if (userId) {
       checkReviewEligibility();
     }
   }, [coachId]);
@@ -93,7 +93,7 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
     try {
       setAssigning(true);
       // Call UserContext method to set coach
-      userContext.setCoach(coachId, coach?.bio || '');
+      assignCoach(String(coachId), coach?.bio || '');
       Alert.alert('Success', `Coach assigned successfully!`, [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -381,7 +381,7 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
             <>
               <MaterialIcons name="check-circle" size={20} color="white" style={tw`mr-2`} />
               <Text style={tw`text-white font-bold text-lg`}>
-                {userContext.coachId ? 'Change Coach' : 'Assign as Coach'}
+                {assignedCoachId ? 'Change Coach' : 'Assign as Coach'}
               </Text>
             </>
           )}
