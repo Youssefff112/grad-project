@@ -163,7 +163,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
             </View>
           )}
           {/* Button to Create Workout if none exist */}
-          {workouts.length === 0 && (
+          {!workouts.length && (
             <View style={tw`px-4 pt-2 pb-2`}>
               <TouchableOpacity
                 onPress={() => navigation.navigate('WorkoutBuilder')}

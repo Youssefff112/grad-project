@@ -154,7 +154,7 @@ export const MessagesScreen = ({ navigation }: any) => {
                   ]}
                 >
                   <MaterialIcons name="notifications" size={20} color={accent} />
-                  {totalUnread > 0 && (
+                  {!!totalUnread && (
                     <View
                       style={[
                         tw`absolute -top-1 -right-1 w-5 h-5 rounded-full items-center justify-center`,

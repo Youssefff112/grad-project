@@ -47,36 +47,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   // Make unread count real-time using Socket
-  useEffect(() => {
-    let socket: any = null;
-    const initSocket = async () => {
-      try {
-        const io = require('socket.io-client').io;
-        const environment = require('../config/environment').environment;
-        const tokenManager = require('../utils/tokenManager');
-        
-        const token = await tokenManager.getAccessToken();
-        if (!token) return;
-        
-        socket = io(environment.BACKEND_URL, { auth: { token } });
-        
-        socket.on('new_message', (msg: any) => {
-          if (msg && msg.conversationId) {
-             addNotification(msg.conversationId);
-          }
-        });
-      } catch (err) {
-        console.log('Socket real-time initialization failed gracefully');
-      }
-    };
-    
-    initSocket();
-    
-    return () => {
-      if (socket) socket.disconnect();
-    }
-  }, [addNotification]);
-
   const totalUnread = Array.from(conversations.values()).reduce((sum, count) => sum + count, 0);
 
   // Persist notifications whenever they change
@@ -133,6 +103,37 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return newMap;
     });
   }, [persistNotifications]);
+
+  // Make unread count real-time using Socket
+  useEffect(() => {
+    let socket: any = null;
+    const initSocket = async () => {
+      try {
+        const io = require('socket.io-client').io;
+        const environment = require('../config/environment').environment;
+        const tokenManager = require('../utils/tokenManager');
+        
+        const token = await tokenManager.getAccessToken();
+        if (!token) return;
+        
+        socket = io(environment.BACKEND_URL, { auth: { token } });
+        
+        socket.on('new_message', (msg: any) => {
+          if (msg && msg.conversationId) {
+             addNotification(msg.conversationId);
+          }
+        });
+      } catch (err) {
+        console.log('Socket real-time initialization failed gracefully');
+      }
+    };
+    
+    initSocket();
+    
+    return () => {
+      if (socket) socket.disconnect();
+    }
+  }, [addNotification]);
 
   return (
     <NotificationContext.Provider

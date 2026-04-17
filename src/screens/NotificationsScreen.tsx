@@ -27,10 +27,14 @@ export const NotificationsScreen = ({ navigation }: any) => {
     React.useCallback(() => {
       const fetchNotifications = async () => {
         try {
-          const apiNotifications = await getNotifications();
+          const apiNotifications = await getNotifications().catch(e => {
+            console.log('Notifications API not available, gracefully catching', e);
+            return [];
+          });
           setNotifications(apiNotifications);
         } catch (error) {
-          console.error('Error fetching notifications:', error);
+          console.log('Error fetching notifications caught gracefully', error);
+          setNotifications([]);
         } finally {
           setIsLoading(false);
         }

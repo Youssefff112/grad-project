@@ -56,7 +56,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         <View style={tw`flex w-12 items-center justify-start`}>
           <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('NotificationsSettings')}>
             <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
-            {totalUnread > 0 && (
+            {!!totalUnread && (
               <View style={[tw`absolute top-1 right-0 rounded-full items-center justify-center h-5 w-5`, { backgroundColor: accent }]}>
                 <Text style={tw`text-white text-xs font-bold`}>
                   {totalUnread > 99 ? '99+' : totalUnread}
@@ -78,7 +78,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               <Text style={[tw`text-xs font-semibold`, { color: accent }]}>Syncing...</Text>
             </View>
           )}
-          {queuedCount > 0 && (
+          {!!queuedCount && (
             <View style={tw`px-2 py-0.5 rounded bg-yellow-500/20`}>
               <Text style={tw`text-xs text-yellow-600 font-bold`}>{queuedCount} pending</Text>
             </View>
