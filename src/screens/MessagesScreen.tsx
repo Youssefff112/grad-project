@@ -7,7 +7,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useUser } from '../context/UserContext';
-import { BottomNav } from '../components/BottomNav';
+import { TraineeBottomNav } from '../components/TraineeBottomNav';
 import { getConversations, Conversation as ApiConversation } from '../services/messaging.service';
 
 // We map the backend schema to this UI schema on load
@@ -44,8 +44,13 @@ export const MessagesScreen = ({ navigation }: any) => {
   useFocusEffect(
     useCallback(() => {
       const fetchConversations = async () => {
+        setIsLoading(true);
         try {
-          const apiConvs = await getConversations();
+          // If using mock mode or not authenticated, just return some mock data
+          const apiConvs = await getConversations().catch(e => {
+             console.log('Conversations API not available or 401, using empty state');
+             return [];
+          });
           
           let mapped: UIConversation[] = apiConvs.map(conv => {
             // Determine if the *other* party in this conversation is a coach or client
@@ -75,15 +80,15 @@ export const MessagesScreen = ({ navigation }: any) => {
               lastMessage: lastMsg,
               time: timeStr,
               unread: unreadCount,
-              isAI: false, // Wait, is AI coach supported?
+              isAI: false,
               category: 'coaches'
             };
           });
 
-          // Also inject some AI modules if they are using them? Let's just push their DB convos.
           setConversations(mapped);
         } catch (error) {
-          console.error('Error fetching conversations:', error);
+          console.log('Error fetching conversations gracefully caught:', error);
+          setConversations([]);
         } finally {
           setIsLoading(false);
         }
@@ -339,24 +344,7 @@ export const MessagesScreen = ({ navigation }: any) => {
       )}
 
       {/* Bottom Navigation */}
-      <BottomNav
-        activeId="messages"
-        onSelect={(id) => {
-          if (id === 'home') navigation.navigate('TraineeCommandCenter');
-          if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
-          if (id === 'track') navigation.navigate('DailyTracker');
-          if (id === 'meals') navigation.navigate('Meals');
-          if (id === 'profile') navigation.navigate('Profile');
-        }}
-        items={[
-          { id: 'home', icon: 'home', label: 'Home' },
-          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
-          { id: 'track', icon: 'trending-up', label: 'Track' },
-          { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          { id: 'profile', icon: 'person', label: 'Profile' },
-        ]}
-      />
+      <TraineeBottomNav activeId="messages" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

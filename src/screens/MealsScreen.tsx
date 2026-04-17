@@ -9,7 +9,7 @@ import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useFoodManagement } from '../context/FoodManagementContext';
 import * as offlineService from '../services/offlineService';
-import { BottomNav } from '../components/BottomNav';
+import { TraineeBottomNav } from '../components/TraineeBottomNav';
 
 // Default meal templates if no custom meals exist
 const DEFAULT_MEALS = [
@@ -546,24 +546,7 @@ export const MealsScreen = ({ navigation }: any) => {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <BottomNav
-        activeId="meals"
-        onSelect={(id) => {
-          if (id === 'home') navigation.navigate('TraineeCommandCenter');
-          if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
-          if (id === 'track') navigation.navigate('DailyTracker');
-          if (id === 'messages') navigation.navigate('Messages');
-          if (id === 'profile') navigation.navigate('Profile');
-        }}
-        items={[
-          { id: 'home', icon: 'home', label: 'Home' },
-          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
-          { id: 'track', icon: 'trending-up', label: 'Track' },
-          { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          { id: 'profile', icon: 'person', label: 'Profile' },
-        ]}
-      />
+      <TraineeBottomNav activeId="meals" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

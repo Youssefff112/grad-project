@@ -6,7 +6,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
-import { BottomNav } from '../components/BottomNav';
+import { TraineeBottomNav } from '../components/TraineeBottomNav';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
@@ -174,24 +174,7 @@ export const ProfileScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <BottomNav
-        activeId="profile"
-        onSelect={(id) => {
-          if (id === 'home') navigation.navigate('TraineeCommandCenter');
-          if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
-          if (id === 'track') navigation.navigate('DailyTracker');
-          if (id === 'meals') navigation.navigate('Meals');
-          if (id === 'messages') navigation.navigate('Messages');
-        }}
-        items={[
-          { id: 'home', icon: 'home', label: 'Home' },
-          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
-          { id: 'track', icon: 'trending-up', label: 'Track' },
-          { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          { id: 'profile', icon: 'person', label: 'Profile' },
-        ]}
-      />
+      <TraineeBottomNav activeId="profile" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

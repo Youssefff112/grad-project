@@ -15,7 +15,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useFoodManagement } from '../context/FoodManagementContext';
 import { useExerciseManagement } from '../context/ExerciseManagementContext';
 import * as offlineService from '../services/offlineService';
-import { BottomNav } from '../components/BottomNav';
+import { TraineeBottomNav } from '../components/TraineeBottomNav';
 
 const DAILY_TARGETS = {
   calories: 2400,
@@ -429,24 +429,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <BottomNav
-        activeId="track"
-        onSelect={(id) => {
-          if (id === 'home') navigation.navigate('TraineeCommandCenter');
-          if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
-          if (id === 'meals') navigation.navigate('Meals');
-          if (id === 'messages') navigation.navigate('Messages');
-          if (id === 'profile') navigation.navigate('Profile');
-        }}
-        items={[
-          { id: 'home', icon: 'home', label: 'Home' },
-          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
-          { id: 'track', icon: 'trending-up', label: 'Track' },
-          { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          { id: 'profile', icon: 'person', label: 'Profile' },
-        ]}
-      />
+      <TraineeBottomNav activeId="track" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

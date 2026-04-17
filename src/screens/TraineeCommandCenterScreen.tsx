@@ -8,7 +8,7 @@ import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useOffline } from '../context/OfflineContext';
 import { hasFeatureAccess } from '../utils/planUtils';
-import { BottomNav } from '../components/BottomNav';
+import { TraineeBottomNav } from '../components/TraineeBottomNav';
 import { Button } from '../components/Button';
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
@@ -416,27 +416,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         )}
       </ScrollView>
 
-      <BottomNav
-        activeId={activeTab}
-        onSelect={(id) => {
-          setActiveTab(id);
-          if (id === 'workouts') navigation.navigate('VisionAnalysisLab');
-          if (id === 'track') navigation.navigate('DailyTracker');
-          if (id === 'meals') navigation.navigate('Meals');
-          if (id === 'messages') navigation.navigate('Messages');
-          if (id === 'coaches') navigation.navigate('CoachBrowsingScreen');
-          if (id === 'profile') navigation.navigate('Profile');
-        }}
-        items={[
-          { id: 'home', icon: 'home', label: 'Home' },
-          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
-          { id: 'track', icon: 'trending-up', label: 'Track' },
-          { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          ...((subscriptionPlan === 'Premium' || subscriptionPlan === 'Elite') ? [{ id: 'coaches', icon: 'person-add' as const, label: 'Coaches' }] : []),
-          { id: 'profile', icon: 'person' as const, label: 'Profile' },
-        ]}
-      />
+      <TraineeBottomNav activeId={activeTab} navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

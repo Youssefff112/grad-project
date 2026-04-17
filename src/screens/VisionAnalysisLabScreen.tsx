@@ -10,7 +10,7 @@ import { useExerciseManagement } from '../context/ExerciseManagementContext';
 import * as offlineService from '../services/offlineService';
 import { hasFeatureAccess } from '../utils/planUtils';
 import { FeatureLocked } from '../components/FeatureLocked';
-import { BottomNav } from '../components/BottomNav';
+import { TraineeBottomNav } from '../components/TraineeBottomNav';
 
 export const VisionAnalysisLabScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -253,24 +253,7 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
         </ScrollView>
       )}
 
-      <BottomNav
-        activeId="workouts"
-        onSelect={(id) => {
-          if (id === 'home') navigation.navigate('TraineeCommandCenter');
-          if (id === 'track') navigation.navigate('DailyTracker');
-          if (id === 'meals') navigation.navigate('Meals');
-          if (id === 'messages') navigation.navigate('Messages');
-          if (id === 'profile') navigation.navigate('Profile');
-        }}
-        items={[
-          { id: 'home', icon: 'home', label: 'Home' },
-          { id: 'workouts', icon: 'fitness-center', label: 'Workouts' },
-          { id: 'track', icon: 'trending-up', label: 'Track' },
-          { id: 'meals', icon: 'restaurant', label: 'Meals' },
-          { id: 'messages', icon: 'chat-bubble', label: 'Messages', badge: totalUnread },
-          { id: 'profile', icon: 'person', label: 'Profile' },
-        ]}
-      />
+      <TraineeBottomNav activeId="workouts" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };
