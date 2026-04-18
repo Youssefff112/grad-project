@@ -5,6 +5,7 @@ export interface PlanFeatures {
   name: string;
   price: number;
   isCoachAccount: boolean;
+  // Client features
   hasFoodTracking: boolean;
   hasWaterTracking: boolean;
   hasExerciseLogging: boolean;
@@ -16,6 +17,15 @@ export interface PlanFeatures {
   hasCoachChat: boolean;
   hasSharedDashboard: boolean;
   hasProgressTracking: boolean;
+  // Coach features
+  hasClientManagement: boolean;
+  hasMealPlanCreation: boolean;
+  hasWorkoutPlanCreation: boolean;
+  hasEarningsTracking: boolean;
+  hasScheduleManagement: boolean;
+  hasProgramTemplates: boolean;
+  hasClientProgressTracking: boolean;
+  hasReviewManagement: boolean;
 }
 
 export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
@@ -35,6 +45,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasCoachChat: false,
     hasSharedDashboard: false,
     hasProgressTracking: false,
+    hasClientManagement: false,
+    hasMealPlanCreation: false,
+    hasWorkoutPlanCreation: false,
+    hasEarningsTracking: false,
+    hasScheduleManagement: false,
+    hasProgramTemplates: false,
+    hasClientProgressTracking: false,
+    hasReviewManagement: false,
   },
   Standard: {
     plan: 'Standard',
@@ -52,6 +70,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasCoachChat: false,
     hasSharedDashboard: false,
     hasProgressTracking: false,
+    hasClientManagement: false,
+    hasMealPlanCreation: false,
+    hasWorkoutPlanCreation: false,
+    hasEarningsTracking: false,
+    hasScheduleManagement: false,
+    hasProgramTemplates: false,
+    hasClientProgressTracking: false,
+    hasReviewManagement: false,
   },
   Premium: {
     plan: 'Premium',
@@ -69,6 +95,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasCoachChat: true,
     hasSharedDashboard: true,
     hasProgressTracking: true,
+    hasClientManagement: false,
+    hasMealPlanCreation: false,
+    hasWorkoutPlanCreation: false,
+    hasEarningsTracking: false,
+    hasScheduleManagement: false,
+    hasProgramTemplates: false,
+    hasClientProgressTracking: false,
+    hasReviewManagement: false,
   },
   ProCoach: {
     plan: 'ProCoach',
@@ -83,9 +117,17 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasAIWorkoutGeneration: false,
     hasAIMealPlanGeneration: false,
     hasComputerVision: false,
-    hasCoachChat: false,
-    hasSharedDashboard: false,
+    hasCoachChat: true,
+    hasSharedDashboard: true,
     hasProgressTracking: false,
+    hasClientManagement: true,
+    hasMealPlanCreation: true,
+    hasWorkoutPlanCreation: true,
+    hasEarningsTracking: true,
+    hasScheduleManagement: true,
+    hasProgramTemplates: true,
+    hasClientProgressTracking: true,
+    hasReviewManagement: true,
   },
   Elite: {
     plan: 'Elite',
@@ -103,5 +145,13 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasCoachChat: true,
     hasSharedDashboard: true,
     hasProgressTracking: true,
+    hasClientManagement: false,
+    hasMealPlanCreation: false,
+    hasWorkoutPlanCreation: false,
+    hasEarningsTracking: false,
+    hasScheduleManagement: false,
+    hasProgramTemplates: false,
+    hasClientProgressTracking: false,
+    hasReviewManagement: false,
   },
 };

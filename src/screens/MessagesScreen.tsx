@@ -8,6 +8,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useUser } from '../context/UserContext';
 import { TraineeBottomNav } from '../components/TraineeBottomNav';
+import { CoachBottomNav } from '../components/coach/CoachBottomNav';
 import { getConversations, Conversation as ApiConversation } from '../services/messaging.service';
 
 // We map the backend schema to this UI schema on load
@@ -25,7 +26,7 @@ interface UIConversation {
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { totalUnread } = useNotifications();
-  const { userId, userMode } = useUser();
+  const { userId, userMode, isCoach } = useUser();
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
@@ -344,7 +345,10 @@ export const MessagesScreen = ({ navigation }: any) => {
       )}
 
       {/* Bottom Navigation */}
-      <TraineeBottomNav activeId="messages" navigation={navigation} totalUnread={totalUnread} />
+      {isCoach
+        ? <CoachBottomNav activeId="messages" navigation={navigation} totalUnread={totalUnread} />
+        : <TraineeBottomNav activeId="messages" navigation={navigation} totalUnread={totalUnread} />
+      }
     </SafeAreaView>
   );
 };

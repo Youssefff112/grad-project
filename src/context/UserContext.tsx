@@ -24,6 +24,7 @@ interface UserContextType {
   bodyFatPercentage: number | null;
   userMode: UserMode;
   subscriptionPlan: SubscriptionPlan;
+  isCoach: boolean;
   experienceLevel: ExperienceLevel | null;
   dietPreferences: DietPreference[];
   coachId: string | null;
@@ -69,6 +70,7 @@ const UserContext = createContext<UserContextType>({
   bodyFatPercentage: null,
   userMode: 'Basic',
   subscriptionPlan: 'Free',
+  isCoach: false,
   experienceLevel: null,
   dietPreferences: [],
   coachId: null,
@@ -448,6 +450,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       bodyFatPercentage,
       userMode,
       subscriptionPlan,
+      isCoach: subscriptionPlan === 'ProCoach',
       experienceLevel,
       dietPreferences,
       coachId,

@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -18,13 +19,14 @@ import * as authService from '../services/auth.service';
 
 export const AccountCreationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setAuthTokens } = useUser();
+  const { setFullName, setEmail: saveEmail, setAuthTokens, setSubscriptionPlan } = useUser();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isCoachSignup, setIsCoachSignup] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
@@ -78,18 +80,19 @@ export const AccountCreationScreen = ({ navigation }: any) => {
         email,
         password,
         userType: 'offline',
-        role: 'client',
+        role: isCoachSignup ? 'coach' : 'client',
       });
 
       if (response.success && response.data?.token) {
-        // Save auth tokens
         await setAuthTokens(response.data.token, response.data.refreshToken);
-
-        // Save user info locally
         setFullName(name);
         saveEmail(email);
 
-        navigation.navigate('SubscriptionSelection');
+        if (isCoachSignup) {
+          navigation.navigate('CoachSubscription');
+        } else {
+          navigation.navigate('SubscriptionSelection');
+        }
       }
     } catch (error: any) {
       let errorMessage = 'Failed to create account. Please try again.';
@@ -98,11 +101,14 @@ export const AccountCreationScreen = ({ navigation }: any) => {
         const msg = error.response?.data?.message;
         errorMessage = msg || 'Invalid registration data. Please check your inputs.';
       } else if (error.message === 'Network Error' || !error.response) {
-        // Fallback: allow local-only account creation when backend is unavailable
         console.log('Backend unavailable, creating local-only account...');
         setFullName(name);
         saveEmail(email);
-        navigation.navigate('SubscriptionSelection');
+        if (isCoachSignup) {
+          navigation.navigate('CoachSubscription');
+        } else {
+          navigation.navigate('SubscriptionSelection');
+        }
         return;
       }
 
@@ -134,6 +140,27 @@ export const AccountCreationScreen = ({ navigation }: any) => {
           <Text style={[tw`text-base leading-relaxed`, { color: subtextColor }]}>
             Join Vertex and start your journey toward peak performance.
           </Text>
+        </View>
+
+        {/* Role Toggle */}
+        <View style={[tw`flex-row items-center justify-between p-4 rounded-xl mb-2`, { backgroundColor: isCoachSignup ? accent + '14' : isDark ? '#111128' : '#f1f5f9', borderWidth: 1, borderColor: isCoachSignup ? accent + '40' : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+          <View style={tw`flex-row items-center gap-3`}>
+            <MaterialIcons name={isCoachSignup ? 'fitness-center' : 'person'} size={22} color={isCoachSignup ? accent : subtextColor} />
+            <View>
+              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                {isCoachSignup ? 'Registering as a Coach' : 'Registering as a Client'}
+              </Text>
+              <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
+                {isCoachSignup ? 'You will manage and train clients' : 'You will follow a fitness program'}
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={isCoachSignup}
+            onValueChange={setIsCoachSignup}
+            trackColor={{ false: isDark ? '#1e293b' : '#e2e8f0', true: accent + '80' }}
+            thumbColor={isCoachSignup ? accent : isDark ? '#475569' : '#cbd5e1'}
+          />
         </View>
 
         <View style={tw`flex-col gap-5`}>

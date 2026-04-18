@@ -74,8 +74,13 @@ export const SignInScreen = ({ navigation }: any) => {
         // TODO: Fetch actual subscription plan from backend profile
         setSubscriptionPlan('Free'); // Default for now, should come from backend
 
-        // Navigate to main app
-        navigation.navigate('TraineeCommandCenter');
+        // Navigate based on role
+        if (user.role === 'coach') {
+          setSubscriptionPlan('ProCoach');
+          navigation.navigate('CoachCommandCenter');
+        } else {
+          navigation.navigate('TraineeCommandCenter');
+        }
       }
     } catch (error: any) {
       let errorMessage = 'Sign in failed. Please try again.';
@@ -92,7 +97,11 @@ export const SignInScreen = ({ navigation }: any) => {
           setFullName(mockUser.fullName);
           saveEmail(mockUser.email);
           setSubscriptionPlan(mockUser.subscriptionPlan);
-          navigation.navigate('TraineeCommandCenter');
+          if (mockUser.subscriptionPlan === 'ProCoach') {
+            navigation.navigate('CoachCommandCenter');
+          } else {
+            navigation.navigate('TraineeCommandCenter');
+          }
           return;
         }
         errorMessage = 'Backend is unavailable. Please check your connection.';
@@ -143,12 +152,16 @@ export const SignInScreen = ({ navigation }: any) => {
                       setEmail(user.email);
                       setPassword(user.password);
                       // Auto-login
-                      setTimeout(() => {
-                        setFullName(user.fullName);
-                        saveEmail(user.email);
-                        setSubscriptionPlan(user.subscriptionPlan);
-                        navigation.navigate('TraineeCommandCenter');
-                      }, 100);
+                        setTimeout(() => {
+                          setFullName(user.fullName);
+                          saveEmail(user.email);
+                          setSubscriptionPlan(user.subscriptionPlan);
+                          if (user.subscriptionPlan === 'ProCoach') {
+                            navigation.navigate('CoachCommandCenter');
+                          } else {
+                            navigation.navigate('TraineeCommandCenter');
+                          }
+                        }, 100);
                     }}
                     style={[tw`px-4 py-2 rounded-lg border`, {
                       backgroundColor: accent + '0a',
