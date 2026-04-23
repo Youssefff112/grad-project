@@ -7,15 +7,54 @@ import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../../components/Button';
 import { ProgressBar } from '../../components/ProgressBar';
 import { Card } from '../../components/Card';
+import * as authService from '../../services/auth.service';
 
 export const SafeGuardIntakeScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
+  const [saving, setSaving] = useState(false);
 
   const [conditions, setConditions] = useState({
     heart: false,
     hypertension: false,
-    diabetes: true });
+    diabetes: false,
+  });
+
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [allergyInput, setAllergyInput] = useState('');
+
+  const addAllergy = () => {
+    const trimmed = allergyInput.trim();
+    if (trimmed && !allergies.includes(trimmed)) {
+      setAllergies([...allergies, trimmed]);
+    }
+    setAllergyInput('');
+  };
+
+  const removeAllergy = (item: string) => {
+    setAllergies(allergies.filter((a) => a !== item));
+  };
+
+  const handleContinue = async () => {
+    setSaving(true);
+    try {
+      const activeConditions = Object.entries(conditions)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
+
+      await authService.updateProfile({
+        profile: {
+          medicalConditions: activeConditions,
+          allergies,
+        },
+      } as any);
+    } catch {
+      // non-blocking — navigate regardless
+    } finally {
+      setSaving(false);
+      navigation.navigate('Goals');
+    }
+  };
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -73,21 +112,27 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
             Allergies
           </Text>
           <Text style={[tw`text-sm font-normal mb-3`, { color: subtextColor }]}>
-            Multi-select any known allergies.
+            Type an allergy and press enter to add it.
           </Text>
           <View style={[tw`flex-row flex-wrap gap-2 p-3 rounded-xl border min-h-[56px] items-center`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-            <View style={[tw`flex-row items-center gap-1 px-3 py-1 rounded-full`, { backgroundColor: accent + '1A', borderWidth: 1, borderColor: accent + '33' }]}>
-              <Text style={{ color: accent, fontSize: 14, fontWeight: '500' }}>Peanuts</Text>
-              <MaterialIcons name="close" size={14} color={accent} />
-            </View>
-            <View style={[tw`flex-row items-center gap-1 px-3 py-1 rounded-full`, { backgroundColor: accent + '1A', borderWidth: 1, borderColor: accent + '33' }]}>
-              <Text style={{ color: accent, fontSize: 14, fontWeight: '500' }}>Penicillin</Text>
-              <MaterialIcons name="close" size={14} color={accent} />
-            </View>
+            {allergies.map((a) => (
+              <TouchableOpacity
+                key={a}
+                onPress={() => removeAllergy(a)}
+                style={[tw`flex-row items-center gap-1 px-3 py-1 rounded-full`, { backgroundColor: accent + '1A', borderWidth: 1, borderColor: accent + '33' }]}
+              >
+                <Text style={{ color: accent, fontSize: 14, fontWeight: '500' }}>{a}</Text>
+                <MaterialIcons name="close" size={14} color={accent} />
+              </TouchableOpacity>
+            ))}
             <TextInput
-              style={[tw`bg-transparent border-0 text-sm flex-1 min-w-[80px] p-0 ml-2`, { color: '#94a3b8' }]}
-              placeholder="Add more..."
+              style={[tw`bg-transparent border-0 text-sm flex-1 min-w-[80px] p-0 ml-2`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}
+              placeholder="Add allergy..."
               placeholderTextColor="#94a3b8"
+              value={allergyInput}
+              onChangeText={setAllergyInput}
+              onSubmitEditing={addAllergy}
+              returnKeyType="done"
             />
           </View>
         </View>
@@ -95,10 +140,11 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
 
       <View style={[tw`p-6 pt-2`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
         <Button
-          title="Continue"
+          title={saving ? 'Saving...' : 'Continue'}
           size="lg"
-          onPress={() => navigation.navigate('Goals')}
-          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
+          disabled={saving}
+          onPress={handleContinue}
+          icon={!saving && <MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
         <Text style={tw`text-center text-slate-500 text-xs mt-4 uppercase font-semibold`}>
           By continuing, you agree to Vertex Health Terms

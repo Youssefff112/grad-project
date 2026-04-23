@@ -19,7 +19,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "tunnel": "ngrok http --log=stdout 5000"
   },
   "keywords": [],
   "author": "",

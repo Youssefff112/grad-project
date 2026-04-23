@@ -20,14 +20,25 @@ export const userService = {
   },
 
   async updateProfile(userId, updates) {
-    await User.update(updates, { where: { id: userId } });
     const user = await User.findByPk(userId);
-
     if (!user) {
       throw new AppError('User not found', 404);
     }
 
-    return user;
+    // Deep-merge the profile JSONB so individual onboarding steps don't
+    // overwrite each other (e.g. Goals saving last must not wipe Biometrics).
+    if (updates.profile && typeof updates.profile === 'object') {
+      updates = {
+        ...updates,
+        profile: {
+          ...(user.profile || {}),
+          ...updates.profile,
+        },
+      };
+    }
+
+    await User.update(updates, { where: { id: userId } });
+    return await User.findByPk(userId);
   },
 
   async completeOnboarding(userId, data) {

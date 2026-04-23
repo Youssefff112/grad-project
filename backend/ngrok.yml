@@ -1,0 +1,26 @@
+# ngrok tunnel configuration
+# ---------------------------------------------------------------------------
+# HOW TO GET YOUR FREE STATIC DOMAIN (one-time setup):
+#
+#  1. Sign up free at https://dashboard.ngrok.com/signup
+#  2. Copy your auth token from https://dashboard.ngrok.com/get-started/your-authtoken
+#  3. Run in this terminal:
+#       ngrok config add-authtoken <YOUR_TOKEN>
+#  4. Claim your free static domain at:
+#       https://dashboard.ngrok.com/cloud-edge/domains  → "New Domain"
+#  5. Replace "your-domain.ngrok-free.app" below with the domain you claimed.
+#  6. Update the root .env file:
+#       EXPO_PUBLIC_BACKEND_URL=https://your-domain.ngrok-free.app
+#  7. Restart Expo: npx expo start --clear
+#
+# After this one-time setup, just run `npm run tunnel` here and
+# `npx expo start` in the project root — the URL never changes again.
+# ---------------------------------------------------------------------------
+
+version: "3"
+tunnels:
+  backend:
+    proto: http
+    addr: 5000
+    # Uncomment and fill in after claiming your static domain:
+    # domain: your-domain.ngrok-free.app

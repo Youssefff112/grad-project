@@ -1,9 +1,15 @@
 /**
  * Environment Configuration
- * Loads environment variables for the app
+ *
+ * Priority order for backend URL:
+ *  1. EXPO_PUBLIC_BACKEND_URL in .env  ← set this to your ngrok static domain
+ *  2. Falls back to localhost (same-machine emulator only)
+ *
+ * To make the app work from any device / network:
+ *   - Run `npm run tunnel` in the backend folder
+ *   - Copy the ngrok URL into .env as EXPO_PUBLIC_BACKEND_URL
+ *   - Restart Expo with `npx expo start --clear`
  */
-
-// Use Expo public environment variables (prefixed with EXPO_PUBLIC_)
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 const API_PREFIX = process.env.EXPO_PUBLIC_API_PREFIX || '/api/v1';
 const ENV = process.env.EXPO_PUBLIC_ENV || 'development';
