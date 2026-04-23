@@ -37,7 +37,7 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
   const dietOptions: { value: DietPreference; label: string; icon: string }[] = [
     { value: 'omnivore', label: 'Omnivore', icon: 'fastfood' },
     { value: 'vegetarian', label: 'Vegetarian', icon: 'eco' },
-    { value: 'vegan', label: 'Vegan', icon: 'leaf' },
+    { value: 'vegan', label: 'Vegan', icon: 'eco' },
     { value: 'pescatarian', label: 'Pescatarian', icon: 'water-drop' },
     { value: 'keto', label: 'Keto', icon: 'local-fire-department' },
     { value: 'paleo', label: 'Paleo', icon: 'nature' },

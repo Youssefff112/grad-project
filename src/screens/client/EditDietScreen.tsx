@@ -11,7 +11,7 @@ import type { DietPreference } from '../../context/UserContext';
 const DIET_OPTIONS: { id: DietPreference; label: string; icon: any }[] = [
   { id: 'omnivore', label: 'Omnivore', icon: 'restaurant' },
   { id: 'vegetarian', label: 'Vegetarian', icon: 'eco' },
-  { id: 'vegan', label: 'Vegan', icon: 'leaf' },
+  { id: 'vegan', label: 'Vegan', icon: 'eco' },
   { id: 'keto', label: 'Keto', icon: 'oil-barrel' },
   { id: 'paleo', label: 'Paleo', icon: 'terrain' },
   { id: 'gluten-free', label: 'Gluten-Free', icon: 'no-meals' },
