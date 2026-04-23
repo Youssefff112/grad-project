@@ -6,7 +6,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { getNotifications, markNotificationAsRead, AppNotification } from '../services/notification.service';
+import { getNotifications, markNotificationAsRead, markAllNotificationsRead, AppNotification } from '../services/notification.service';
 
 export const NotificationsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -56,14 +56,10 @@ export const NotificationsScreen = ({ navigation }: any) => {
   };
 
   const handleClearAll = async () => {
-    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
     // Optimistic update
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    
-    // Background sync all
-    for (const id of unreadIds) {
-      await markNotificationAsRead(id);
-    }
+    // Single bulk API call instead of looping N times
+    await markAllNotificationsRead();
   };
 
   return (

@@ -27,3 +27,17 @@ export const markNotificationAsRead = async (id: number): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Mark ALL unread notifications as read in one API call.
+ * Use this instead of looping over each notification.
+ */
+export const markAllNotificationsRead = async (): Promise<boolean> => {
+  try {
+    await apiPatch('/notifications/mark-all-read', {});
+    return true;
+  } catch (error) {
+    console.error('Failed to mark all notifications as read:', error);
+    return false;
+  }
+};

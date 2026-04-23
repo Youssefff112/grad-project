@@ -79,7 +79,8 @@ export const AccountCreationScreen = ({ navigation }: any) => {
         lastName,
         email,
         password,
-        userType: 'offline',
+        confirmPassword,
+        userType: 'onsite', // default; user can update during onboarding
         role: isCoachSignup ? 'coach' : 'client',
       });
 

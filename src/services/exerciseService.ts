@@ -1,4 +1,113 @@
+/**
+ * Exercise Service
+ * Contains both:
+ *   1. Real API functions — fetch exercises from the backend DB (use these in screens)
+ *   2. Local utility data — static COMMON_EXERCISES, MUSCLE_GROUPS (used by workout builder UI)
+ */
+
+import { apiGet, apiPost, apiPatch, apiDelete } from './api';
+
+// ─── API Types ────────────────────────────────────────────────────────────────
+
+export interface Exercise {
+  id: number;
+  name: string;
+  muscleGroups: string[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  description?: string;
+  videoUrl?: string;
+  imageUrl?: string;
+  defaultSets?: number;
+  defaultReps?: string;
+  defaultRest?: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ExerciseFilters {
+  category?: 'cardio' | 'strength' | 'flexibility' | 'balance' | 'sports' | 'other';
+  muscleGroups?: string | string[];   // comma-separated string or array
+  equipment?: string | string[];      // comma-separated string or array
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+// ─── API Functions ─────────────────────────────────────────────────────────
+
+/**
+ * Fetch all exercises from the backend database.
+ * Public endpoint — no auth required.
+ */
+export const fetchExercises = async (
+  filters?: ExerciseFilters
+): Promise<{ exercises: Exercise[]; pagination: any }> => {
+  const params = new URLSearchParams();
+  if (filters?.category) params.append('category', filters.category);
+  if (filters?.muscleGroups) {
+    const mg = Array.isArray(filters.muscleGroups)
+      ? filters.muscleGroups.join(',')
+      : filters.muscleGroups;
+    params.append('muscleGroups', mg);
+  }
+  if (filters?.equipment) {
+    const eq = Array.isArray(filters.equipment)
+      ? filters.equipment.join(',')
+      : filters.equipment;
+    params.append('equipment', eq);
+  }
+  if (filters?.search) params.append('search', filters.search);
+  if (filters?.page) params.append('page', filters.page.toString());
+  if (filters?.limit) params.append('limit', filters.limit.toString());
+
+  const url = params.toString() ? `/exercises?${params.toString()}` : '/exercises';
+  const response: any = await apiGet(url);
+  return {
+    exercises: response.data || [],
+    pagination: response.pagination
+  };
+};
+
+/**
+ * Fetch a single exercise by ID from the backend.
+ */
+export const fetchExerciseById = async (id: number): Promise<{ exercise: Exercise }> => {
+  const response: any = await apiGet(`/exercises/${id}`);
+  return { exercise: response.data?.exercise };
+};
+
+/**
+ * Create a new exercise (admin only).
+ */
+export const createExercise = async (
+  data: Partial<Exercise>
+): Promise<{ exercise: Exercise }> => {
+  const response: any = await apiPost('/exercises', data);
+  return { exercise: response.data?.exercise };
+};
+
+/**
+ * Update an exercise (admin only).
+ */
+export const updateExercise = async (
+  id: number,
+  data: Partial<Exercise>
+): Promise<{ exercise: Exercise }> => {
+  const response: any = await apiPatch(`/exercises/${id}`, data);
+  return { exercise: response.data?.exercise };
+};
+
+/**
+ * Delete an exercise (admin only — soft delete).
+ */
+export const deleteExercise = async (id: number): Promise<void> => {
+  await apiDelete(`/exercises/${id}`);
+};
+
+// ─── Local Utility Data (existing — do not remove) ────────────────────────────
 // Exercise utility functions and constants
+
 
 export const MUSCLE_GROUPS = [
   'Chest',
