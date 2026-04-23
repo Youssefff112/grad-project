@@ -6,6 +6,7 @@ import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
+import * as subscriptionService from '../../services/subscriptionService';
 
 const COACH_FEATURES = [
   { icon: 'group' as const, label: 'Client Management', desc: 'Manage up to 50 active clients' },
@@ -31,7 +32,17 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
   const handleActivate = async () => {
     setIsLoading(true);
     try {
-      await new Promise(r => setTimeout(r, 800));
+      const { subscription } = await subscriptionService.createSubscription({
+        role: 'coach',
+        planName: 'ProCoach',
+        price: 49.99,
+        autoRenew: true,
+      });
+      await subscriptionService.recordPayment(subscription.id, {
+        amount: 49.99,
+        provider: 'manual',
+        status: 'paid',
+      });
       setSubscriptionPlan('ProCoach');
       navigation.navigate('CoachProfileEdit');
     } catch {

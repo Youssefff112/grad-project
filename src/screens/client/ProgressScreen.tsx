@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import { useNotifications } from '../../context/NotificationContext';
 import { useFoodManagement } from '../../context/FoodManagementContext';
 import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
+import * as workoutService from '../../services/workoutService';
+import * as dietService from '../../services/dietService';
+import * as progressService from '../../services/progressService';
 
 const DAILY_TARGETS = {
   calories: 2400,
@@ -32,6 +35,28 @@ export const ProgressScreen = ({ navigation }: any) => {
   const { workouts } = useExerciseManagement();
 
   const [timeframe, setTimeframe] = useState<'week' | 'month' | 'all'>('week');
+  const [workoutLogs, setWorkoutLogs] = useState<workoutService.WorkoutSession[]>([]);
+  const [dietLogs, setDietLogs] = useState<dietService.DietLog[]>([]);
+  const [measurements, setMeasurements] = useState<progressService.Measurement[]>([]);
+
+  useEffect(() => {
+    loadProgressData();
+  }, []);
+
+  const loadProgressData = async () => {
+    try {
+      const [workoutRes, dietRes, measurementRes] = await Promise.all([
+        workoutService.getWorkoutHistory(1, 20),
+        dietService.getDietHistory(1, 20),
+        progressService.getMeasurements(1, 20),
+      ]);
+      setWorkoutLogs(workoutRes.logs || []);
+      setDietLogs(dietRes.logs || []);
+      setMeasurements(measurementRes.measurements || []);
+    } catch {
+      // use defaults
+    }
+  };
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -58,30 +83,32 @@ export const ProgressScreen = ({ navigation }: any) => {
 
   const stats = [
     {
-      label: 'Meals Logged',
-      value: `${meals.length}`,
-      subtitle: 'custom meals',
+      label: 'Diet Days Tracked',
+      value: `${dietLogs.length || meals.length}`,
+      subtitle: dietLogs.length ? 'diet logs saved' : 'custom meals',
       icon: 'restaurant',
       color: '#4ade80',
     },
     {
-      label: 'Workouts Created',
-      value: `${workouts.length}`,
-      subtitle: 'custom routines',
+      label: 'Workouts Logged',
+      value: `${workoutLogs.length || workouts.length}`,
+      subtitle: workoutLogs.length ? 'sessions recorded' : 'custom routines',
       icon: 'fitness-center',
       color: '#f87171',
     },
     {
-      label: 'Current Streak',
-      value: '7',
-      subtitle: 'days tracking',
-      icon: 'local-fire-department',
+      label: 'Measurements',
+      value: `${measurements.length}`,
+      subtitle: 'body check-ins',
+      icon: 'monitor-weight',
       color: '#facc15',
     },
     {
-      label: 'Personal Best',
-      value: '94%',
-      subtitle: 'calorie target',
+      label: 'Latest Weight',
+      value: measurements.length > 0 && measurements[0].weight
+        ? `${measurements[0].weight}kg`
+        : '--',
+      subtitle: measurements.length > 0 ? 'most recent' : 'not logged yet',
       icon: 'trending-up',
       color: '#3b82f6',
     },
@@ -96,13 +123,44 @@ export const ProgressScreen = ({ navigation }: any) => {
     { icon: 'star', label: 'Macro Expert', unlocked: false },
   ];
 
-  const recentActivities = [
-    { date: 'Today', type: 'meal', title: 'Logged 3 meals', icon: 'restaurant' },
-    { date: 'Today', type: 'water', title: 'Drank 6/8 glasses', icon: 'water-drop' },
-    { date: 'Yesterday', type: 'workout', title: 'Completed 45-min workout', icon: 'fitness-center' },
-    { date: '2 days ago', type: 'meal', title: 'Created custom meal plan', icon: 'restaurant' },
-    { date: '3 days ago', type: 'milestone', title: 'Reached 7-day streak', icon: 'local-fire-department' },
-  ];
+  const recentActivities = useMemo(() => {
+    const activities: Array<{ date: string; type: string; title: string; icon: string }> = [];
+
+    workoutLogs.slice(0, 3).forEach(log => {
+      activities.push({
+        date: log.date ? new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Unknown',
+        type: 'workout',
+        title: `Workout: ${log.day || 'Session'} · ${log.duration ? log.duration + ' min' : log.status}`,
+        icon: 'fitness-center',
+      });
+    });
+
+    dietLogs.slice(0, 2).forEach(log => {
+      activities.push({
+        date: log.date ? new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Unknown',
+        type: 'meal',
+        title: `Diet tracked: ${log.caloriesConsumed ? log.caloriesConsumed + ' kcal' : log.status}`,
+        icon: 'restaurant',
+      });
+    });
+
+    measurements.slice(0, 2).forEach(m => {
+      activities.push({
+        date: m.measuredAt ? new Date(m.measuredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Unknown',
+        type: 'measurement',
+        title: `Check-in: ${m.weight ? m.weight + 'kg' : ''}${m.bodyFat ? ' · ' + m.bodyFat + '% fat' : ''}`,
+        icon: 'monitor-weight',
+      });
+    });
+
+    if (activities.length === 0) {
+      return [
+        { date: '--', type: 'info', title: 'No activity yet. Start tracking!', icon: 'info' },
+      ];
+    }
+
+    return activities.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  }, [workoutLogs, dietLogs, measurements]);
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>

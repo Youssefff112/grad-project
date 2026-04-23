@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
+import * as coachService from '../../services/coachService';
 
 type ClientStatus = 'active' | 'pending' | 'inactive';
 
@@ -20,14 +21,6 @@ interface Client {
   weight: number | null;
 }
 
-const MOCK_CLIENTS: Client[] = [
-  { id: '1', name: 'Alex Johnson', email: 'alex@email.com', plan: 'Weight Loss', status: 'active', joinedDate: 'Jan 2026', lastActivity: '2h ago', progress: 78, weight: 82 },
-  { id: '2', name: 'Maria Garcia', email: 'maria@email.com', plan: 'Strength Training', status: 'active', joinedDate: 'Feb 2026', lastActivity: '5h ago', progress: 92, weight: 65 },
-  { id: '3', name: 'James Wilson', email: 'james@email.com', plan: 'Muscle Gain', status: 'active', joinedDate: 'Mar 2026', lastActivity: '1d ago', progress: 65, weight: 75 },
-  { id: '4', name: 'Sarah Chen', email: 'sarah@email.com', plan: 'Cardio & Endurance', status: 'pending', joinedDate: 'Apr 2026', lastActivity: '2d ago', progress: 0, weight: null },
-  { id: '5', name: 'Mike Thompson', email: 'mike@email.com', plan: 'General Fitness', status: 'inactive', joinedDate: 'Dec 2025', lastActivity: '2w ago', progress: 40, weight: 90 },
-];
-
 const STATUS_CONFIG: Record<ClientStatus, { label: string; bg: string; text: string }> = {
   active: { label: 'Active', bg: '#10b98120', text: '#10b981' },
   pending: { label: 'Pending', bg: '#f59e0b20', text: '#f59e0b' },
@@ -38,7 +31,35 @@ export const CoachClientListScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ClientStatus | 'all'>('all');
-  const [clients, setClients] = useState(MOCK_CLIENTS);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadClients = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { clients: raw } = await coachService.getMyClients();
+      const mapped: Client[] = raw.map((c) => ({
+        id: String(c.id),
+        name: c.User
+          ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}`
+          : `Client #${c.id}`,
+        email: c.User?.email || '',
+        plan: (c.goals as any)?.primary || 'General Fitness',
+        status: (c.status as ClientStatus) || 'active',
+        joinedDate: '',
+        lastActivity: c.lastActivity || 'Recently',
+        progress: 0,
+        weight: null,
+      }));
+      setClients(mapped);
+    } catch {
+      setClients([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadClients(); }, [loadClients]);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -61,6 +82,14 @@ export const CoachClientListScreen = ({ navigation }: any) => {
       { text: 'Remove', style: 'destructive', onPress: () => setClients(prev => prev.filter(c => c.id !== id)) },
     ]);
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[tw`flex-1 items-center justify-center`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
+        <ActivityIndicator size="large" color={accent} />
+      </SafeAreaView>
+    );
+  }
 
   const counts = {
     all: clients.length,

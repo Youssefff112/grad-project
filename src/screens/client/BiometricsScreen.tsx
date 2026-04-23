@@ -1,23 +1,57 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
 import { ProgressBar } from '../../components/ProgressBar';
 import { FormInput } from '../../components/FormInput';
 import { Card } from '../../components/Card';
+import * as authService from '../../services/auth.service';
+import * as progressService from '../../services/progressService';
 
 export const BiometricsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const { setWeight: setUserWeight } = useUser();
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
+
+  const handleContinue = async () => {
+    setSaving(true);
+    try {
+      const profileData: Record<string, any> = {};
+      if (gender) profileData.gender = gender;
+      if (age) profileData.age = parseInt(age, 10);
+      if (height) profileData.height = parseFloat(height);
+      if (weight) profileData.currentWeight = parseFloat(weight);
+      if (bodyFat) profileData.bodyFat = parseFloat(bodyFat);
+
+      if (Object.keys(profileData).length > 0) {
+        await authService.updateProfile({ profile: profileData } as any);
+        if (weight) setUserWeight(parseFloat(weight));
+      }
+
+      if (weight || bodyFat) {
+        await progressService.addMeasurement({
+          ...(weight ? { weight: parseFloat(weight) } : {}),
+          ...(bodyFat ? { bodyFat: parseFloat(bodyFat) } : {}),
+        });
+      }
+    } catch {
+      // Non-blocking: navigate regardless
+    } finally {
+      setSaving(false);
+      navigation.navigate('SafeGuardIntake');
+    }
+  };
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -132,10 +166,11 @@ export const BiometricsScreen = ({ navigation }: any) => {
         ]}
       >
         <Button
-          title="Continue"
+          title={saving ? 'Saving...' : 'Continue'}
           size="lg"
-          onPress={() => navigation.navigate('SafeGuardIntake')}
-          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
+          disabled={saving}
+          onPress={handleContinue}
+          icon={!saving && <MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
       </View>
     </SafeAreaView>

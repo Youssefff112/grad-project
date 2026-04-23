@@ -1,65 +1,86 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { CoachCard } from '../../components/coach/CoachCard';
-import { getMockCoaches, MockCoach } from '../../data/mockCoaches';
+import { getCoaches, Coach } from '../../services/coachService';
 
 interface FilterState {
   specialty?: string;
   minRating?: number;
 }
 
+type CoachWithDisplay = Coach & { displayName: string };
+
+const buildDisplayName = (coach: Coach): string => {
+  if (coach.User?.firstName) {
+    return `${coach.User.firstName} ${coach.User.lastName || ''}`.trim();
+  }
+  return (coach as any).name || `Coach #${coach.userId}`;
+};
+
 export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isDark, accent } = useTheme();
   const [searchText, setSearchText] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({});
+  const [coaches, setCoaches] = useState<CoachWithDisplay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const specialtyOptions = ['Strength', 'Cardio', 'Weight Loss', 'Nutrition', 'Flexibility', 'CrossFit', 'HIIT', 'Yoga', 'Pilates'];
 
-  const coaches = useMemo(() => {
-    let result = getMockCoaches({ specialty: filters.specialty, minRating: filters.minRating });
-    if (searchText.trim()) {
-      const q = searchText.toLowerCase();
-      result = result.filter(
-        c => c.name.toLowerCase().includes(q) ||
-             c.specialties.some(s => s.toLowerCase().includes(q)) ||
-             c.bio.toLowerCase().includes(q)
-      );
+  const loadCoaches = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { coaches: data } = await getCoaches({
+        specialty: filters.specialty,
+        minRating: filters.minRating,
+      });
+      setCoaches(data.map(c => ({ ...c, displayName: buildDisplayName(c) })));
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load coaches');
+      setCoaches([]);
+    } finally {
+      setLoading(false);
     }
-    return result;
-  }, [filters, searchText]);
+  }, [filters.specialty, filters.minRating]);
 
-  const handleCoachPress = (coach: MockCoach) => {
-    navigation.navigate('CoachProfileDetail', { coachId: coach.id });
+  useEffect(() => {
+    loadCoaches();
+  }, [loadCoaches]);
+
+  const filteredCoaches = useMemo(() => {
+    if (!searchText.trim()) return coaches;
+    const q = searchText.toLowerCase();
+    return coaches.filter(
+      c =>
+        c.displayName.toLowerCase().includes(q) ||
+        c.specialties?.some(s => s.toLowerCase().includes(q)) ||
+        c.bio?.toLowerCase().includes(q)
+    );
+  }, [coaches, searchText]);
+
+  const handleCoachPress = (coach: CoachWithDisplay) => {
+    navigation.navigate('CoachProfileDetail', { coachId: coach.id, coachName: coach.displayName });
   };
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
-  const cardBg = isDark ? '#111128' : '#ffffff';
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
-  const renderCoachItem = ({ item }: { item: MockCoach }) => (
+  const renderCoachItem = ({ item }: { item: CoachWithDisplay }) => (
     <CoachCard
-      coach={{
-        id: item.id,
-        userId: item.id,
-        displayName: item.name,
-        bio: item.bio,
-        specialties: item.specialties,
-        experienceYears: item.experienceYears,
-        rating: item.rating,
-        ratingCount: item.ratingCount,
-        profilePicture: item.profilePicture,
-      }}
+      coach={item}
       onPress={() => handleCoachPress(item)}
     />
   );
@@ -145,7 +166,24 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
         </View>
       )}
 
-      {coaches.length === 0 ? (
+      {loading ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <ActivityIndicator size="large" color={accent} />
+          <Text style={[tw`mt-3 text-sm`, { color: subtextColor }]}>Loading coaches...</Text>
+        </View>
+      ) : error ? (
+        <View style={tw`flex-1 items-center justify-center px-6`}>
+          <MaterialIcons name="wifi-off" size={52} color={isDark ? '#334155' : '#cbd5e1'} />
+          <Text style={[tw`mt-4 text-lg font-bold`, { color: isDark ? '#475569' : '#94a3b8' }]}>Could not load coaches</Text>
+          <Text style={[tw`mt-1 text-sm text-center`, { color: subtextColor }]}>{error}</Text>
+          <TouchableOpacity
+            onPress={loadCoaches}
+            style={[tw`mt-4 px-6 py-3 rounded-xl`, { backgroundColor: accent }]}
+          >
+            <Text style={tw`text-white font-bold`}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : filteredCoaches.length === 0 ? (
         <View style={tw`flex-1 items-center justify-center px-6`}>
           <MaterialIcons name="person-search" size={52} color={isDark ? '#334155' : '#cbd5e1'} />
           <Text style={[tw`mt-4 text-lg font-bold`, { color: isDark ? '#475569' : '#94a3b8' }]}>No coaches found</Text>
@@ -153,13 +191,13 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
         </View>
       ) : (
         <FlatList
-          data={coaches}
+          data={filteredCoaches}
           renderItem={renderCoachItem}
           keyExtractor={coach => `coach-${coach.id}`}
           contentContainerStyle={tw`px-4 pt-4 pb-8`}
           ListHeaderComponent={
             <Text style={[tw`text-xs font-semibold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
-              {coaches.length} coach{coaches.length !== 1 ? 'es' : ''} available
+              {filteredCoaches.length} coach{filteredCoaches.length !== 1 ? 'es' : ''} available
             </Text>
           }
         />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,17 +7,55 @@ import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
 import { TraineeBottomNav } from '../components/TraineeBottomNav';
+import * as workoutService from '../services/workoutService';
+import * as progressService from '../services/progressService';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
-  const { fullName, email } = useUser();
+  const { fullName, email, logout } = useUser();
   const { totalUnread } = useNotifications();
   const displayName = fullName || 'Trainee';
 
+  const [workoutCount, setWorkoutCount] = useState<string>('—');
+  const [latestWeight, setLatestWeight] = useState<string>('—');
+  const [streakDays, setStreakDays] = useState<string>('—');
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [{ logs }, { measurements }] = await Promise.all([
+          workoutService.getWorkoutHistory(),
+          progressService.getMeasurements(),
+        ]);
+        setWorkoutCount(String(logs?.length ?? 0));
+        if (measurements && measurements.length > 0) {
+          const latest = measurements[measurements.length - 1];
+          setLatestWeight(latest.weight ? `${latest.weight}kg` : '—');
+        }
+        // Compute simple streak from consecutive workout days
+        if (logs && logs.length > 0) {
+          const days = new Set(logs.map((s: any) => new Date(s.date || s.completedAt || s.createdAt).toDateString()));
+          let streak = 0;
+          const today = new Date();
+          for (let i = 0; i < 365; i++) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            if (days.has(d.toDateString())) streak++;
+            else if (i > 0) break;
+          }
+          setStreakDays(`${streak}d`);
+        }
+      } catch {
+        // keep defaults
+      }
+    };
+    loadStats();
+  }, []);
+
   const STATS = [
-    { label: 'Workouts', value: '47', icon: 'fitness-center' as const },
-    { label: 'Streak', value: '12d', icon: 'local-fire-department' as const },
-    { label: 'PR\'s Hit', value: '8', icon: 'emoji-events' as const },
+    { label: 'Workouts', value: workoutCount, icon: 'fitness-center' as const },
+    { label: 'Streak', value: streakDays, icon: 'local-fire-department' as const },
+    { label: 'Weight', value: latestWeight, icon: 'monitor-weight' as const },
   ];
 
   const handleMenuPress = (id: string) => {
@@ -165,7 +203,7 @@ export const ProfileScreen = ({ navigation }: any) => {
         {/* Sign Out */}
         <View style={tw`px-4 mb-8`}>
           <TouchableOpacity
-            onPress={() => Alert.alert('Sign Out', 'Are you sure you want to sign out?', [{ text: 'Cancel' }, { text: 'Sign Out', style: 'destructive', onPress: () => navigation.navigate('Splash') }])}
+            onPress={() => Alert.alert('Sign Out', 'Are you sure you want to sign out?', [{ text: 'Cancel' }, { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); navigation.navigate('Splash'); } }])}
             style={[tw`flex-row items-center justify-center gap-2 py-4 rounded-2xl`, { backgroundColor: '#ef444420', borderWidth: 1, borderColor: '#ef444430' }]}
           >
             <MaterialIcons name="logout" size={20} color="#ef4444" />

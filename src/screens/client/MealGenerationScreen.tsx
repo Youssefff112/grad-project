@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useUser } from '../../context/UserContext';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { Button } from '../../components/Button';
+import * as dietService from '../../services/dietService';
 
 interface MealItem {
   name: string;
@@ -41,11 +42,34 @@ interface GeneratedMealPlan {
   approvedBy?: string;
 }
 
+const dietPlanToDisplay = (plan: dietService.DietPlan, status: 'pending' | 'approved' = 'approved'): GeneratedMealPlan => {
+  const firstDay = plan.weeklyMealPlan?.[0];
+  return {
+    id: String(plan.id),
+    name: `${plan.goal || 'My'} Meal Plan`,
+    dayCount: plan.weeklyMealPlan?.length || 7,
+    totalCalories: plan.dailyCalorieTarget,
+    dietType: plan.dietaryPreference || 'balanced',
+    meals: (firstDay?.meals || []).map(m => ({
+      time: m.type.charAt(0).toUpperCase() + m.type.slice(1),
+      totalCalories: m.nutrition.calories,
+      items: [{
+        name: m.name,
+        calories: m.nutrition.calories,
+        protein: m.nutrition.protein,
+        carbs: m.nutrition.carbs,
+        fat: m.nutrition.fats,
+        serving: m.ingredients?.slice(0, 2).join(', ') || '1 serving',
+      }],
+    })),
+    status,
+  };
+};
+
 export const MealGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, dietPreferences } = useUser();
 
-  // Check if user has access to AI meal generation
   if (!hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
     return (
       <FeatureLocked
@@ -60,120 +84,55 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   }
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
   const [generatedMeal, setGeneratedMeal] = useState<GeneratedMealPlan | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [availableMeals, setAvailableMeals] = useState<GeneratedMealPlan[]>([]);
 
-  // Mock data for meal generation
-  const mockMealPlans: GeneratedMealPlan[] = [
-    {
-      id: '1',
-      name: 'High Protein Bulk',
-      dayCount: 7,
-      totalCalories: 3200,
-      dietType: 'omnivore',
-      meals: [
-        {
-          time: 'Breakfast',
-          items: [
-            { name: 'Whole Grain Toast', calories: 160, protein: 6, carbs: 28, fat: 3, serving: '2 slices' },
-            { name: 'Scrambled Eggs', calories: 155, protein: 13, carbs: 1, fat: 11, serving: '2 eggs' },
-            { name: 'Berries', calories: 80, protein: 1, carbs: 20, fat: 0, serving: '1 cup' },
-          ],
-          totalCalories: 395,
-        },
-        {
-          time: 'Snack 1',
-          items: [
-            { name: 'Greek Yogurt', calories: 150, protein: 20, carbs: 10, fat: 5, serving: '1 cup' },
-            { name: 'Granola', calories: 120, protein: 3, carbs: 19, fat: 4, serving: '1/3 cup' },
-          ],
-          totalCalories: 270,
-        },
-        {
-          time: 'Lunch',
-          items: [
-            { name: 'Chicken Breast', calories: 275, protein: 53, carbs: 0, fat: 6, serving: '200g' },
-            { name: 'Brown Rice', calories: 200, protein: 5, carbs: 43, fat: 2, serving: '1 cup' },
-            { name: 'Broccoli', calories: 55, protein: 3, carbs: 11, fat: 0, serving: '2 cups' },
-          ],
-          totalCalories: 530,
-        },
-        {
-          time: 'Snack 2',
-          items: [
-            { name: 'Protein Shake', calories: 200, protein: 30, carbs: 15, fat: 3, serving: '1 shake' },
-            { name: 'Banana', calories: 105, protein: 1, carbs: 27, fat: 0, serving: '1 medium' },
-          ],
-          totalCalories: 305,
-        },
-        {
-          time: 'Dinner',
-          items: [
-            { name: 'Salmon', calories: 280, protein: 34, carbs: 0, fat: 15, serving: '200g' },
-            { name: 'Sweet Potato', calories: 200, protein: 3, carbs: 46, fat: 0, serving: '1 medium' },
-            { name: 'Asparagus', calories: 30, protein: 3, carbs: 5, fat: 0, serving: '8 spears' },
-          ],
-          totalCalories: 510,
-        },
-      ],
-      status: 'pending',
-    },
-    {
-      id: '2',
-      name: 'Balanced Maintenance',
-      dayCount: 7,
-      totalCalories: 2400,
-      dietType: 'omnivore',
-      meals: [
-        {
-          time: 'Breakfast',
-          items: [
-            { name: 'Oatmeal', calories: 150, protein: 5, carbs: 27, fat: 3, serving: '1/2 cup' },
-            { name: 'Almond Butter', calories: 190, protein: 7, carbs: 7, fat: 17, serving: '2 tbsp' },
-          ],
-          totalCalories: 340,
-        },
-        {
-          time: 'Lunch',
-          items: [
-            { name: 'Turkey Breast', calories: 165, protein: 35, carbs: 0, fat: 2, serving: '100g' },
-            { name: 'Whole Wheat Bread', calories: 160, protein: 5, carbs: 28, fat: 2, serving: '2 slices' },
-          ],
-          totalCalories: 325,
-        },
-        {
-          time: 'Dinner',
-          items: [
-            { name: 'Lean Beef', calories: 240, protein: 36, carbs: 0, fat: 10, serving: '150g' },
-            { name: 'White Rice', calories: 200, protein: 4, carbs: 45, fat: 1, serving: '1 cup' },
-          ],
-          totalCalories: 440,
-        },
-      ],
-      status: 'pending',
-    },
-  ];
+  useEffect(() => {
+    loadActivePlan();
+  }, []);
+
+  const loadActivePlan = async () => {
+    setIsLoadingPlan(true);
+    try {
+      const { plan } = await dietService.getActiveDietPlan();
+      if (plan && plan.weeklyMealPlan?.length > 0) {
+        setAvailableMeals([dietPlanToDisplay(plan, 'approved')]);
+      }
+    } catch {
+      // no active plan yet
+    } finally {
+      setIsLoadingPlan(false);
+    }
+  };
 
   const handleGenerateMealPlan = async () => {
     setIsGenerating(true);
-    // Simulate API call
-    setTimeout(() => {
-      const randomPlan = mockMealPlans[Math.floor(Math.random() * mockMealPlans.length)];
-      const planWithStatus: GeneratedMealPlan = {
-        ...randomPlan,
-        status: userMode === 'CoachAssisted' ? 'pending' : 'pending',
-      };
-      setGeneratedMeal(planWithStatus);
+    try {
+      const { plan } = await dietService.generateDietPlan();
+      if (plan) {
+        const displayPlan = dietPlanToDisplay(plan, 'pending');
+        setGeneratedMeal(displayPlan);
+        setAvailableMeals([{ ...displayPlan, status: 'approved' }]);
+        setIsGenerating(false);
+        setShowPreview(true);
+      } else {
+        throw new Error('No plan returned');
+      }
+    } catch (error: any) {
       setIsGenerating(false);
-      setShowPreview(true);
-    }, 2000);
+      Alert.alert(
+        'Generation Failed',
+        error?.message || 'Unable to generate meal plan. Make sure your profile is complete and you have an active subscription.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleApproveMealPlan = () => {
     if (!generatedMeal) return;
-
-    Alert.alert('Success', 'Meal plan has been added to your routine!', [
+    Alert.alert('Meal Plan Saved!', 'Your meal plan has been added to your routine.', [
       {
         text: 'View Meals',
         onPress: () => {
@@ -187,6 +146,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
         onPress: () => {
           setShowPreview(false);
           setGeneratedMeal(null);
+          handleGenerateMealPlan();
         },
       },
     ]);
@@ -194,15 +154,11 @@ export const MealGenerationScreen = ({ navigation }: any) => {
 
   const handleSubmitForApproval = () => {
     if (!generatedMeal) return;
-
     Alert.alert(
       'Submit for Coach Review',
       `Your meal plan will be reviewed by ${coachName || 'your coach'} within 24 hours.`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Submit',
           onPress: () => {
@@ -270,7 +226,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
               Create New Meal Plan
             </Text>
 
-            {/* Options */}
             <View style={tw`gap-3 mb-6`}>
               <TouchableOpacity
                 disabled={isGenerating}
@@ -292,7 +247,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => Alert.alert('Build Custom Meal Plan', 'Meal planner builder coming soon! For now, use Generate Auto and modify the plan as needed.', [{ text: 'OK' }])}
+                onPress={() => navigation.navigate('MealBuilder')}
                 style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
               >
                 <View style={[tw`p-3 rounded-lg`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
@@ -309,7 +264,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Quick Tips */}
             <View style={[tw`rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
               <Text style={[tw`font-bold text-sm mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                 🍽️ Meal Planning Tips
@@ -319,7 +273,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   • Meals respect your dietary preferences
                 </Text>
                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  • You can swap meals and adjust portions
+                  • Generating a new plan replaces your current one
                 </Text>
                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
                   • Track macros in detail for each meal
@@ -329,11 +283,11 @@ export const MealGenerationScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {/* Recent Generated Meal Plans */}
-        {availableMeals.length > 0 && (
+        {/* Active Meal Plans */}
+        {!isLoadingPlan && availableMeals.length > 0 && (
           <View style={tw`mt-8`}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              Recently Generated
+              Your Current Plan
             </Text>
             {availableMeals.map((plan) => (
               <TouchableOpacity
@@ -365,6 +319,13 @@ export const MealGenerationScreen = ({ navigation }: any) => {
             ))}
           </View>
         )}
+
+        {isLoadingPlan && (
+          <View style={tw`items-center py-6`}>
+            <ActivityIndicator color={accent} />
+            <Text style={[tw`text-xs mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Loading your plan...</Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Meal Plan Preview Modal */}
@@ -383,7 +344,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
           <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
             {generatedMeal && (
               <>
-                {/* Header */}
                 <View>
                   <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                     {generatedMeal.name}
@@ -404,7 +364,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   </View>
                 </View>
 
-                {/* Meals Breakdown */}
                 <View>
                   <Text style={[tw`text-lg font-bold mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                     Sample Day
@@ -439,9 +398,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                                   </Text>
                                 </View>
                               </View>
-                              <TouchableOpacity style={[tw`px-2 py-1 rounded`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
-                                <MaterialIcons name="edit" size={14} color={accent} />
-                              </TouchableOpacity>
                             </View>
                           )) : null}
                         </View>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -8,6 +8,7 @@ import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 import * as offlineService from '../../services/offlineService';
+import * as workoutService from '../../services/workoutService';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
@@ -25,6 +26,8 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
     score: string;
     exercises: number;
   }> | null>(null);
+  const [apiHistory, setApiHistory] = useState<workoutService.WorkoutSession[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Load cached workout history on mount
   useEffect(() => {
@@ -33,7 +36,6 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
         const cached = await offlineService.getCachedWorkoutHistory();
         if (cached && cached.length > 0) {
           setCachedHistory(cached);
-          console.log('[VisionAnalysisLab] Loaded cached workout history');
         }
       } catch (error) {
         console.error('Error loading cached workouts:', error);
@@ -41,6 +43,25 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
     };
     loadCachedWorkouts();
   }, []);
+
+  // Load real API history when history tab is opened
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadWorkoutHistory();
+    }
+  }, [activeTab]);
+
+  const loadWorkoutHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { logs } = await workoutService.getWorkoutHistory();
+      setApiHistory(logs || []);
+    } catch {
+      // fall back to cached
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   // Check if user has access to computer vision
   if (!hasFeatureAccess(subscriptionPlan, 'hasComputerVision')) {
@@ -225,31 +246,62 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
         </ScrollView>
       ) : (
         <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 gap-3 pb-32`}>
-          {/* Past Sessions */}
-          {(cachedHistory || [
-            { date: 'Yesterday', type: 'Push Day', duration: '1h 12m', score: '94%', exercises: 6 },
-            { date: 'Mar 15', type: 'Pull Day', duration: '58m', score: '89%', exercises: 5 },
-            { date: 'Mar 14', type: 'Leg Day', duration: '1h 05m', score: '91%', exercises: 7 },
-            { date: 'Mar 12', type: 'Push Day', duration: '1h 08m', score: '87%', exercises: 6 },
-          ]).map((session, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => navigation.navigate('WorkoutSessionDetail', { session })}
-              style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
-                <MaterialIcons name="fitness-center" size={24} color={accent} />
-              </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{session.type}</Text>
-                <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{session.date} - {session.duration} - {session.exercises} exercises</Text>
-              </View>
-              <View style={tw`items-end`}>
-                <Text style={[tw`text-lg font-black`, { color: accent }]}>{session.score}</Text>
-                <Text style={[tw`text-[9px] font-bold uppercase`, { color: '#94a3b8' }]}>Form</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {historyLoading ? (
+            <View style={tw`flex-1 items-center justify-center py-12`}>
+              <ActivityIndicator color={accent} />
+              <Text style={[tw`mt-2 text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Loading history...</Text>
+            </View>
+          ) : apiHistory.length > 0 ? (
+            apiHistory.map((session, i) => (
+              <TouchableOpacity
+                key={session.id || i}
+                onPress={() => navigation.navigate('WorkoutSessionDetail', { session })}
+                style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+              >
+                <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                  <MaterialIcons name="fitness-center" size={24} color={accent} />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{session.day || 'Workout'}</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>
+                    {session.date ? new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                    {session.duration ? ` · ${session.duration}m` : ''}
+                    {session.exercises?.length ? ` · ${session.exercises.length} exercises` : ''}
+                  </Text>
+                </View>
+                <View style={tw`items-end`}>
+                  <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, { backgroundColor: accent + '20', color: accent }]}>
+                    {session.status === 'completed' ? 'Done' : session.status || '--'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            /* Fallback to cached or placeholder */
+            (cachedHistory || [
+              { date: 'No history yet', type: 'Start a workout to see history', duration: '--', score: '--', exercises: 0 },
+            ]).map((session, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => session.exercises > 0 && navigation.navigate('WorkoutSessionDetail', { session })}
+                style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+              >
+                <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                  <MaterialIcons name="fitness-center" size={24} color={accent} />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{session.type}</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{session.date}{session.duration !== '--' ? ` - ${session.duration}` : ''}{session.exercises > 0 ? ` - ${session.exercises} exercises` : ''}</Text>
+                </View>
+                {session.score !== '--' && (
+                  <View style={tw`items-end`}>
+                    <Text style={[tw`text-lg font-black`, { color: accent }]}>{session.score}</Text>
+                    <Text style={[tw`text-[9px] font-bold uppercase`, { color: '#94a3b8' }]}>Form</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
       )}
 

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import * as coachService from '../../services/coachService';
 
 interface Exercise {
   id: string;
@@ -28,8 +29,9 @@ const EXERCISE_SUGGESTIONS = [
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
-  const { clientName } = route?.params ?? {};
+  const { clientId, clientName } = route?.params ?? {};
   const { isDark, accent } = useTheme();
+  const [isSaving, setIsSaving] = useState(false);
 
   const [planName, setPlanName] = useState('');
   const [selectedDay, setSelectedDay] = useState('Mon');
@@ -60,14 +62,40 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!planName.trim()) {
       Alert.alert('Missing Info', 'Please enter a plan name.');
       return;
     }
-    Alert.alert('Plan Saved', `Workout plan "${planName}" has been ${clientName ? `assigned to ${clientName}` : 'saved as template'}.`, [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+    setIsSaving(true);
+    try {
+      const days = DAYS.map(day => ({
+        day,
+        isRestDay: (dayExercises[day] || []).length === 0,
+        exercises: (dayExercises[day] || []).map(e => ({
+          name: e.name,
+          sets: e.sets,
+          reps: e.reps,
+          restSeconds: parseInt(e.rest, 10) || 60,
+          notes: e.notes,
+        })),
+      }));
+      const planData = { planName, days };
+      if (clientId) {
+        await coachService.assignWorkoutToClient(Number(clientId), planData);
+        Alert.alert('Plan Assigned', `Workout plan "${planName}" has been assigned to ${clientName}.`, [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        Alert.alert('Plan Saved', `Workout plan "${planName}" has been saved as a template.`, [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to save the plan. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -80,8 +108,8 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
           <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>Workout Plan Builder</Text>
           {clientName && <Text style={[tw`text-xs`, { color: subtextColor }]}>for {clientName}</Text>}
         </View>
-        <TouchableOpacity onPress={handleSave} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: accent }]}>
-          <Text style={tw`text-sm text-white font-bold`}>Save</Text>
+        <TouchableOpacity onPress={handleSave} disabled={isSaving} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: isSaving ? accent + '80' : accent }]}>
+          <Text style={tw`text-sm text-white font-bold`}>{isSaving ? '...' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
 

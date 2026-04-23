@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -13,11 +14,13 @@ import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
 import { PLAN_FEATURES, SubscriptionPlan } from '../../constants/plans';
+import * as subscriptionService from '../../services/subscriptionService';
 
 export const SubscriptionSelectionScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { setSubscriptionPlan } = useUser();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const plans: SubscriptionPlan[] = ['Free', 'Standard', 'Premium', 'ProCoach', 'Elite'];
 
@@ -31,17 +34,34 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleConfirmPlan = () => {
+  const handleConfirmPlan = async () => {
     if (!selectedPlan) {
       Alert.alert('Select a Plan', 'Please choose a subscription plan to continue');
       return;
     }
-
-    // Set the plan in context
-    setSubscriptionPlan(selectedPlan);
-
-    // Navigate to next onboarding screen
-    navigation.navigate('OnboardingPreferences');
+    setIsConfirming(true);
+    try {
+      const planData = PLAN_FEATURES[selectedPlan];
+      const { subscription } = await subscriptionService.createSubscription({
+        role: 'client',
+        planName: selectedPlan,
+        price: planData.price,
+        autoRenew: true,
+      });
+      if (planData.price > 0) {
+        await subscriptionService.recordPayment(subscription.id, {
+          amount: planData.price,
+          provider: 'manual',
+          status: 'paid',
+        });
+      }
+      setSubscriptionPlan(selectedPlan);
+      navigation.navigate('OnboardingPreferences');
+    } catch {
+      Alert.alert('Error', 'Could not activate plan. Please try again.');
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   return (
@@ -161,10 +181,11 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
       {/* Footer */}
       <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
         <Button
-          title={selectedPlan ? `Continue with ${selectedPlan}` : 'Select a Plan to Continue'}
+          title={isConfirming ? 'Activating...' : (selectedPlan ? `Continue with ${selectedPlan}` : 'Select a Plan to Continue')}
           size="lg"
+          disabled={isConfirming}
           onPress={handleConfirmPlan}
-          icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
+          icon={!isConfirming && <MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
         <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.goBack()}>
           <Text style={[tw`text-sm`, { color: isDark ? '#94a3b8' : '#64748b' }]}>

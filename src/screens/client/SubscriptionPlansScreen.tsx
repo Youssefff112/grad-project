@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,6 +15,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
 import type { SubscriptionPlan } from '../../context/UserContext';
+import * as subscriptionService from '../../services/subscriptionService';
+import type { Subscription } from '../../services/subscriptionService';
 
 interface Plan {
   id: SubscriptionPlan;
@@ -139,31 +142,83 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
   const { subscriptionPlan, setSubscriptionPlan, updateLastPlanReview } = useUser();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [activeSubscriptionData, setActiveSubscriptionData] = useState<Subscription | null>(null);
+
+  useEffect(() => {
+    loadActiveSubscription();
+  }, []);
+
+  const loadActiveSubscription = async () => {
+    try {
+      const { subscription } = await subscriptionService.getActiveSubscription('client');
+      if (subscription) {
+        setActiveSubscriptionData(subscription);
+        if (subscription.planName) {
+          setSubscriptionPlan(subscription.planName as SubscriptionPlan);
+        }
+      }
+    } catch {
+      // use local state
+    }
+  };
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
-    const fullPlan = plans.find((p) => p.id === plan);
     setSelectedPlan(plan);
     setShowDisclaimer(true);
   };
 
-  const handleConfirmPlan = () => {
+  const handleConfirmPlan = async () => {
     if (!selectedPlan) return;
+    setIsConfirming(true);
 
-    setSubscriptionPlan(selectedPlan);
-    updateLastPlanReview();
+    try {
+      const fullPlan = plans.find((p) => p.id === selectedPlan);
+      if (!fullPlan) return;
 
-    Alert.alert('Success', `You've selected the ${selectedPlan} plan. Welcome to Vertex!`, [
-      {
-        text: 'Continue',
-        onPress: () => {
-          setShowDisclaimer(false);
-          setSelectedPlan(null);
-          if (navigation.canGoBack()) {
-            navigation.goBack();
-          }
+      const { subscription } = await subscriptionService.createSubscription({
+        role: 'client',
+        planName: selectedPlan,
+        price: fullPlan.price,
+        currency: 'USD',
+        autoRenew: true,
+      });
+
+      // Record payment to activate the subscription
+      if (fullPlan.price > 0 && subscription?.id) {
+        await subscriptionService.recordPayment(subscription.id, {
+          amount: fullPlan.price,
+          currency: 'USD',
+          provider: 'card',
+          status: 'paid',
+        });
+      }
+
+      setActiveSubscriptionData(subscription || null);
+      setSubscriptionPlan(selectedPlan);
+      updateLastPlanReview();
+
+      Alert.alert('Success', `You're now on the ${selectedPlan} plan!`, [
+        {
+          text: 'Continue',
+          onPress: () => {
+            setShowDisclaimer(false);
+            setSelectedPlan(null);
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            }
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error: any) {
+      Alert.alert(
+        'Subscription Failed',
+        error?.message || 'Could not process your subscription. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   const selectedPlanData = plans.find((p) => p.id === selectedPlan);
@@ -451,15 +506,24 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
               </View>
             </View>
             <View style={[tw`h-px mb-3`, { backgroundColor: accent + '28' }]} />
-            <View style={tw`gap-2`}>
+              <View style={tw`gap-2`}>
               <View style={tw`flex-row items-center justify-between`}>
                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Next renewal</Text>
-                <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>April 17, 2026</Text>
+                <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  {activeSubscriptionData?.endDate
+                    ? new Date(activeSubscriptionData.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                    : 'Not set'}
+                </Text>
               </View>
               <View style={tw`flex-row items-center justify-between`}>
                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Amount</Text>
                 <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                  ${subscriptionPlan === 'Free' ? '0.00' : subscriptionPlan === 'Standard' ? '9.99' : subscriptionPlan === 'Premium' ? '19.99' : subscriptionPlan === 'ProCoach' ? '49.99' : '99.99'}/month
+                  ${activeSubscriptionData?.price != null
+                    ? activeSubscriptionData.price.toFixed(2)
+                    : subscriptionPlan === 'Free' ? '0.00'
+                    : subscriptionPlan === 'Standard' ? '9.99'
+                    : subscriptionPlan === 'Premium' ? '19.99'
+                    : subscriptionPlan === 'ProCoach' ? '49.99' : '99.99'}/month
                 </Text>
               </View>
             </View>
@@ -707,12 +771,14 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
 
           <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
             <Button
-              title={`Confirm ${selectedPlanData?.name} Plan`}
+              title={isConfirming ? 'Processing...' : `Confirm ${selectedPlanData?.name} Plan`}
               size="lg"
               onPress={handleConfirmPlan}
-              icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
+              icon={isConfirming
+                ? <ActivityIndicator size="small" color="white" style={tw`mr-2`} />
+                : <MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
             />
-            <TouchableOpacity style={tw`items-center py-3`} onPress={() => setShowDisclaimer(false)}>
+            <TouchableOpacity style={tw`items-center py-3`} onPress={() => !isConfirming && setShowDisclaimer(false)}>
               <Text style={[tw`text-base font-semibold`, { color: accent }]}>Cancel</Text>
             </TouchableOpacity>
           </View>

@@ -19,6 +19,10 @@ export interface Coach {
   rating?: number;
   ratingCount?: number;
   isApproved?: boolean;
+  /** Populated from User association by the backend */
+  User?: { firstName?: string; lastName?: string; email?: string };
+  /** Convenience field computed from User.firstName + User.lastName */
+  displayName?: string;
 }
 
 export interface CoachDetail extends Coach {
@@ -197,4 +201,48 @@ export const addCertification = async (formData: FormData): Promise<{ certificat
 
 export const deleteCertification = async (certId: string): Promise<void> => {
   await apiDelete(`/coach/certifications/${certId}`);
+};
+
+// ─── Coach Client Management ──────────────────────────────────
+
+export interface CoachClient {
+  id: number;
+  userId: number;
+  selectedCoachId?: number;
+  goals?: Record<string, any>;
+  status?: string;
+  lastActivity?: string;
+  User?: { firstName?: string; lastName?: string; email?: string };
+}
+
+export interface CoachAnalytics {
+  totalClients: number;
+  activeClients: number;
+  pendingClients: number;
+  totalSessions?: number;
+  monthlyRevenue?: number;
+}
+
+export const getMyClients = async (): Promise<{ clients: CoachClient[] }> => {
+  const response = await apiGet('/coach/clients');
+  return { clients: response.data?.clients || [] };
+};
+
+export const getCoachAnalytics = async (): Promise<{ analytics: CoachAnalytics }> => {
+  const response = await apiGet('/coach/analytics');
+  return { analytics: response.data?.analytics || {} };
+};
+
+export const assignWorkoutToClient = async (
+  clientId: number,
+  planData: any
+): Promise<void> => {
+  await apiPost('/coach/assign/workout', { clientId, ...planData });
+};
+
+export const assignDietToClient = async (
+  clientId: number,
+  planData: any
+): Promise<void> => {
+  await apiPost('/coach/assign/diet', { clientId, ...planData });
 };

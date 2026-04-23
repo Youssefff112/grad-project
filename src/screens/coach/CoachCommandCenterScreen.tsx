@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,19 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
-
-const MOCK_RECENT_CLIENTS = [
-  { id: '1', name: 'Alex Johnson', plan: 'Weight Loss', lastCheckin: '2h ago', progress: 78, status: 'active' },
-  { id: '2', name: 'Maria Garcia', plan: 'Strength Training', lastCheckin: '5h ago', progress: 92, status: 'active' },
-  { id: '3', name: 'James Wilson', plan: 'Muscle Gain', lastCheckin: '1d ago', progress: 65, status: 'active' },
-  { id: '4', name: 'Sarah Chen', plan: 'Cardio & Endurance', lastCheckin: '2d ago', progress: 55, status: 'pending' },
-];
-
-const MOCK_UPCOMING_SESSIONS = [
-  { id: '1', clientName: 'Alex Johnson', time: '10:00 AM', type: 'Check-in Call', today: true },
-  { id: '2', clientName: 'Maria Garcia', time: '2:30 PM', type: 'Plan Review', today: true },
-  { id: '3', clientName: 'James Wilson', time: 'Tomorrow 9:00 AM', type: 'Assessment', today: false },
-];
+import * as coachService from '../../services/coachService';
 
 export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -32,11 +20,49 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
 
+  const [recentClients, setRecentClients] = useState<Array<{
+    id: string; name: string; plan: string; lastCheckin: string; progress: number; status: string;
+  }>>([]);
+  const [analytics, setAnalytics] = useState<coachService.CoachAnalytics>({
+    totalClients: 0,
+    activeClients: 0,
+    pendingClients: 0,
+    monthlyRevenue: 0,
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [clientsRes, analyticsRes] = await Promise.allSettled([
+          coachService.getMyClients(),
+          coachService.getCoachAnalytics(),
+        ]);
+        if (clientsRes.status === 'fulfilled') {
+          const mapped = clientsRes.value.clients.slice(0, 4).map((c) => ({
+            id: String(c.id),
+            name: c.User ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}` : `Client #${c.id}`,
+            plan: (c.goals as any)?.primary || 'General Fitness',
+            lastCheckin: c.lastActivity || 'Recently',
+            progress: 0,
+            status: c.status || 'active',
+          }));
+          setRecentClients(mapped);
+        }
+        if (analyticsRes.status === 'fulfilled') {
+          setAnalytics(analyticsRes.value.analytics);
+        }
+      } catch {
+        // keep defaults
+      }
+    };
+    load();
+  }, []);
+
   const stats = [
-    { label: 'Active Clients', value: '12', icon: 'group' as const, color: accent },
-    { label: 'Sessions Today', value: '3', icon: 'event' as const, color: '#10b981' },
-    { label: 'Unread', value: String(totalUnread || 5), icon: 'chat-bubble' as const, color: '#f59e0b' },
-    { label: 'This Month', value: '$1,240', icon: 'attach-money' as const, color: '#8b5cf6' },
+    { label: 'Active Clients', value: String(analytics.activeClients || recentClients.length), icon: 'group' as const, color: accent },
+    { label: 'Pending', value: String(analytics.pendingClients || 0), icon: 'event' as const, color: '#10b981' },
+    { label: 'Unread', value: String(totalUnread || 0), icon: 'chat-bubble' as const, color: '#f59e0b' },
+    { label: 'This Month', value: analytics.monthlyRevenue ? `$${analytics.monthlyRevenue}` : '—', icon: 'attach-money' as const, color: '#8b5cf6' },
   ];
 
   return (
@@ -117,48 +143,6 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Upcoming Sessions */}
-        <View style={tw`px-4 mt-8`}>
-          <View style={tw`flex-row items-center justify-between mb-4`}>
-            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: textPrimary }]}>Today's Sessions</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('CoachSchedule')}>
-              <Text style={[tw`text-sm font-bold`, { color: accent }]}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          {MOCK_UPCOMING_SESSIONS.filter(s => s.today).map(session => (
-            <View
-              key={session.id}
-              style={[tw`flex-row items-center gap-4 p-4 rounded-xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
-            >
-              <View style={[tw`w-10 h-10 rounded-xl items-center justify-center flex-shrink-0`, { backgroundColor: accent + '14' }]}>
-                <MaterialIcons name="event" size={20} color={accent} />
-              </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{session.clientName}</Text>
-                <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{session.type}</Text>
-              </View>
-              <View style={[tw`px-2.5 py-1 rounded-full`, { backgroundColor: accent + '14' }]}>
-                <Text style={[tw`text-xs font-bold`, { color: accent }]}>{session.time}</Text>
-              </View>
-            </View>
-          ))}
-          {MOCK_UPCOMING_SESSIONS.filter(s => !s.today).map(session => (
-            <View
-              key={session.id}
-              style={[tw`flex-row items-center gap-4 p-4 rounded-xl mb-3 opacity-70`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
-            >
-              <View style={[tw`w-10 h-10 rounded-xl items-center justify-center flex-shrink-0`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
-                <MaterialIcons name="event" size={20} color={subtextColor} />
-              </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{session.clientName}</Text>
-                <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{session.type}</Text>
-              </View>
-              <Text style={[tw`text-xs font-semibold`, { color: subtextColor }]}>{session.time}</Text>
-            </View>
-          ))}
-        </View>
-
         {/* Recent Clients */}
         <View style={tw`px-4 mt-8`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
@@ -167,7 +151,12 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
               <Text style={[tw`text-sm font-bold`, { color: accent }]}>View All</Text>
             </TouchableOpacity>
           </View>
-          {MOCK_RECENT_CLIENTS.map(client => (
+          {recentClients.length === 0 ? (
+            <View style={[tw`p-6 rounded-xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
+              <MaterialIcons name="group" size={32} color={subtextColor} />
+              <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No clients yet</Text>
+            </View>
+          ) : recentClients.map(client => (
             <TouchableOpacity
               key={client.id}
               onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, clientName: client.name })}
@@ -186,12 +175,6 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
                   )}
                 </View>
                 <Text style={[tw`text-xs`, { color: subtextColor }]}>{client.plan}</Text>
-                <View style={tw`flex-row items-center gap-2 mt-2`}>
-                  <View style={[tw`flex-1 h-1 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
-                    <View style={{ width: `${client.progress}%`, height: '100%', borderRadius: 4, backgroundColor: client.progress >= 80 ? '#10b981' : accent }} />
-                  </View>
-                  <Text style={[tw`text-xs font-bold w-8 text-right`, { color: subtextColor }]}>{client.progress}%</Text>
-                </View>
               </View>
               <View style={tw`items-end`}>
                 <Text style={[tw`text-xs`, { color: subtextColor }]}>{client.lastCheckin}</Text>

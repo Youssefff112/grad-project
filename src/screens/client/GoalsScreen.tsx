@@ -7,6 +7,8 @@ import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../../components/Button';
 import { ProgressBar } from '../../components/ProgressBar';
+import * as clientService from '../../services/clientService';
+import * as authService from '../../services/auth.service';
 
 const GOALS = [
   { id: 'hypertrophy', label: 'Hypertrophy', description: 'Build muscle size & raw strength', icon: 'fitness-center' as const, lightColors: ['#fff3ea', '#ffe5cc'] as const, darkColors: ['#1a0f00', '#2a1800'] as const },
@@ -17,8 +19,30 @@ const GOALS = [
 
 export const GoalsScreen = ({ navigation, route }: any) => {
   const [selectedGoal, setSelectedGoal] = useState<string>('');
+  const [saving, setSaving] = useState(false);
   const { isDark, accent } = useTheme();
   const fromSettings = route?.params?.fromSettings === true;
+
+  const handleSave = async () => {
+    if (!selectedGoal) {
+      if (fromSettings) { navigation.goBack(); return; }
+      navigation.navigate('TraineeCommandCenter');
+      return;
+    }
+    setSaving(true);
+    try {
+      await Promise.allSettled([
+        authService.updateProfile({ profile: { goal: selectedGoal } } as any),
+        clientService.updateClientProfile({ goals: { primary: selectedGoal } }),
+      ]);
+    } catch {
+      // non-blocking
+    } finally {
+      setSaving(false);
+      if (fromSettings) navigation.goBack();
+      else navigation.navigate('TraineeCommandCenter');
+    }
+  };
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -80,10 +104,11 @@ export const GoalsScreen = ({ navigation, route }: any) => {
 
       <View style={[tw`p-4`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
         <Button
-          title={fromSettings ? "Save" : "Continue"}
+          title={saving ? 'Saving...' : (fromSettings ? 'Save' : 'Continue')}
           size="lg"
-          onPress={() => fromSettings ? navigation.goBack() : navigation.navigate('TraineeCommandCenter')}
-          icon={<MaterialIcons name={fromSettings ? "check" : "arrow-forward"} size={20} color="white" style={tw`ml-2`} />}
+          disabled={saving}
+          onPress={handleSave}
+          icon={!saving && <MaterialIcons name={fromSettings ? 'check' : 'arrow-forward'} size={20} color="white" style={tw`ml-2`} />}
         />
       </View>
     </SafeAreaView>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,11 +10,15 @@ import { useOffline } from '../../context/OfflineContext';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 import { Button } from '../../components/Button';
+import * as progressService from '../../services/progressService';
+import * as workoutService from '../../services/workoutService';
+import type { WorkoutPlan, WorkoutDay } from '../../services/workoutService';
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('home');
   const [weightInput, setWeightInput] = useState('');
   const [bodyFatInput, setBodyFatInput] = useState('');
+  const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
   const { isDark, accent } = useTheme();
   const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage } = useUser();
   const { totalUnread } = useNotifications();
@@ -23,9 +27,30 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
   // Calculate readiness score based on various factors
   const readinessScore = Math.floor(Math.random() * 40 + 60); // 60-100%
-  const waterIntake = 1.2; // liters
-  const caloriesBurned = 1850;
-  const caloriesTarget = 2400;
+
+  useEffect(() => {
+    loadActivePlan();
+  }, []);
+
+  const loadActivePlan = async () => {
+    try {
+      const { plan } = await workoutService.getActiveWorkoutPlan();
+      if (plan) setActivePlan(plan);
+    } catch {
+      // no active plan
+    }
+  };
+
+  // Get today's workout day from the active plan
+  const todayWorkoutDay = useMemo((): WorkoutDay | null => {
+    if (!activePlan?.weeklySchedule) return null;
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    return (
+      activePlan.weeklySchedule.find(d => d.day?.toLowerCase() === dayName.toLowerCase() && !d.isRestDay) ||
+      activePlan.weeklySchedule.find(d => !d.isRestDay) ||
+      null
+    );
+  }, [activePlan]);
 
   const getReadinessStatus = () => {
     if (readinessScore >= 80) return 'Optimal';
@@ -136,16 +161,24 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                   }]}
                 />
                 <TouchableOpacity
-                  onPress={() => {
+                  onPress={async () => {
                     if (weightInput.trim() || bodyFatInput.trim()) {
-                      if (weightInput.trim()) {
-                        const newWeight = parseFloat(weightInput);
-                        setWeight(newWeight);
+                      const newWeight = weightInput.trim() ? parseFloat(weightInput) : undefined;
+                      const newBodyFat = bodyFatInput.trim() ? parseFloat(bodyFatInput) : undefined;
+
+                      if (newWeight) setWeight(newWeight);
+                      if (newBodyFat) setBodyFatPercentage(newBodyFat);
+
+                      try {
+                        await progressService.addMeasurement({
+                          weight: newWeight,
+                          bodyFat: newBodyFat,
+                          measuredAt: new Date().toISOString(),
+                        });
+                      } catch {
+                        // silently fail — local state already updated
                       }
-                      if (bodyFatInput.trim()) {
-                        const newBodyFat = parseFloat(bodyFatInput);
-                        setBodyFatPercentage(newBodyFat);
-                      }
+
                       setWeightInput('');
                       setBodyFatInput('');
                     }
@@ -349,50 +382,68 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[tw`relative overflow-hidden rounded-2xl shadow-md h-56 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
-            onPress={() => navigation.navigate('Calibration')}
-          >
-            <ImageBackground
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDJ4HA56Mu3dyuNK4f9nB1SFPydEev27AOQn_-ewCXe9iCD5qxMTOfJgpXlQ-1tG5MTrt7NDEdQBU_VUwyL5jUSIvWoXiY6pXRIqBqTcFeVzwkm4pJXTij-TeqZRrPQqmeNFsr3s77CuXyiWBfXzRImn6hYZz5UkQ0_gcReSZy7CsJkJpqyO-yMgt5d10YU6ieEJtQTsH1ft3luYH5QwEfZsh0o4rW7aoCKGrrCJKWhBs2Difj4yw5edzCACz4ncL8qdGmvWjNf8Fs' }}
-              style={tw`w-full h-full justify-end`}
-              imageStyle={tw`opacity-75`}
-            >
-              <View style={tw`absolute inset-0 bg-black/50`} />
-              <View style={tw`p-5 z-10`}>
-                <View style={tw`flex-row items-center gap-2 mb-1`}>
-                  <View style={[tw`px-2 py-0.5 rounded`, { backgroundColor: accent }]}>
-                    <Text style={tw`text-white text-[10px] font-bold uppercase`}>Focus</Text>
+          {todayWorkoutDay ? (
+            <>
+              <TouchableOpacity
+                style={[tw`relative overflow-hidden rounded-2xl shadow-md h-56 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
+                onPress={() => navigation.navigate('Calibration')}
+              >
+                <ImageBackground
+                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDJ4HA56Mu3dyuNK4f9nB1SFPydEev27AOQn_-ewCXe9iCD5qxMTOfJgpXlQ-1tG5MTrt7NDEdQBU_VUwyL5jUSIvWoXiY6pXRIqBqTcFeVzwkm4pJXTij-TeqZRrPQqmeNFsr3s77CuXyiWBfXzRImn6hYZz5UkQ0_gcReSZy7CsJkJpqyO-yMgt5d10YU6ieEJtQTsH1ft3luYH5QwEfZsh0o4rW7aoCKGrrCJKWhBs2Difj4yw5edzCACz4ncL8qdGmvWjNf8Fs' }}
+                  style={tw`w-full h-full justify-end`}
+                  imageStyle={tw`opacity-75`}
+                >
+                  <View style={tw`absolute inset-0 bg-black/50`} />
+                  <View style={tw`p-5 z-10`}>
+                    <View style={tw`flex-row items-center gap-2 mb-1`}>
+                      <View style={[tw`px-2 py-0.5 rounded`, { backgroundColor: accent }]}>
+                        <Text style={tw`text-white text-[10px] font-bold uppercase`}>Focus</Text>
+                      </View>
+                      <Text style={tw`text-slate-300 text-xs`}>{todayWorkoutDay.day} · {todayWorkoutDay.duration || 60} mins</Text>
+                    </View>
+                    <Text style={tw`text-white text-2xl font-bold mb-3`}>{todayWorkoutDay.focus || "Today's Workout"}</Text>
+                    <View style={tw`flex-row items-center justify-between mt-2`}>
+                      <Button title="Start Session" size="sm" onPress={() => navigation.navigate('Calibration')} containerStyle={tw`rounded-xl px-6`} />
+                    </View>
                   </View>
-                  <Text style={tw`text-slate-300 text-xs`}>Leg Day - 75 mins</Text>
-                </View>
-                <Text style={tw`text-white text-2xl font-bold mb-3`}>Hypertrophy: Lower Body</Text>
-                <View style={tw`flex-row items-center justify-between mt-2`}>
-                  <Button title="Start Session" size="sm" onPress={() => navigation.navigate('Calibration')} containerStyle={tw`rounded-xl px-6`} />
-                </View>
-              </View>
-            </ImageBackground>
-          </TouchableOpacity>
-
-          <View style={tw`mt-4 flex-col gap-3`}>
-            {[
-              { name: 'Barbell Squats', sets: '4 sets x 10 reps' },
-              { name: 'Leg Extensions', sets: '3 sets x 15 reps' },
-            ].map((exercise) => (
-              <TouchableOpacity key={exercise.name} onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name, sets: exercise.sets })} style={[tw`flex-row items-center justify-between p-4 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                <View style={tw`flex-row items-center gap-3`}>
-                  <View style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '14' }]}>
-                    <MaterialIcons name="fitness-center" size={24} color={accent} />
-                  </View>
-                  <View>
-                    <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{exercise.name}</Text>
-                    <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>{exercise.sets}</Text>
-                  </View>
-                </View>
-                <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                </ImageBackground>
               </TouchableOpacity>
-            ))}
-          </View>
+
+              <View style={tw`mt-4 flex-col gap-3`}>
+                {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
+                    style={[tw`flex-row items-center justify-between p-4 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                  >
+                    <View style={tw`flex-row items-center gap-3`}>
+                      <View style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '14' }]}>
+                        <MaterialIcons name="fitness-center" size={24} color={accent} />
+                      </View>
+                      <View>
+                        <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{exercise.name}</Text>
+                        <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>{exercise.sets} sets × {exercise.reps} reps</Text>
+                      </View>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          ) : (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('WorkoutGeneration')}
+              style={[tw`rounded-2xl p-6 items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+            >
+              <MaterialIcons name="auto-awesome" size={40} color={accent} />
+              <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>No Workout Plan Yet</Text>
+              <Text style={[tw`text-sm text-center`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Generate your personalized AI workout plan</Text>
+              <View style={[tw`flex-row items-center justify-center gap-2 py-3 px-6 rounded-xl mt-1`, { backgroundColor: accent + '14' }]}>
+                <MaterialIcons name="arrow-forward" size={16} color={accent} />
+                <Text style={[tw`text-sm font-bold`, { color: accent }]}>Generate Plan</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
         ) : (
         <TouchableOpacity

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import * as coachService from '../../services/coachService';
 
 interface Meal {
   id: string;
@@ -33,8 +34,9 @@ const MOCK_FOOD_SUGGESTIONS = [
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export const CoachMealPlanScreen = ({ navigation, route }: any) => {
-  const { clientName } = route?.params ?? {};
+  const { clientId, clientName } = route?.params ?? {};
   const { isDark, accent } = useTheme();
+  const [isSaving, setIsSaving] = useState(false);
 
   const [planName, setPlanName] = useState('');
   const [calorieTarget, setCalorieTarget] = useState('2000');
@@ -72,14 +74,46 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     setShowFoodPicker(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!planName.trim()) {
       Alert.alert('Missing Info', 'Please enter a plan name.');
       return;
     }
-    Alert.alert('Plan Saved', `Meal plan "${planName}" has been ${clientName ? `assigned to ${clientName}` : 'saved as template'}.`, [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+    setIsSaving(true);
+    try {
+      const weeklyMealPlan = DAYS.map(day => ({
+        day,
+        meals: (dayPlans[day] || []).flatMap(group =>
+          group.items.map(item => ({
+            type: group.type.toLowerCase() as any,
+            name: item.name,
+            description: item.name,
+            ingredients: [item.name],
+            nutrition: { calories: item.calories, protein: item.protein, carbs: item.carbs, fats: item.fat },
+            preparationTime: 15,
+          }))
+        ),
+      }));
+      const planData = {
+        planName,
+        dailyCalorieTarget: parseInt(calorieTarget, 10) || 2000,
+        weeklyMealPlan,
+      };
+      if (clientId) {
+        await coachService.assignDietToClient(Number(clientId), planData);
+        Alert.alert('Plan Assigned', `Meal plan "${planName}" has been assigned to ${clientName}.`, [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        Alert.alert('Plan Saved', `Meal plan "${planName}" has been saved as a template.`, [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to save the plan. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -92,8 +126,8 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>Meal Plan Builder</Text>
           {clientName && <Text style={[tw`text-xs`, { color: subtextColor }]}>for {clientName}</Text>}
         </View>
-        <TouchableOpacity onPress={handleSave} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: accent }]}>
-          <Text style={tw`text-sm text-white font-bold`}>Save</Text>
+        <TouchableOpacity onPress={handleSave} disabled={isSaving} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: isSaving ? accent + '80' : accent }]}>
+          <Text style={tw`text-sm text-white font-bold`}>{isSaving ? '...' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
 

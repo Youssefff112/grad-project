@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useUser } from '../../context/UserContext';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { Button } from '../../components/Button';
+import * as workoutService from '../../services/workoutService';
 
 interface GeneratedWorkout {
   id: string;
@@ -34,11 +35,35 @@ interface GeneratedWorkout {
   approvedBy?: string;
 }
 
+const mapExperienceToDifficulty = (level?: string): 'Easy' | 'Moderate' | 'Hard' => {
+  if (level === 'beginner') return 'Easy';
+  if (level === 'advanced') return 'Hard';
+  return 'Moderate';
+};
+
+const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => {
+  const workoutDays = plan.weeklySchedule?.filter(d => !d.isRestDay) || [];
+  return workoutDays.map(day => ({
+    id: `${plan.id}-${day.day}`,
+    name: `${day.day}: ${day.focus || 'Workout'}`,
+    duration: day.duration || 60,
+    difficulty: mapExperienceToDifficulty(plan.experienceLevel),
+    focus: day.focus || 'Full Body',
+    exercises: (day.exercises || []).map(e => ({
+      name: e.name,
+      sets: e.sets,
+      reps: e.reps,
+      rest: e.restTime,
+    })),
+    notes: `${workoutDays.length} workout days per week · Goal: ${plan.goal || 'Fitness'}`,
+    status: 'approved' as const,
+  }));
+};
+
 export const WorkoutGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, experienceLevel } = useUser();
 
-  // Check if user has access to AI workout generation
   if (!hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration')) {
     return (
       <FeatureLocked
@@ -53,65 +78,62 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
   }
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [availableWorkouts, setAvailableWorkouts] = useState<GeneratedWorkout[]>([]);
 
-  // Mock data for workout generation
-  const mockWorkouts: GeneratedWorkout[] = [
-    {
-      id: '1',
-      name: 'Upper Body Strength',
-      duration: 60,
-      difficulty: 'Hard',
-      focus: 'Chest & Back',
-      exercises: [
-        { name: 'Barbell Bench Press', sets: 4, reps: '6-8', rest: 180 },
-        { name: 'Barbell Rows', sets: 4, reps: '6-8', rest: 180 },
-        { name: 'Incline Dumbbell Press', sets: 3, reps: '8-10', rest: 120 },
-        { name: 'Lat Pulldowns', sets: 3, reps: '8-10', rest: 120 },
-      ],
-      notes: 'Focus on form. Maintain a controlled tempo.',
-      status: 'pending',
-    },
-    {
-      id: '2',
-      name: 'Core & Stability',
-      duration: 45,
-      difficulty: 'Moderate',
-      focus: 'Abs & Stabilizers',
-      exercises: [
-        { name: 'Ab Wheel Rollouts', sets: 3, reps: '10-12', rest: 90 },
-        { name: 'Pallof Press', sets: 3, reps: '12 each side', rest: 90 },
-        { name: 'Dead Bugs', sets: 3, reps: '15', rest: 60 },
-        { name: 'Hollow Body Holds', sets: 3, reps: '30-45s', rest: 60 },
-      ],
-      notes: 'Great for baseline fitness. Build from here.',
-      status: 'pending',
-    },
-  ];
+  useEffect(() => {
+    loadActivePlan();
+  }, []);
+
+  const loadActivePlan = async () => {
+    setIsLoadingPlan(true);
+    try {
+      const { plan } = await workoutService.getActiveWorkoutPlan();
+      if (plan) {
+        setAvailableWorkouts(planToWorkout(plan));
+      }
+    } catch {
+      // no active plan yet
+    } finally {
+      setIsLoadingPlan(false);
+    }
+  };
 
   const handleGenerateWorkout = async () => {
     setIsGenerating(true);
-    // Simulate API call
-    setTimeout(() => {
-      const randomWorkout = mockWorkouts[Math.floor(Math.random() * mockWorkouts.length)];
-      const workoutWithStatus: GeneratedWorkout = {
-        ...randomWorkout,
-        status: userMode === 'CoachAssisted' ? 'pending' : 'pending',
-      };
-      setGeneratedWorkout(workoutWithStatus);
+    try {
+      const { plan } = await workoutService.generateWorkoutPlan();
+      if (plan) {
+        const workouts = planToWorkout(plan);
+        const first = workouts[0];
+        if (first) {
+          setGeneratedWorkout({ ...first, status: 'pending' });
+          setShowPreview(true);
+          setAvailableWorkouts(workouts);
+        } else {
+          throw new Error('Plan has no workout days');
+        }
+      } else {
+        throw new Error('No plan returned');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Generation Failed',
+        error?.message || 'Unable to generate workout plan. Make sure your profile is complete and you have an active subscription.',
+        [{ text: 'OK' }]
+      );
+    } finally {
       setIsGenerating(false);
-      setShowPreview(true);
-    }, 2000);
+    }
   };
 
   const handleApproveWorkout = () => {
     if (!generatedWorkout) return;
-
-    Alert.alert('Success', 'Workout has been added to your routine!', [
+    Alert.alert('Workout Plan Saved!', 'Your workout plan has been added to your routine.', [
       {
-        text: 'View Workout',
+        text: 'View Workouts',
         onPress: () => {
           setShowPreview(false);
           setGeneratedWorkout(null);
@@ -123,6 +145,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         onPress: () => {
           setShowPreview(false);
           setGeneratedWorkout(null);
+          handleGenerateWorkout();
         },
       },
     ]);
@@ -130,15 +153,11 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
 
   const handleSubmitForApproval = () => {
     if (!generatedWorkout) return;
-
     Alert.alert(
       'Submit for Coach Review',
       `Your workout will be reviewed by ${coachName || 'your coach'} within 24 hours.`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Submit',
           onPress: () => {
@@ -153,14 +172,10 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'Easy':
-        return '#10b981';
-      case 'Moderate':
-        return '#f59e0b';
-      case 'Hard':
-        return '#ef4444';
-      default:
-        return accent;
+      case 'Easy': return '#10b981';
+      case 'Moderate': return '#f59e0b';
+      case 'Hard': return '#ef4444';
+      default: return accent;
     }
   };
 
@@ -217,7 +232,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
               Create New Workout
             </Text>
 
-            {/* Options */}
             <View style={tw`gap-3 mb-6`}>
               <TouchableOpacity
                 disabled={isGenerating}
@@ -232,14 +246,14 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                     Generate Auto
                   </Text>
                   <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                    Let AI create a workout for you
+                    Let AI create a workout plan for you
                   </Text>
                 </View>
                 {isGenerating && <ActivityIndicator color={accent} />}
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => Alert.alert('Build Custom Workout', 'Exercise library builder coming soon! For now, use Generate Auto and modify the workout as needed.', [{ text: 'OK' }])}
+                onPress={() => navigation.navigate('WorkoutBuilder')}
                 style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
               >
                 <View style={[tw`p-3 rounded-lg`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
@@ -256,7 +270,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Quick Tips */}
             <View style={[tw`rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
               <Text style={[tw`font-bold text-sm mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                 💡 Quick Tips
@@ -266,21 +279,21 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   • {userMode === 'CoachAssisted' ? 'Your coach customizes workouts' : 'AI learns from your preferences'}
                 </Text>
                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  • You can swap exercises after generation
+                  • Generating a new plan replaces your current one
                 </Text>
                 <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  • All changes reflect instantly in your routine
+                  • All changes are saved to your profile automatically
                 </Text>
               </View>
             </View>
           </View>
         )}
 
-        {/* Recent Generated Workouts */}
-        {availableWorkouts.length > 0 && (
+        {/* Active Workout Plan Days */}
+        {!isLoadingPlan && availableWorkouts.length > 0 && (
           <View style={tw`mt-8`}>
             <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              Recently Generated
+              Your Current Plan
             </Text>
             {availableWorkouts.map((workout) => (
               <TouchableOpacity
@@ -317,6 +330,13 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
             ))}
           </View>
         )}
+
+        {isLoadingPlan && (
+          <View style={tw`items-center py-6`}>
+            <ActivityIndicator color={accent} />
+            <Text style={[tw`text-xs mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Loading your plan...</Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Workout Preview Modal */}
@@ -335,7 +355,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
           <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
             {generatedWorkout && (
               <>
-                {/* Header */}
                 <View>
                   <View style={tw`flex-row items-start justify-between mb-3`}>
                     <View style={tw`flex-1`}>
@@ -369,7 +388,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   </View>
                 </View>
 
-                {/* Notes */}
                 {generatedWorkout.notes && (
                   <View style={[tw`rounded-xl p-4`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
                     <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
@@ -378,7 +396,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   </View>
                 )}
 
-                {/* Exercises */}
                 <View>
                   <Text style={[tw`text-lg font-bold mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                     Exercises
@@ -390,9 +407,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                           <Text style={[tw`font-bold text-sm flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                             {idx + 1}. {exercise.name}
                           </Text>
-                          <TouchableOpacity style={[tw`px-2 py-1 rounded`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
-                            <MaterialIcons name="edit" size={14} color={accent} />
-                          </TouchableOpacity>
                         </View>
                         <View style={tw`flex-row gap-4 text-xs`}>
                           <Text style={[tw`text-xs`, { color: isDark ? '#cbd5e1' : '#475569' }]}>

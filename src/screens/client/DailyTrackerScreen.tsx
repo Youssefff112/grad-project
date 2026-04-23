@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,10 @@ import { useNotifications } from '../../context/NotificationContext';
 import { useFoodManagement } from '../../context/FoodManagementContext';
 import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 import * as offlineService from '../../services/offlineService';
+import * as dietService from '../../services/dietService';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 
-const DAILY_TARGETS = {
+const DEFAULT_TARGETS = {
   calories: 2400,
   protein: 160,
   carbs: 220,
@@ -38,6 +39,10 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({});
   const [waterGlasses, setWaterGlasses] = useState(0);
   const [completedWorkoutMinutes, setCompletedWorkoutMinutes] = useState(0);
+  const [activeDietPlan, setActiveDietPlan] = useState<dietService.DietPlan | null>(null);
+  const [dailyTargets, setDailyTargets] = useState(DEFAULT_TARGETS);
+  // Ref to debounce diet log saves
+  const dietLogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -48,31 +53,81 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
 
   const firstName = fullName ? fullName.split(' ')[0] : 'Champ';
 
-  // Load cached data on mount
+  // Load cached data and active diet plan on mount
   useEffect(() => {
-    const loadCachedData = async () => {
+    const loadData = async () => {
       const today = new Date().toISOString().split('T')[0];
-
       const cachedMeals = await offlineService.getCachedMealLog(today);
       if (cachedMeals) {
         setCheckedMeals(cachedMeals.checkedMeals);
         setWaterGlasses(cachedMeals.waterGlasses);
       }
+
+      try {
+        const { plan } = await dietService.getActiveDietPlan();
+        if (plan) {
+          setActiveDietPlan(plan);
+          setDailyTargets({
+            calories: plan.dailyCalorieTarget || DEFAULT_TARGETS.calories,
+            protein: plan.macronutrients?.protein || DEFAULT_TARGETS.protein,
+            carbs: plan.macronutrients?.carbs || DEFAULT_TARGETS.carbs,
+            fats: plan.macronutrients?.fats || DEFAULT_TARGETS.fats,
+            water: DEFAULT_TARGETS.water,
+            workoutMinutes: DEFAULT_TARGETS.workoutMinutes,
+          });
+        }
+      } catch {
+        // use default targets
+      }
     };
-    loadCachedData();
+    loadData();
   }, []);
 
-  // Cache data whenever it changes
+  // Cache data and save to backend whenever it changes
   useEffect(() => {
-    const cacheData = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      await offlineService.cacheMealLog(today, {
-        checkedMeals,
-        waterGlasses,
-        date: today,
-      });
-    };
-    cacheData();
+    const today = new Date().toISOString().split('T')[0];
+
+    // Always save to local cache
+    offlineService.cacheMealLog(today, { checkedMeals, waterGlasses, date: today });
+
+    // Debounce backend save
+    if (dietLogTimer.current) clearTimeout(dietLogTimer.current);
+    dietLogTimer.current = setTimeout(async () => {
+      if (!activeDietPlan) return;
+      try {
+        const consumed = Object.keys(checkedMeals).reduce(
+          (acc, id) => {
+            if (!checkedMeals[id]) return acc;
+            const meal = meals.find((m: any) => m.id === id);
+            if (meal) {
+              acc.calories += meal.totalCalories || 0;
+              acc.protein += meal.totalMacros?.protein || 0;
+              acc.carbs += meal.totalMacros?.carbs || 0;
+              acc.fats += meal.totalMacros?.fats || 0;
+            }
+            return acc;
+          },
+          { calories: 0, protein: 0, carbs: 0, fats: 0 }
+        );
+
+        const completedCount = Object.values(checkedMeals).filter(Boolean).length;
+        const totalMeals = meals.length;
+        const status: 'full' | 'partial' | 'missed' =
+          completedCount === 0 ? 'missed' :
+          completedCount >= totalMeals ? 'full' : 'partial';
+
+        await dietService.logDietDay({
+          date: today,
+          mealsCompleted: checkedMeals,
+          caloriesConsumed: consumed.calories,
+          macrosConsumed: { protein: consumed.protein, carbs: consumed.carbs, fats: consumed.fats },
+          status,
+          dietPlanId: activeDietPlan.id,
+        });
+      } catch {
+        // silently fail — local cache is the source of truth while offline
+      }
+    }, 2000);
   }, [checkedMeals, waterGlasses]);
 
   // Calculate consumed macros from checked custom meals
@@ -95,12 +150,12 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
   }, [meals, checkedMeals]);
 
   // Progress calculations
-  const calorieProgress = Math.min(consumedMacros.calories / DAILY_TARGETS.calories, 1);
-  const proteinProgress = Math.min(consumedMacros.protein / DAILY_TARGETS.protein, 1);
-  const carbsProgress = Math.min(consumedMacros.carbs / DAILY_TARGETS.carbs, 1);
-  const fatsProgress = Math.min(consumedMacros.fats / DAILY_TARGETS.fats, 1);
-  const waterProgress = Math.min(waterGlasses / DAILY_TARGETS.water, 1);
-  const workoutProgress = Math.min(completedWorkoutMinutes / DAILY_TARGETS.workoutMinutes, 1);
+  const calorieProgress = Math.min(consumedMacros.calories / dailyTargets.calories, 1);
+  const proteinProgress = Math.min(consumedMacros.protein / dailyTargets.protein, 1);
+  const carbsProgress = Math.min(consumedMacros.carbs / dailyTargets.carbs, 1);
+  const fatsProgress = Math.min(consumedMacros.fats / dailyTargets.fats, 1);
+  const waterProgress = Math.min(waterGlasses / dailyTargets.water, 1);
+  const workoutProgress = Math.min(completedWorkoutMinutes / dailyTargets.workoutMinutes, 1);
 
   // Ring calculations
   const ringSize = 120;
@@ -113,7 +168,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
     {
       label: 'Protein',
       current: consumedMacros.protein,
-      target: DAILY_TARGETS.protein,
+      target: dailyTargets.protein,
       unit: 'g',
       color: '#4ade80',
       icon: 'restaurant',
@@ -121,7 +176,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
     {
       label: 'Carbs',
       current: consumedMacros.carbs,
-      target: DAILY_TARGETS.carbs,
+      target: dailyTargets.carbs,
       unit: 'g',
       color: '#facc15',
       icon: 'grain',
@@ -129,7 +184,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
     {
       label: 'Fats',
       current: consumedMacros.fats,
-      target: DAILY_TARGETS.fats,
+      target: dailyTargets.fats,
       unit: 'g',
       color: '#f87171',
       icon: 'opacity',
@@ -137,7 +192,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
     {
       label: 'Water',
       current: waterGlasses,
-      target: DAILY_TARGETS.water,
+      target: dailyTargets.water,
       unit: 'glasses',
       color: '#38bdf8',
       icon: 'water-drop',
@@ -225,7 +280,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
             <View style={tw`flex-1 ml-5 gap-2`}>
               {[
                 { label: 'Consumed', value: `${Math.round(consumedMacros.calories)}`, icon: 'local-fire-department' },
-                { label: 'Remaining', value: `${Math.max(DAILY_TARGETS.calories - consumedMacros.calories, 0)}`, icon: 'flag' },
+                { label: 'Remaining', value: `${Math.max(dailyTargets.calories - consumedMacros.calories, 0)}`, icon: 'flag' },
                 { label: 'Meals', value: `${mealCount}/${(meals || []).length}`, icon: 'restaurant' },
               ].map((stat) => (
                 <View key={stat.label} style={tw`flex-row items-center gap-2`}>

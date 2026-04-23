@@ -1,21 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
-
-const MOCK_REVIEWS = [
-  { id: 1, rating: 5, comment: 'Alex is an incredible coach. My transformation exceeded all expectations. Highly recommend!', authorName: 'Maria G.', createdAt: '2026-04-10T00:00:00Z', isAnonymous: false },
-  { id: 2, rating: 5, comment: 'Best investment I made for my health. Lost 12kg in 3 months with his personalized plan.', authorName: 'James W.', createdAt: '2026-03-22T00:00:00Z', isAnonymous: false },
-  { id: 3, rating: 4, comment: 'Great communication and very knowledgeable. Plans are well-structured and easy to follow.', authorName: 'Anonymous', createdAt: '2026-03-10T00:00:00Z', isAnonymous: true },
-  { id: 4, rating: 5, comment: 'Completely changed my relationship with fitness. Patient, professional, and results-driven.', authorName: 'Sarah C.', createdAt: '2026-02-18T00:00:00Z', isAnonymous: false },
-  { id: 5, rating: 4, comment: 'Solid coach. Very responsive and always adjusts the program based on feedback.', authorName: 'Mike T.', createdAt: '2026-01-30T00:00:00Z', isAnonymous: false },
-];
-
-const distribution: Record<number, number> = { 5: 3, 4: 2, 3: 0, 2: 0, 1: 0 };
-const total = MOCK_REVIEWS.length;
-const average = MOCK_REVIEWS.reduce((s, r) => s + r.rating, 0) / total;
+import { useUser } from '../../context/UserContext';
+import * as coachService from '../../services/coachService';
 
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr);
@@ -24,6 +14,31 @@ const formatDate = (dateStr: string) => {
 
 export const CoachReviewManagementScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const { coachId } = useUser() as any;
+  const [reviews, setReviews] = useState<coachService.Review[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        if (coachId) {
+          const { reviews: data } = await coachService.getCoachReviews(coachId);
+          setReviews(data);
+        }
+      } catch {
+        // keep empty
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [coachId]);
+
+  const total = reviews.length;
+  const average = total ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0;
+  const distribution: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  reviews.forEach((r) => { distribution[r.rating] = (distribution[r.rating] || 0) + 1; });
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -39,12 +54,17 @@ export const CoachReviewManagementScreen = ({ navigation }: any) => {
         <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>Reviews</Text>
       </View>
 
+      {loading ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <ActivityIndicator size="large" color={accent} />
+        </View>
+      ) : (
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
         {/* Summary */}
         <View style={[tw`p-6 rounded-2xl mb-6`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
           <View style={tw`flex-row items-center gap-6`}>
             <View style={tw`items-center`}>
-              <Text style={[tw`text-5xl font-black`, { color: accent }]}>{average.toFixed(1)}</Text>
+              <Text style={[tw`text-5xl font-black`, { color: accent }]}>{total ? average.toFixed(1) : '—'}</Text>
               <View style={tw`flex-row gap-0.5 mt-1`}>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <MaterialIcons
@@ -78,7 +98,13 @@ export const CoachReviewManagementScreen = ({ navigation }: any) => {
 
         {/* Reviews list */}
         <Text style={[tw`text-sm font-bold mb-3`, { color: textPrimary }]}>All Reviews</Text>
-        {MOCK_REVIEWS.map(review => (
+        {reviews.length === 0 && (
+          <View style={[tw`p-8 rounded-xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
+            <MaterialIcons name="star-outline" size={36} color={isDark ? '#334155' : '#cbd5e1'} />
+            <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No reviews yet</Text>
+          </View>
+        )}
+        {reviews.map(review => (
           <View key={review.id} style={[tw`p-4 rounded-xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
             <View style={tw`flex-row items-center justify-between mb-2`}>
               <View style={tw`flex-row items-center gap-0.5`}>
@@ -95,6 +121,7 @@ export const CoachReviewManagementScreen = ({ navigation }: any) => {
           </View>
         ))}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
