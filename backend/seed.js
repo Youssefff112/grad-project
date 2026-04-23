@@ -16,6 +16,9 @@ import { connectDB } from './DB/connection.js';
 import { User } from './SRC/Modules/User/user.model.js';
 import { CoachProfile } from './SRC/Modules/Coach/coach.model.js';
 import { ClientProfile } from './SRC/Modules/Client/client.model.js';
+import { Subscription } from './SRC/Modules/Subscription/subscription.model.js';
+
+const ONE_YEAR = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
 const SEED_USERS = [
   // ── Clients ──────────────────────────────────────────
@@ -27,6 +30,7 @@ const SEED_USERS = [
     role: 'client',
     userType: 'onsite',
     profile: { goal: 'fatloss', experienceLevel: 'beginner' },
+    subscription: { role: 'client', planName: 'Free', price: 0 },
   },
   {
     firstName: 'Sam',
@@ -36,6 +40,7 @@ const SEED_USERS = [
     role: 'client',
     userType: 'onsite',
     profile: { goal: 'hypertrophy', experienceLevel: 'intermediate' },
+    subscription: { role: 'client', planName: 'Standard', price: 9.99 },
   },
   {
     firstName: 'Petra',
@@ -50,6 +55,7 @@ const SEED_USERS = [
       canUseAIAssistant: true,
       canUseComputerVision: true,
     },
+    subscription: { role: 'client', planName: 'Premium', price: 29.99 },
   },
   {
     firstName: 'Elite',
@@ -64,6 +70,7 @@ const SEED_USERS = [
       canUseAIAssistant: true,
       canUseComputerVision: true,
     },
+    subscription: { role: 'client', planName: 'Elite', price: 49.99 },
   },
 
   // ── Coach ─────────────────────────────────────────────
@@ -75,6 +82,7 @@ const SEED_USERS = [
     role: 'coach',
     userType: 'onsite',
     profile: { experienceLevel: 'advanced' },
+    subscription: { role: 'coach', planName: 'ProCoach', price: 19.99 },
   },
 
   // ── Admin ─────────────────────────────────────────────
@@ -86,8 +94,29 @@ const SEED_USERS = [
     role: 'admin',
     userType: 'onsite',
     profile: {},
+    subscription: null, // admins don't need a subscription
   },
 ];
+
+async function ensureSubscription(user, subData) {
+  if (!subData) return;
+  const existing = await Subscription.findOne({
+    where: { userId: user.id, role: subData.role, status: 'active' },
+  });
+  if (!existing) {
+    await Subscription.create({
+      userId: user.id,
+      role: subData.role,
+      planName: subData.planName,
+      price: subData.price,
+      currency: 'USD',
+      status: 'active',
+      autoRenew: true,
+      startDate: new Date(),
+      endDate: ONE_YEAR,
+    });
+  }
+}
 
 async function ensureProfile(user, userData) {
   if (user.role === 'coach') {
@@ -126,8 +155,9 @@ async function seed() {
       });
 
       if (existing) {
-        // Still ensure their profile row exists (handles partial-seed failures)
+        // Still ensure their profile and subscription rows exist (handles partial-seed failures)
         await ensureProfile(existing, userData);
+        await ensureSubscription(existing, userData.subscription);
         console.log(`  ✓ Already exists  [${existing.role.padEnd(6)}]  ${userData.email}`);
         continue;
       }
@@ -135,8 +165,9 @@ async function seed() {
       // Create user (beforeCreate hook hashes the password automatically)
       const user = await User.create(userData);
 
-      // Create associated profile rows
+      // Create associated profile and subscription rows
       await ensureProfile(user, userData);
+      await ensureSubscription(user, userData.subscription);
 
       console.log(`  ✅ Created         [${user.role.padEnd(6)}]  ${user.email}`);
     } catch (err) {

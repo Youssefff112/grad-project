@@ -24,12 +24,7 @@ export const dietService = {
 
   async getActiveDietPlan(userId) {
     const plan = await DietPlan.findOne({ where: { userId, isActive: true } });
-
-    if (!plan) {
-      throw new AppError('No active diet plan found. Please generate a new plan.', 404);
-    }
-
-    return plan;
+    return plan || null; // null = no plan yet, not an error
   },
 
   async logDietDay(userId, data) {

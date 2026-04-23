@@ -157,11 +157,32 @@ export const SignInScreen = ({ navigation }: any) => {
                 {MOCK_USERS.map((user) => (
                   <TouchableOpacity
                     key={user.id}
-                    onPress={() => {
+                    onPress={async () => {
                       setEmail(user.email);
                       setPassword(user.password);
-                      // Auto-login for offline/demo mode
-                      setTimeout(() => {
+                      setIsLoading(true);
+                      try {
+                        // Real login so the device gets a JWT for all protected endpoints
+                        const response = await authService.login({ email: user.email, password: user.password });
+                        if (response.success && response.data?.user && response.data?.token) {
+                          const u = response.data.user;
+                          const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
+                          await setAuthTokens(response.data.token, response.data.refreshToken);
+                          setFullName(fullName);
+                          saveEmail(u.email);
+                          setRole(u.role as any);
+                          if (u.role === 'admin') {
+                            navigation.navigate('AdminDashboard');
+                          } else if (u.role === 'coach') {
+                            setSubscriptionPlan('ProCoach');
+                            navigation.navigate('CoachCommandCenter');
+                          } else {
+                            setSubscriptionPlan(user.subscriptionPlan);
+                            navigation.navigate('TraineeCommandCenter');
+                          }
+                        }
+                      } catch {
+                        // Backend unavailable — fall back to local navigation without token
                         setFullName(user.fullName);
                         saveEmail(user.email);
                         setRole(user.role as any);
@@ -174,7 +195,9 @@ export const SignInScreen = ({ navigation }: any) => {
                           setSubscriptionPlan(user.subscriptionPlan);
                           navigation.navigate('TraineeCommandCenter');
                         }
-                      }, 100);
+                      } finally {
+                        setIsLoading(false);
+                      }
                     }}
                     style={[tw`px-4 py-2 rounded-lg border`, {
                       backgroundColor: user.role === 'admin' ? '#ef444420' : accent + '0a',
