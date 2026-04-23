@@ -32,8 +32,10 @@ export const connectDB = async () => {
     await import('../SRC/Modules/Messaging/messaging.model.js');
 
     await sequelize.authenticate();
-    // alter: true adds missing columns/indexes without dropping existing data
-    await sequelize.sync({ alter: true });
+    // alter.drop:false adds missing columns/indexes but never drops
+    // existing constraints — prevents "Unknown constraint" errors on
+    // tables whose FK names differ between Sequelize and the live DB.
+    await sequelize.sync({ alter: { drop: false } });
 
     console.log('✅ PostgreSQL Connected');
     return sequelize;

@@ -87,7 +87,7 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
         </View>
 
         {/* Features */}
-        <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>What's included</Text>
+        <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>{"What's included"}</Text>
         <View style={[tw`rounded-2xl overflow-hidden mb-6`, { borderWidth: 1, borderColor: borderColor }]}>
           {COACH_FEATURES.map((f, i) => (
             <View
@@ -134,7 +134,7 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
           icon={!isLoading && <MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
         />
         <Text style={[tw`text-xs text-center`, { color: subtextColor }]}>
-          By continuing you agree to our Terms of Service. You won't be charged until your trial ends.
+          {"By continuing you agree to our Terms of Service. You won't be charged until your trial ends."}
         </Text>
       </View>
     </SafeAreaView>

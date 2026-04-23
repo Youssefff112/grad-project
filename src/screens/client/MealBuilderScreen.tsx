@@ -292,7 +292,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
               </View>
             ) : (
               <Text style={[tw`text-sm text-center py-4`, { color: textSecondary }]}>
-                No foods added yet. Tap "+ Add" to get started.
+                {'No foods added yet. Tap "+ Add" to get started.'}
               </Text>
             )}
           </View>

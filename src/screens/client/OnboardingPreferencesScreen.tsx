@@ -93,7 +93,7 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
         {/* Experience Level */}
         <View style={tw`mb-8`}>
           <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-            What's Your Experience Level?
+            {"What's Your Experience Level?"}
           </Text>
           <View style={tw`gap-3`}>
             {experienceLevels.map((option) => (

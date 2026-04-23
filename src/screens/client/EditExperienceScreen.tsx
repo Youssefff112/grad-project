@@ -39,7 +39,7 @@ export const EditExperienceScreen = ({ navigation }: any) => {
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-8`}>
         <Text style={[tw`text-2xl font-bold mb-2`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-          What's your fitness level?
+          {"What's your fitness level?"}
         </Text>
         <Text style={[tw`text-sm mb-6`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
           This helps personalize your training plans

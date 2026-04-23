@@ -221,7 +221,7 @@ export const MealsScreen = ({ navigation }: any) => {
             Meal Planner
           </Text>
           <Text style={[tw`text-2xl font-black mt-1`, { color: textPrimary }]}>
-            Hey {firstName}, let's fuel up!
+            {"Hey "}{firstName}{", let's fuel up!"}
           </Text>
           {planLoading ? (
             <ActivityIndicator size="small" color={accent} style={tw`mt-1 self-start`} />
@@ -406,7 +406,7 @@ export const MealsScreen = ({ navigation }: any) => {
         {/* Meal Cards */}
         <View style={tw`px-5 mt-6`}>
           <Text style={[tw`text-lg font-black mb-3`, { color: textPrimary }]}>
-            Today's Meals
+            {"Today's Meals"}
           </Text>
 
           {mealsToDisplay.map((meal) => {

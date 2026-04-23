@@ -196,7 +196,7 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
             ) : (
               <TouchableOpacity onPress={handleResendCode}>
                 <Text style={[tw`text-sm font-bold`, { color: accent }]}>
-                  Didn't receive code? Resend
+                  {"Didn't receive code? Resend"}
                 </Text>
               </TouchableOpacity>
             )}
@@ -207,7 +207,7 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
             <View style={tw`flex-row gap-3`}>
               <MaterialIcons name="info" size={18} color={accent} style={tw`mt-0.5`} />
               <Text style={[tw`text-sm flex-1 leading-5`, { color: subtextColor }]}>
-                The code expires in 15 minutes. Check your spam folder if you haven't received it.
+                {"The code expires in 15 minutes. Check your spam folder if you haven't received it."}
               </Text>
             </View>
           </Card>

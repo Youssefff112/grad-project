@@ -70,6 +70,19 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, dietPreferences } = useUser();
 
+  // All hooks must be declared before any conditional return
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
+  const [generatedMeal, setGeneratedMeal] = useState<GeneratedMealPlan | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [availableMeals, setAvailableMeals] = useState<GeneratedMealPlan[]>([]);
+
+  useEffect(() => {
+    if (hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
+      loadActivePlan();
+    }
+  }, [subscriptionPlan]);
+
   if (!hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
     return (
       <FeatureLocked
@@ -82,16 +95,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
       />
     );
   }
-
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
-  const [generatedMeal, setGeneratedMeal] = useState<GeneratedMealPlan | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [availableMeals, setAvailableMeals] = useState<GeneratedMealPlan[]>([]);
-
-  useEffect(() => {
-    loadActivePlan();
-  }, []);
 
   const loadActivePlan = async () => {
     setIsLoadingPlan(true);

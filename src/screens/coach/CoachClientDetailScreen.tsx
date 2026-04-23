@@ -214,7 +214,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                     )}
                   </View>
                   {checkin.notes && (
-                    <Text style={[tw`text-xs leading-relaxed`, { color: subtextColor }]}>"{checkin.notes}"</Text>
+                    <Text style={[tw`text-xs leading-relaxed`, { color: subtextColor }]}>{'"'}{checkin.notes}{'"'}</Text>
                   )}
                 </View>
               ))}
