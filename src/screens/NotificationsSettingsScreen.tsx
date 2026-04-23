@@ -51,7 +51,7 @@ export const NotificationsSettingsScreen = ({ navigation }: any) => {
               Smart Notifications
             </Text>
             <Text style={[tw`text-xs mt-1`, { color: '#94a3b8' }]}>
-              We'll notify you at optimal times based on your activity
+              {"We'll notify you at optimal times based on your activity"}
             </Text>
           </View>
         </View>

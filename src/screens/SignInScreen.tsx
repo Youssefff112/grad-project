@@ -287,7 +287,7 @@ export const SignInScreen = ({ navigation }: any) => {
         />
         <TouchableOpacity style={tw`items-center py-2`} onPress={() => navigation.navigate('AccountCreation')} disabled={isLoading}>
           <Text style={[tw`text-sm`, { color: subtextColor }]}>
-            Don't have an account?{' '}
+            {"Don't have an account? "}
             <Text style={[tw`font-bold`, { color: accent }]}>Create One</Text>
           </Text>
         </TouchableOpacity>

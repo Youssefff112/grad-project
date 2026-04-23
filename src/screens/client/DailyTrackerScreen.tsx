@@ -215,7 +215,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
             Daily Tracker
           </Text>
           <Text style={[tw`text-2xl font-black mt-1`, { color: textPrimary }]}>
-            {firstName}, let's crush today!
+            {firstName}{", let's crush today!"}
           </Text>
           <Text style={[tw`text-sm mt-1`, { color: textSecondary }]}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}

@@ -302,7 +302,7 @@ export const WorkoutBuilderScreen = ({ navigation, route }: any) => {
               </View>
             ) : (
               <Text style={[tw`text-sm text-center py-4`, { color: textSecondary }]}>
-                No exercises added yet. Tap "+ Add" to get started.
+                {'No exercises added yet. Tap "+ Add" to get started.'}
               </Text>
             )}
           </View>

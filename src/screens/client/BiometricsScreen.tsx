@@ -68,7 +68,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
             Core Biometrics
           </Text>
           <Text style={[tw`text-base leading-relaxed`, { color: subtextColor }]}>
-            Let's get to know you better to personalize your Vertex experience. Accurate data ensures better performance tracking.
+            {"Let's get to know you better to personalize your Vertex experience. Accurate data ensures better performance tracking."}
           </Text>
         </View>
 

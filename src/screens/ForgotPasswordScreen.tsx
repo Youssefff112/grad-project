@@ -81,7 +81,7 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
             Reset Password
           </Text>
           <Text style={[tw`text-base leading-relaxed`, { color: subtextColor }]}>
-            Enter your email address and we'll send you a verification code to reset your password.
+            {"Enter your email address and we'll send you a verification code to reset your password."}
           </Text>
         </View>
 
