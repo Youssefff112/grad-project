@@ -1,5 +1,7 @@
 import { SubscriptionPlan } from '../constants/plans';
 
+export type MockUserRole = 'client' | 'coach' | 'admin';
+
 export interface MockUser {
   id: string;
   fullName: string;
@@ -7,6 +9,7 @@ export interface MockUser {
   password: string;
   subscriptionPlan: SubscriptionPlan;
   description: string;
+  role: MockUserRole;
 }
 
 export const MOCK_USERS: MockUser[] = [
@@ -17,6 +20,7 @@ export const MOCK_USERS: MockUser[] = [
     password: 'password123',
     subscriptionPlan: 'Free',
     description: 'Free plan - Basic tracking only',
+    role: 'client',
   },
   {
     id: '2',
@@ -25,6 +29,7 @@ export const MOCK_USERS: MockUser[] = [
     password: 'password123',
     subscriptionPlan: 'Standard',
     description: 'Standard plan - Enhanced tracking',
+    role: 'client',
   },
   {
     id: '3',
@@ -33,6 +38,7 @@ export const MOCK_USERS: MockUser[] = [
     password: 'password123',
     subscriptionPlan: 'Premium',
     description: 'Premium (AI) plan - AI workouts & meals',
+    role: 'client',
   },
   {
     id: '4',
@@ -41,6 +47,7 @@ export const MOCK_USERS: MockUser[] = [
     password: 'password123',
     subscriptionPlan: 'ProCoach',
     description: 'Pro Coach plan - Dedicated coach support',
+    role: 'coach',
   },
   {
     id: '5',
@@ -49,6 +56,16 @@ export const MOCK_USERS: MockUser[] = [
     password: 'password123',
     subscriptionPlan: 'Elite',
     description: 'Elite plan - Everything included',
+    role: 'client',
+  },
+  {
+    id: '6',
+    fullName: 'Admin User',
+    email: 'admin@vertex.com',
+    password: 'admin123',
+    subscriptionPlan: 'Free',
+    description: 'Admin - Full platform control',
+    role: 'admin',
   },
 ];
 

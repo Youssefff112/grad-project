@@ -101,10 +101,14 @@ export const SignInScreen = ({ navigation }: any) => {
         if (mockUser) {
           setFullName(mockUser.fullName);
           saveEmail(mockUser.email);
-          setSubscriptionPlan(mockUser.subscriptionPlan);
-          if (mockUser.subscriptionPlan === 'ProCoach') {
+          setRole(mockUser.role as any);
+          if (mockUser.role === 'admin') {
+            navigation.navigate('AdminDashboard');
+          } else if (mockUser.role === 'coach') {
+            setSubscriptionPlan('ProCoach');
             navigation.navigate('CoachCommandCenter');
           } else {
+            setSubscriptionPlan(mockUser.subscriptionPlan);
             navigation.navigate('TraineeCommandCenter');
           }
           return;
@@ -156,28 +160,40 @@ export const SignInScreen = ({ navigation }: any) => {
                     onPress={() => {
                       setEmail(user.email);
                       setPassword(user.password);
-                      // Auto-login
-                        setTimeout(() => {
-                          setFullName(user.fullName);
-                          saveEmail(user.email);
+                      // Auto-login for offline/demo mode
+                      setTimeout(() => {
+                        setFullName(user.fullName);
+                        saveEmail(user.email);
+                        setRole(user.role as any);
+                        if (user.role === 'admin') {
+                          navigation.navigate('AdminDashboard');
+                        } else if (user.role === 'coach') {
+                          setSubscriptionPlan('ProCoach');
+                          navigation.navigate('CoachCommandCenter');
+                        } else {
                           setSubscriptionPlan(user.subscriptionPlan);
-                          if (user.subscriptionPlan === 'ProCoach') {
-                            navigation.navigate('CoachCommandCenter');
-                          } else {
-                            navigation.navigate('TraineeCommandCenter');
-                          }
-                        }, 100);
+                          navigation.navigate('TraineeCommandCenter');
+                        }
+                      }, 100);
                     }}
                     style={[tw`px-4 py-2 rounded-lg border`, {
-                      backgroundColor: accent + '0a',
-                      borderColor: accent + '40'
+                      backgroundColor: user.role === 'admin' ? '#ef444420' : accent + '0a',
+                      borderColor: user.role === 'admin' ? '#ef444460' : accent + '40',
                     }]}
                   >
                     <View style={tw`flex-row items-center gap-1`}>
-                      <MaterialIcons name="person" size={14} color={accent} />
+                      <MaterialIcons
+                        name={user.role === 'admin' ? 'admin-panel-settings' : user.role === 'coach' ? 'fitness-center' : 'person'}
+                        size={14}
+                        color={user.role === 'admin' ? '#ef4444' : accent}
+                      />
                       <View>
-                        <Text style={[tw`text-xs font-bold`, { color: accent }]}>{user.subscriptionPlan}</Text>
-                        <Text style={[tw`text-xs`, { color: '#94a3b8' }]} numberOfLines={1}>{user.fullName.split(' ')[0]}</Text>
+                        <Text style={[tw`text-xs font-bold`, { color: user.role === 'admin' ? '#ef4444' : accent }]}>
+                          {user.role === 'admin' ? 'Admin' : user.subscriptionPlan}
+                        </Text>
+                        <Text style={[tw`text-xs`, { color: '#94a3b8' }]} numberOfLines={1}>
+                          {user.fullName.split(' ')[0]}
+                        </Text>
                       </View>
                     </View>
                   </TouchableOpacity>

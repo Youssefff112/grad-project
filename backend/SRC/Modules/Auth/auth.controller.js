@@ -23,7 +23,8 @@ export const authController = {
           role: user.role
         },
         token,
-        refreshToken
+        refreshToken,
+        expiresIn: 7 * 24 * 60 * 60 // 604800 seconds — matches JWT_EXPIRES_IN=7d
       });
     } catch (error) {
       next(error);
@@ -45,7 +46,8 @@ export const authController = {
           role: user.role
         },
         token,
-        refreshToken
+        refreshToken,
+        expiresIn: 7 * 24 * 60 * 60 // 604800 seconds — matches JWT_EXPIRES_IN=7d
       });
     } catch (error) {
       next(error);

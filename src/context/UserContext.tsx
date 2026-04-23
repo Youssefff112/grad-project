@@ -263,7 +263,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_notification_settings', JSON.stringify(settings)).catch((error) =>
       console.log('Failed to save notification settings:', error)
     );
-    authService.updateProfile({ profile: { notificationSettings: settings } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { notificationSettings: settings } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setRole = useCallback((r: UserRole) => {
@@ -279,7 +281,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Failed to save fullname:', error)
     );
     const parts = name.split(' ');
-    authService.updateProfile({ firstName: parts[0], lastName: parts.slice(1).join(' ') }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ firstName: parts[0], lastName: parts.slice(1).join(' ') }).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setEmail = useCallback((email: string) => {
@@ -294,7 +298,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_weight', w.toString()).catch((error) =>
       console.log('Failed to save weight:', error)
     );
-    authService.updateProfile({ profile: { currentWeight: w } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { currentWeight: w } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setBodyFatPercentage = useCallback((percentage: number) => {
@@ -302,7 +308,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_body_fat_percentage', percentage.toString()).catch((error) =>
       console.log('Failed to save body fat percentage:', error)
     );
-    authService.updateProfile({ profile: { bodyFat: percentage } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { bodyFat: percentage } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setUserMode = useCallback((mode: UserMode) => {
@@ -324,7 +332,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_experience_level', level).catch((error) =>
       console.log('Failed to save experience level:', error)
     );
-    authService.updateProfile({ profile: { experienceLevel: level } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { experienceLevel: level } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setDietPreferences = useCallback((preferences: DietPreference[]) => {
@@ -332,7 +342,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_diet_preferences', JSON.stringify(preferences)).catch((error) =>
       console.log('Failed to save diet preferences:', error)
     );
-    authService.updateProfile({ profile: { dietaryPreferences: preferences } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { dietaryPreferences: preferences } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setCoach = useCallback((id: string, name: string) => {
@@ -366,7 +378,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_cv_enabled', JSON.stringify(enabled)).catch((error) =>
       console.log('Failed to save CV setting:', error)
     );
-    authService.updateProfile({ profile: { canUseComputerVision: enabled } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { canUseComputerVision: enabled } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const setAIAssistantEnabled = useCallback((enabled: boolean) => {
@@ -374,7 +388,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_ai_enabled', JSON.stringify(enabled)).catch((error) =>
       console.log('Failed to save AI setting:', error)
     );
-    authService.updateProfile({ profile: { canUseAIAssistant: enabled } }).catch(console.error);
+    tokenManager.getAccessToken().then((token) => {
+      if (token) authService.updateProfile({ profile: { canUseAIAssistant: enabled } } as any).catch(console.error);
+    }).catch(console.error);
   }, []);
 
   const updateLastPlanReview = useCallback(() => {
@@ -391,11 +407,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRefreshTokenState(refreshToken);
       setIsAuthenticatedState(true);
 
-      // Save tokens using tokenManager
+      // Save tokens using tokenManager — 7 days matches JWT_EXPIRES_IN on the backend
       await tokenManager.saveTokens({
         accessToken,
         refreshToken,
-        expiresIn: 86400, // 24 hours default
+        expiresIn: 7 * 24 * 60 * 60,
       });
     } catch (error) {
       console.error('Failed to set auth tokens:', error);

@@ -32,7 +32,8 @@ export const connectDB = async () => {
     await import('../SRC/Modules/Messaging/messaging.model.js');
 
     await sequelize.authenticate();
-    await sequelize.sync();
+    // alter: true adds missing columns/indexes without dropping existing data
+    await sequelize.sync({ alter: true });
 
     console.log('✅ PostgreSQL Connected');
     return sequelize;

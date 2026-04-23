@@ -18,12 +18,15 @@ export interface TokenData {
 /**
  * Save tokens to AsyncStorage
  */
+const DEFAULT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — matches JWT_EXPIRES_IN on the backend
+
 export const saveTokens = async (data: TokenData): Promise<void> => {
   try {
+    const expiryMs = data.expiresIn ? data.expiresIn * 1000 : DEFAULT_EXPIRY_MS;
     await Promise.all([
       AsyncStorage.setItem(AUTH_TOKEN_KEY, data.accessToken),
       AsyncStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken),
-      AsyncStorage.setItem(TOKEN_EXPIRY_KEY, String(data.expiresIn ? Date.now() + data.expiresIn * 1000 : 0)),
+      AsyncStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + expiryMs)),
     ]);
   } catch (error) {
     console.warn('[TokenManager] Failed to save tokens:', error);

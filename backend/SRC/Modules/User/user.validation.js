@@ -5,20 +5,26 @@ export const updateProfileSchema = Joi.object({
   body: Joi.object({
     firstName: Joi.string().min(2).max(50).trim(),
     lastName: Joi.string().min(2).max(50).trim(),
+    // profile is a JSONB column — allow any fields the client sends through
     profile: Joi.object({
       age: Joi.number().min(13).max(120),
       gender: Joi.string().valid('male', 'female', 'other'),
       height: Joi.number().min(50).max(300),
       currentWeight: Joi.number().min(20).max(500),
-      goal: Joi.string().valid('weight_loss', 'muscle_gain', 'maintenance', 'endurance'),
+      bodyFat: Joi.number().min(0).max(100),
+      goal: Joi.string(), // accept any goal string (stored in JSONB, no DB-level enum)
       experienceLevel: Joi.string().valid('beginner', 'intermediate', 'advanced'),
-      dietaryPreferences: Joi.string().valid('none', 'vegetarian', 'vegan', 'gluten_free', 'keto', 'paleo'),
-      dietaryPreference: Joi.string().valid('none', 'vegetarian', 'vegan', 'gluten_free', 'keto', 'paleo'),
+      dietaryPreferences: Joi.alternatives().try(
+        Joi.string(),
+        Joi.array().items(Joi.string())
+      ),
+      dietaryPreference: Joi.string(),
       allergies: Joi.array().items(Joi.string()),
-      homeEquipment: Joi.array().items(
-        Joi.string().valid('none', 'dumbbells', 'resistance_bands', 'yoga_mat', 'pull_up_bar', 'kettlebell', 'barbell')
-      )
-    })
+      homeEquipment: Joi.array().items(Joi.string()),
+      notificationSettings: Joi.object().unknown(true),
+      canUseComputerVision: Joi.boolean(),
+      canUseAIAssistant: Joi.boolean(),
+    }).unknown(true) // allow any other profile fields (JSONB is flexible)
   })
 });
 
@@ -29,18 +35,19 @@ export const completeOnboardingSchema = Joi.object({
       gender: Joi.string().valid('male', 'female', 'other').required(),
       height: Joi.number().min(50).max(300).required(),
       currentWeight: Joi.number().min(20).max(500).required(),
-      goal: Joi.string().valid('weight_loss', 'muscle_gain', 'maintenance', 'endurance').required(),
+      goal: Joi.string().required(), // accept any goal string
       experienceLevel: Joi.string().valid('beginner', 'intermediate', 'advanced').required(),
-      dietaryPreferences: Joi.string().valid('none', 'vegetarian', 'vegan', 'gluten_free', 'keto', 'paleo'),
-      dietaryPreference: Joi.string().valid('none', 'vegetarian', 'vegan', 'gluten_free', 'keto', 'paleo'),
+      dietaryPreferences: Joi.alternatives().try(
+        Joi.string(),
+        Joi.array().items(Joi.string())
+      ),
+      dietaryPreference: Joi.string(),
       allergies: Joi.array().items(Joi.string()),
       homeEquipment: Joi.when('$userType', {
         is: 'offline',
-        then: Joi.array().items(
-          Joi.string().valid('none', 'dumbbells', 'resistance_bands', 'yoga_mat', 'pull_up_bar', 'kettlebell', 'barbell')
-        ).min(1).required(),
+        then: Joi.array().items(Joi.string()).min(1).required(),
         otherwise: Joi.forbidden()
       })
-    }).required()
+    }).unknown(true).required()
   })
 });
