@@ -1,0 +1,375 @@
+Auth
+POST /auth/register
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john@example.com",
+  "password": "Password123",
+  "confirmPassword": "Password123",
+  "userType": "offline",
+  "role": "client"
+}
+
+
+POST /auth/login
+
+{
+  "email": "john@example.com",
+  "password": "Password123"
+}
+
+
+X POST /auth/refresh-token
+
+{
+  "refreshToken": "YOUR_REFRESH_TOKEN"
+}
+
+
+POST /auth/forgot-password
+
+
+{
+  "email": "john@example.com"
+}
+
+
+
+X POST /auth/reset-password/:token
+
+
+{
+  "password": "Password123",
+  "confirmPassword": "Password123"
+}
+
+
+User
+PATCH /users/profile
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "profile": {
+    "age": 25,
+    "gender": "male",
+    "height": 175,
+    "currentWeight": 75,
+    "goal": "weight_loss",
+    "experienceLevel": "beginner",
+    "dietaryPreference": "none",
+    "allergies": ["peanuts"],
+    "homeEquipment": ["dumbbells", "yoga_mat"]
+  }
+}
+
+
+
+
+POST /users/onboarding
+
+
+{
+  "profile": {
+    "age": 25,
+    "gender": "male",
+    "height": 175,
+    "currentWeight": 75,
+    "goal": "weight_loss",
+    "experienceLevel": "beginner",
+    "dietaryPreference": "none",
+    "homeEquipment": ["dumbbells", "yoga_mat"]
+  }
+}
+
+
+Admin
+PATCH /admin/users/:id
+
+
+{
+  "isActive": true
+}
+
+
+
+
+POST /admin/gyms
+
+
+
+{
+  "name": "Fit Gym",
+  "address": "123 Main St",
+  "city": "Cairo",
+  "location": {
+    "coordinates": [31.2357, 30.0444]
+  }
+}
+
+
+PATCH /admin/gyms/:id
+
+{
+  "name": "Fit Gym Updated"
+}
+
+
+POST /admin/exercises
+
+
+{
+  "name": "Push-up",
+  "category": "strength",
+  "muscleGroups": ["chest", "triceps"],
+  "equipment": [],
+  "difficulty": "beginner"
+}
+
+
+
+PATCH /admin/exercises/:id
+
+{
+  "isActive": true
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+
+
+
+Exercise
+POST /exercises (admin)
+
+{
+  "name": "Push-up",
+  "muscleGroup": "chest",
+  "equipment": "bodyweight"
+}
+
+
+PATCH /exercises/:id (admin)
+
+{
+  "isActive": true
+}
+
+
+
+Diet (client)
+POST /diet/track
+
+{
+  "mealsCompleted": {
+    "breakfast": true,
+    "lunch": true,
+    "dinner": false
+  },
+  "caloriesConsumed": 1800,
+  "macrosConsumed": {
+    "protein": 120,
+    "carbs": 200,
+    "fats": 50
+  },
+  "notes": "Felt good",
+  "status": "partial"
+}
+
+
+Workout (client)
+POST /workout/start
+
+{
+  "day": "monday"
+}
+
+
+POST /workout/finish/:id
+
+{
+  "exercises": [],
+  "calories": 300,
+  "notes": "Good session",
+  "rating": 4,
+  "status": "completed"
+}
+
+
+
+POST /workout/log
+
+
+{
+  "day": "monday",
+  "exercises": [],
+  "duration": 45,
+  "calories": 350,
+  "notes": "Manual log",
+  "rating": 5
+}
+
+
+
+Coach
+PATCH /coach/profile
+
+
+{
+  "bio": "Certified trainer",
+  "specialties": ["strength", "mobility"],
+  "experienceYears": 5
+}
+
+
+POST /coach/assign/workout
+
+{
+  "userId": "CLIENT_USER_ID"
+}
+
+
+POST /coach/assign/diet
+
+
+{
+  "userId": "CLIENT_USER_ID"
+}
+
+
+Client
+PATCH /client/profile
+
+
+{
+  "goals": { "primary": "fat_loss" },
+  "preferences": { "trainingDays": 4 }
+}
+
+
+POST /client/coach
+
+
+{
+  "coachId": "COACH_USER_ID"
+}
+
+
+
+Subscription
+POST /subscriptions
+
+
+{
+  "role": "client",
+  "planName": "Monthly",
+  "price": 19.99,
+  "currency": "USD",
+  "autoRenew": true
+}
+
+
+
+POST /subscriptions/:id/payments
+
+
+{
+  "amount": 19.99,
+  "currency": "USD",
+  "provider": "manual",
+  "status": "paid",
+  "reference": "PAY-123"
+}
+
+
+
+PATCH /subscriptions/admin/:id/status
+
+
+{
+  "status": "active"
+}
+
+
+Progress (client)
+POST /progress/measurements
+
+
+{
+  "weight": 75,
+  "bodyFat": 18.5,
+  "waist": 80,
+  "hips": 95
+}
+
+
+POST /progress/accuracy
+
+
+{
+  "workoutLogId": "WORKOUT_LOG_ID",
+  "accuracyScore": 92.5,
+  "repsCount": 15,
+  "source": "vision",
+  "feedback": { "notes": "Keep back straight" }
+}
+
+
+Vision (client)
+POST /vision/sessions
+
+
+{
+  "exerciseName": "Squat"
+}
+
+
+
+PATCH /vision/sessions/:id
+
+
+{
+  "repsCount": 12,
+  "accuracyScore": 88.5,
+  "feedback": { "tip": "Go lower" },
+  "endedAt": "2025-01-01T12:00:00.000Z"
+}
+
+
+
+Chatbot
+POST /chatbot/messages (client)
+
+{
+  "message": "I feel sore today"
+}
+
+
+
+PATCH /chatbot/config (coach)
+
+
+{
+  "persona": "Coach Mike",
+  "tone": "direct",
+  "coachingStyle": "form-first",
+  "extraInstructions": "Emphasize safety"
+}
+
+
+
+Notifications (admin)
+POST /notifications/schedule
+
+
+{
+  "userId": "USER_ID",
+  "title": "Workout Reminder",
+  "message": "Time to train",
+  "scheduledFor": "2025-01-01T10:00:00.000Z"
+}
+
+
+
+
+Let me know if you want these split into per-endpoint files or auto-filled with real IDs from your DB.

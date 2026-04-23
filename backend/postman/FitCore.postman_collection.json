@@ -1,0 +1,1157 @@
+{
+  "info": {
+    "name": "FitCore API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "rootUrl", "value": "http://localhost:5000" },
+    { "key": "baseUrl", "value": "http://localhost:5000/api/v1" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "coachToken", "value": "" },
+    { "key": "clientToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "resetToken", "value": "" },
+    { "key": "subscriptionId", "value": "" },
+    { "key": "workoutLogId", "value": "" },
+    { "key": "visionSessionId", "value": "" },
+    { "key": "chatSessionId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "coachId", "value": "" },
+    { "key": "exerciseId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{rootUrl}}/health",
+              "host": ["{{rootUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\",\n  \"confirmPassword\": \"Password123\",\n  \"userType\": \"offline\",\n  \"role\": \"client\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh-token"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "forgot-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password/{{resetToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "reset-password", "{{resetToken}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"Password123\",\n  \"confirmPassword\": \"Password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"profile\": {\n    \"age\": 25,\n    \"gender\": \"male\",\n    \"height\": 175,\n    \"currentWeight\": 75,\n    \"goal\": \"weight_loss\",\n    \"experienceLevel\": \"beginner\",\n    \"dietaryPreference\": \"none\",\n    \"allergies\": [\"peanuts\"],\n    \"homeEquipment\": [\"dumbbells\", \"yoga_mat\"]\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Complete Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/onboarding",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "onboarding"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profile\": {\n    \"age\": 25,\n    \"gender\": \"male\",\n    \"height\": 175,\n    \"currentWeight\": 75,\n    \"goal\": \"weight_loss\",\n    \"experienceLevel\": \"beginner\",\n    \"dietaryPreference\": \"none\",\n    \"homeEquipment\": [\"dumbbells\", \"yoga_mat\"]\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/users/account",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "account"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Exercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/exercises",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exercises"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Push-up\",\n  \"muscleGroup\": \"chest\",\n  \"equipment\": \"bodyweight\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Exercise",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/exercises/{{exerciseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exercises", "{{exerciseId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Exercise",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/exercises/{{exerciseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "exercises", "{{exerciseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Coach Applications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/coaches",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "coaches"]
+            }
+          }
+        },
+        {
+          "name": "Approve Coach",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/coaches/{{coachId}}/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "coaches", "{{coachId}}", "approve"]
+            }
+          }
+        },
+        {
+          "name": "Revoke Coach Approval",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/admin/coaches/{{coachId}}/revoke",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "coaches", "{{coachId}}", "revoke"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Coaches",
+      "item": [
+        {
+          "name": "Create Coach",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{rootUrl}}/api/coaches",
+              "host": ["{{rootUrl}}"],
+              "path": ["api", "coaches"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Coach Ali\",\n  \"age\": 30,\n  \"trainingLocation\": \"Downtown Studio\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Coaches",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{rootUrl}}/api/coaches",
+              "host": ["{{rootUrl}}"],
+              "path": ["api", "coaches"]
+            }
+          }
+        },
+        {
+          "name": "Get Coach By Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{rootUrl}}/api/coaches/{{coachId}}",
+              "host": ["{{rootUrl}}"],
+              "path": ["api", "coaches", "{{coachId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Coach",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{rootUrl}}/api/coaches/{{coachId}}",
+              "host": ["{{rootUrl}}"],
+              "path": ["api", "coaches", "{{coachId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Coach Ali Updated\",\n  \"age\": 31,\n  \"trainingLocation\": \"West Branch\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Coach",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{rootUrl}}/api/coaches/{{coachId}}",
+              "host": ["{{rootUrl}}"],
+              "path": ["api", "coaches", "{{coachId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exercise",
+      "item": [
+        {
+          "name": "Get All Exercises",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/exercises",
+              "host": ["{{baseUrl}}"],
+              "path": ["exercises"]
+            }
+          }
+        },
+        {
+          "name": "Get Exercise By Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/exercises/{{exerciseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exercises", "{{exerciseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Exercise (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exercises",
+              "host": ["{{baseUrl}}"],
+              "path": ["exercises"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Push-up\",\n  \"muscleGroup\": \"chest\",\n  \"equipment\": \"bodyweight\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Exercise (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exercises/{{exerciseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exercises", "{{exerciseId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Exercise (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/exercises/{{exerciseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exercises", "{{exerciseId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Diet (Client)",
+      "item": [
+        {
+          "name": "Generate Plan",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/diet/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["diet", "generate"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Plan",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/diet/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["diet", "active"]
+            }
+          }
+        },
+        {
+          "name": "Track Diet Day",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/diet/track",
+              "host": ["{{baseUrl}}"],
+              "path": ["diet", "track"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mealsCompleted\": {\"breakfast\": true, \"lunch\": true, \"dinner\": false},\n  \"caloriesConsumed\": 1800,\n  \"macrosConsumed\": {\"protein\": 120, \"carbs\": 200, \"fats\": 50},\n  \"notes\": \"Felt good\",\n  \"status\": \"partial\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Diet History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/diet/history?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["diet", "history"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Workout (Client)",
+      "item": [
+        {
+          "name": "Generate Plan",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workout/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["workout", "generate"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Plan",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workout/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["workout", "active"]
+            }
+          }
+        },
+        {
+          "name": "Start Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workout/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["workout", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day\": \"monday\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Finish Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workout/finish/{{workoutLogId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["workout", "finish", "{{workoutLogId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exercises\": [],\n  \"calories\": 300,\n  \"notes\": \"Good session\",\n  \"rating\": 4,\n  \"status\": \"completed\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Log Workout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workout/log",
+              "host": ["{{baseUrl}}"],
+              "path": ["workout", "log"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day\": \"monday\",\n  \"exercises\": [],\n  \"duration\": 45,\n  \"calories\": 350,\n  \"notes\": \"Manual log\",\n  \"rating\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Workout History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workout/history?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["workout", "history"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Coach",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{coachToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/coach/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["coach", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{coachToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/coach/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["coach", "profile"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bio\": \"Certified trainer\",\n  \"specialties\": [\"strength\", \"mobility\"],\n  \"experienceYears\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Clients",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{coachToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/coach/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["coach", "clients"]
+            }
+          }
+        },
+        {
+          "name": "Get Analytics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{coachToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/coach/analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["coach", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Assign Workout Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{coachToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/coach/assign/workout",
+              "host": ["{{baseUrl}}"],
+              "path": ["coach", "assign", "workout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Assign Diet Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{coachToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/coach/assign/diet",
+              "host": ["{{baseUrl}}"],
+              "path": ["coach", "assign", "diet"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Client",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/client/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/client/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "profile"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goals\": {\"primary\": \"fat_loss\"},\n  \"preferences\": {\"trainingDays\": 4}\n}"
+            }
+          }
+        },
+        {
+          "name": "Select Coach",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/client/coach",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "coach"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coachId\": \"{{coachId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Subscription Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/client/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "subscription"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscription",
+      "item": [
+        {
+          "name": "Create Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"client\",\n  \"planName\": \"Monthly\",\n  \"price\": 19.99,\n  \"currency\": \"USD\",\n  \"autoRenew\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Active Subscription",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/active?role=client",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", "active"],
+              "query": [{ "key": "role", "value": "client" }]
+            }
+          }
+        },
+        {
+          "name": "Record Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/{{subscriptionId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", "{{subscriptionId}}", "payments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 19.99,\n  \"currency\": \"USD\",\n  \"provider\": \"manual\",\n  \"status\": \"paid\",\n  \"reference\": \"PAY-123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Subscriptions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/admin",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", "admin"]
+            }
+          }
+        },
+        {
+          "name": "Update Subscription Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/admin/{{subscriptionId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscriptions", "admin", "{{subscriptionId}}", "status"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Progress (Client)",
+      "item": [
+        {
+          "name": "Add Measurement",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/progress/measurements",
+              "host": ["{{baseUrl}}"],
+              "path": ["progress", "measurements"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight\": 75,\n  \"bodyFat\": 18.5,\n  \"waist\": 80,\n  \"hips\": 95\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Measurements",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/progress/measurements?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["progress", "measurements"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Workout Accuracy",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/progress/accuracy",
+              "host": ["{{baseUrl}}"],
+              "path": ["progress", "accuracy"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workoutLogId\": \"{{workoutLogId}}\",\n  \"accuracyScore\": 92.5,\n  \"repsCount\": 15,\n  \"source\": \"vision\",\n  \"feedback\": {\"notes\": \"Keep back straight\"}\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Workout Accuracy",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/progress/accuracy?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["progress", "accuracy"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vision (Client)",
+      "item": [
+        {
+          "name": "Start Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vision/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["vision", "sessions"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exerciseName\": \"Squat\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Session",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/vision/sessions/{{visionSessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["vision", "sessions", "{{visionSessionId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"repsCount\": 12,\n  \"accuracyScore\": 88.5,\n  \"feedback\": {\"tip\": \"Go lower\"},\n  \"endedAt\": \"2025-01-01T12:00:00.000Z\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/vision/sessions?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["vision", "sessions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chatbot",
+      "item": [
+        {
+          "name": "Send Message (Client)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chatbot/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["chatbot", "messages"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"I feel sore today\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Messages (Client)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/chatbot/sessions/{{chatSessionId}}/messages?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["chatbot", "sessions", "{{chatSessionId}}", "messages"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Config (Coach)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{coachToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/chatbot/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["chatbot", "config"]
+            }
+          }
+        },
+        {
+          "name": "Update Config (Coach)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{coachToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chatbot/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["chatbot", "config"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"persona\": \"Coach Mike\",\n  \"tone\": \"direct\",\n  \"coachingStyle\": \"form-first\",\n  \"extraInstructions\": \"Emphasize safety\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications (Admin)",
+      "item": [
+        {
+          "name": "Send Reminders",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/send-reminders",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "send-reminders"]
+            }
+          }
+        },
+        {
+          "name": "Schedule Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "schedule"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"title\": \"Workout Reminder\",\n  \"message\": \"Time to train\",\n  \"scheduledFor\": \"2025-01-01T10:00:00.000Z\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
