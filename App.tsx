@@ -95,6 +95,9 @@ function AppNavigator() {
       initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
+        animation: 'slide_from_right',
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
         contentStyle: {
           backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
         },

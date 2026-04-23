@@ -111,6 +111,16 @@ export const authController = {
     }
   },
 
+  async changePassword(req, res, next) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      await authService.changePassword(req.user.id, currentPassword, newPassword);
+      successResponse(res, 200, 'Password changed successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async logout(req, res, next) {
     try {
       await authService.logout(req.user.id);

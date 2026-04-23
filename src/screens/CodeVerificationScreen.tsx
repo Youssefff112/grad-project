@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -119,6 +121,7 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
   };
 
   return (
+    <KeyboardAvoidingView style={tw`flex-1`} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       <View style={tw`p-4 flex-row items-center justify-between`}>
         <TouchableOpacity
@@ -252,5 +255,6 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 };

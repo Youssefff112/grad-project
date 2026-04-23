@@ -203,22 +203,41 @@ export const AdminSubscriptionScreen = ({ navigation }: any) => {
                 </View>
 
                 {/* Plan details */}
-                <View style={[tw`flex-row items-center justify-between py-2.5 px-3 rounded-xl`, { backgroundColor: isDark ? '#1e293b' : '#f8f7f5' }]}>
-                  <View>
-                    <Text style={[tw`text-xs`, { color: subtextColor }]}>Plan</Text>
-                    <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{sub.planName}</Text>
+                <View style={[tw`py-3 px-3 rounded-xl gap-2.5`, { backgroundColor: isDark ? '#1e293b' : '#f8f7f5' }]}>
+                  {/* Row 1: Plan & Price */}
+                  <View style={tw`flex-row justify-between`}>
+                    <View style={tw`flex-1`}>
+                      <Text style={[tw`text-xs`, { color: subtextColor }]}>Plan</Text>
+                      <Text style={[tw`text-sm font-bold`, { color: textPrimary }]} numberOfLines={1}>
+                        {sub.planName}
+                      </Text>
+                    </View>
+                    <View style={tw`items-end`}>
+                      <Text style={[tw`text-xs`, { color: subtextColor }]}>Price</Text>
+                      <Text style={[tw`text-sm font-bold`, { color: accent }]}>
+                        ${sub.price.toFixed(2)}/mo
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={[tw`text-xs`, { color: subtextColor }]}>Price</Text>
-                    <Text style={[tw`text-sm font-bold`, { color: accent }]}>${sub.price.toFixed(2)}/mo</Text>
-                  </View>
-                  <View>
-                    <Text style={[tw`text-xs`, { color: subtextColor }]}>Started</Text>
-                    <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{formatDate(sub.startDate)}</Text>
-                  </View>
-                  <View>
-                    <Text style={[tw`text-xs`, { color: subtextColor }]}>Ends</Text>
-                    <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{formatDate(sub.endDate)}</Text>
+                  {/* Row 2: Start & End dates */}
+                  <View
+                    style={[
+                      tw`flex-row justify-between pt-2`,
+                      { borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' },
+                    ]}
+                  >
+                    <View style={tw`flex-1`}>
+                      <Text style={[tw`text-xs`, { color: subtextColor }]}>Started</Text>
+                      <Text style={[tw`text-xs font-semibold`, { color: textPrimary }]} numberOfLines={1}>
+                        {formatDate(sub.startDate)}
+                      </Text>
+                    </View>
+                    <View style={tw`items-end flex-1`}>
+                      <Text style={[tw`text-xs`, { color: subtextColor }]}>Ends</Text>
+                      <Text style={[tw`text-xs font-semibold`, { color: textPrimary }]} numberOfLines={1}>
+                        {formatDate(sub.endDate)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 

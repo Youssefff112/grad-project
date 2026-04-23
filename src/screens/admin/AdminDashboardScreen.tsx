@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
@@ -22,6 +23,8 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
   const [stats, setStats] = useState<adminService.DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingCoaches, setPendingCoaches] = useState<adminService.CoachApplication[]>([]);
+  const [notifAvailable, setNotifAvailable] = useState(true);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -42,7 +45,24 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
     }
   }, []);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  const loadPendingCoaches = useCallback(async () => {
+    try {
+      const { applications } = await adminService.getCoachApplications(false);
+      setPendingCoaches(applications);
+      setNotifAvailable(true);
+    } catch {
+      // Gracefully degrade — notifications section simply hides
+      setNotifAvailable(false);
+      setPendingCoaches([]);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStats();
+      loadPendingCoaches();
+    }, [loadStats, loadPendingCoaches])
+  );
 
   const statCards = [
     { label: 'Total Users', value: stats?.totalUsers ?? '—', icon: 'people' as const, color: accent },
@@ -60,10 +80,22 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
           <Text style={[tw`text-xl font-black mt-0.5`, { color: textPrimary }]}>Hey {firstName}</Text>
         </View>
         <TouchableOpacity
-          onPress={() => navigation.navigate('Notifications')}
+          onPress={() => navigation.navigate('AdminCoaches')}
           style={[tw`w-10 h-10 rounded-full items-center justify-center`, { backgroundColor: accent + '14' }]}
         >
           <MaterialIcons name="notifications" size={20} color={accent} />
+          {pendingCoaches.length > 0 && (
+            <View
+              style={[
+                tw`absolute -top-1 -right-1 w-5 h-5 rounded-full items-center justify-center`,
+                { backgroundColor: '#ef4444' },
+              ]}
+            >
+              <Text style={tw`text-white text-[10px] font-bold`}>
+                {pendingCoaches.length > 9 ? '9+' : String(pendingCoaches.length)}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -134,6 +166,39 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
                   ))}
                 </View>
               </View>
+            )}
+
+            {/* Pending Coach Notifications */}
+            {notifAvailable && pendingCoaches.length > 0 && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AdminCoaches')}
+                style={tw`mx-5 mt-5`}
+              >
+                <View
+                  style={[
+                    tw`flex-row items-center gap-3 p-4 rounded-2xl`,
+                    { backgroundColor: '#f59e0b18', borderWidth: 1, borderColor: '#f59e0b30' },
+                  ]}
+                >
+                  <View
+                    style={[
+                      tw`w-10 h-10 rounded-xl items-center justify-center flex-shrink-0`,
+                      { backgroundColor: '#f59e0b20' },
+                    ]}
+                  >
+                    <MaterialIcons name="pending-actions" size={20} color="#f59e0b" />
+                  </View>
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                      {pendingCoaches.length} Coach{pendingCoaches.length > 1 ? 'es' : ''} Awaiting Approval
+                    </Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
+                      Tap to review and approve applications
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={20} color="#f59e0b" />
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* Quick Actions */}

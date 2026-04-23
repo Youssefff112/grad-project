@@ -8,7 +8,8 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  refreshTokenSchema
+  refreshTokenSchema,
+  changePasswordSchema,
 } from './auth.validation.js';
 
 const router = Router();
@@ -22,5 +23,6 @@ router.post('/reset-password/:token', validate(resetPasswordSchema), authControl
 
 // Protected routes
 router.post('/logout', authenticate, authController.logout);
+router.post('/change-password', authenticate, validate(changePasswordSchema), authController.changePassword);
 
 export default router;

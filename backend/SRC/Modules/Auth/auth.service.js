@@ -146,6 +146,24 @@ export const authService = {
     return user;
   },
 
+  async changePassword(userId, currentPassword, newPassword) {
+    const user = await User.findByPk(userId, {
+      attributes: { include: ['password'] }
+    });
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      throw new AppError('Current password is incorrect', 401);
+    }
+
+    user.password = newPassword;
+    await user.save();
+    return user;
+  },
+
   async logout(userId) {
     await User.update({ refreshToken: null }, { where: { id: userId } });
   }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { CoachCard } from '../../components/coach/CoachCard';
@@ -35,12 +37,15 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [filters, setFilters] = useState<FilterState>({});
   const [coaches, setCoaches] = useState<CoachWithDisplay[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const specialtyOptions = ['Strength', 'Cardio', 'Weight Loss', 'Nutrition', 'Flexibility', 'CrossFit', 'HIIT', 'Yoga', 'Pilates'];
 
-  const loadCoaches = useCallback(async () => {
-    setLoading(true);
+  const loadCoaches = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const { coaches: data } = await getCoaches({
@@ -53,12 +58,20 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
       setCoaches([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [filters.specialty, filters.minRating]);
 
-  useEffect(() => {
-    loadCoaches();
-  }, [loadCoaches]);
+  // Refresh when screen comes into focus + poll every 30s for real-time updates
+  useFocusEffect(
+    useCallback(() => {
+      loadCoaches();
+      pollingRef.current = setInterval(() => loadCoaches(), 30000);
+      return () => {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+      };
+    }, [loadCoaches])
+  );
 
   const filteredCoaches = useMemo(() => {
     if (!searchText.trim()) return coaches;
@@ -177,7 +190,7 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
           <Text style={[tw`mt-4 text-lg font-bold`, { color: isDark ? '#475569' : '#94a3b8' }]}>Could not load coaches</Text>
           <Text style={[tw`mt-1 text-sm text-center`, { color: subtextColor }]}>{error}</Text>
           <TouchableOpacity
-            onPress={loadCoaches}
+            onPress={() => loadCoaches()}
             style={[tw`mt-4 px-6 py-3 rounded-xl`, { backgroundColor: accent }]}
           >
             <Text style={tw`text-white font-bold`}>Retry</Text>
@@ -195,6 +208,14 @@ export const CoachBrowsingScreen: React.FC<{ navigation: any }> = ({ navigation 
           renderItem={renderCoachItem}
           keyExtractor={coach => `coach-${coach.id}`}
           contentContainerStyle={tw`px-4 pt-4 pb-8`}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadCoaches(true)}
+              tintColor={accent}
+              colors={[accent]}
+            />
+          }
           ListHeaderComponent={
             <Text style={[tw`text-xs font-semibold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
               {filteredCoaches.length} coach{filteredCoaches.length !== 1 ? 'es' : ''} available

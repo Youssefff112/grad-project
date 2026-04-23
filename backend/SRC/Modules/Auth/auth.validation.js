@@ -50,3 +50,13 @@ export const refreshTokenSchema = Joi.object({
     refreshToken: Joi.string().required()
   })
 });
+
+export const changePasswordSchema = Joi.object({
+  body: Joi.object({
+    currentPassword: Joi.string().required(),
+    newPassword: Joi.string().min(8).required()
+      .messages({ 'string.min': 'New password must be at least 8 characters long' }),
+    confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required()
+      .messages({ 'any.only': 'Passwords do not match' }),
+  })
+});

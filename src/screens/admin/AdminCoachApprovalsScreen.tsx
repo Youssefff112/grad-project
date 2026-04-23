@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { AdminBottomNav } from '../../components/admin/AdminBottomNav';
@@ -33,11 +35,13 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [applications, setApplications] = useState<adminService.CoachApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const isApproved = activeTab === 'approved';
@@ -47,10 +51,15 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
       setError('Failed to load coach applications');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [activeTab]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const handleApprove = (app: adminService.CoachApplication) => {
     const name = app.User
@@ -144,12 +153,23 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
         <View style={tw`flex-1 items-center justify-center px-6`}>
           <MaterialIcons name="error-outline" size={48} color="#ef4444" />
           <Text style={[tw`text-base font-bold mt-3 text-center`, { color: textPrimary }]}>{error}</Text>
-          <TouchableOpacity onPress={load} style={[tw`mt-4 px-6 py-3 rounded-xl`, { backgroundColor: accent }]}>
+          <TouchableOpacity onPress={() => load()} style={[tw`mt-4 px-6 py-3 rounded-xl`, { backgroundColor: accent }]}>
             <Text style={tw`text-white font-bold text-sm`}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-4 pb-28`}>
+        <ScrollView
+          style={tw`flex-1`}
+          contentContainerStyle={tw`px-5 pt-4 pb-28`}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { load(true); }}
+              tintColor={accent}
+              colors={[accent]}
+            />
+          }
+        >
           {applications.length === 0 && (
             <View style={tw`items-center py-20`}>
               <MaterialIcons
