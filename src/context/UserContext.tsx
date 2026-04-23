@@ -17,9 +17,13 @@ export interface NotificationSettings {
   restTimer: boolean;
 }
 
+export type UserRole = 'client' | 'coach' | 'admin';
+
 interface UserContextType {
   fullName: string;
   email: string;
+  role: UserRole;
+  isAdmin: boolean;
   weight: number | null;
   bodyFatPercentage: number | null;
   userMode: UserMode;
@@ -54,6 +58,7 @@ interface UserContextType {
   setAIAssistantEnabled: (enabled: boolean) => void;
   updateLastPlanReview: () => void;
   setNotificationSettings: (settings: NotificationSettings) => void;
+  setRole: (role: UserRole) => void;
 
   // Authentication methods
   setAuthTokens: (accessToken: string, refreshToken: string) => Promise<void>;
@@ -66,6 +71,8 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   fullName: '',
   email: '',
+  role: 'client',
+  isAdmin: false,
   weight: null,
   bodyFatPercentage: null,
   userMode: 'Basic',
@@ -107,6 +114,7 @@ const UserContext = createContext<UserContextType>({
   setAIAssistantEnabled: () => {},
   updateLastPlanReview: () => {},
   setNotificationSettings: () => {},
+  setRole: () => {},
 
   // Authentication methods defaults
   setAuthTokens: async () => {},
@@ -119,6 +127,7 @@ const UserContext = createContext<UserContextType>({
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [fullName, setFullNameState] = useState('');
   const [email, setEmailState] = useState('');
+  const [role, setRoleState] = useState<UserRole>('client');
   const [weight, setWeightState] = useState<number | null>(null);
   const [bodyFatPercentage, setBodyFatPercentageState] = useState<number | null>(null);
   const [userMode, setUserModeState] = useState<UserMode>('Basic');
@@ -152,7 +161,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadUserData = async () => {
       try {
         // Load user profile data with defensive error handling
-        const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId, savedNotifs] =
+        const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId, savedNotifs, savedRole] =
           await Promise.all([
             AsyncStorage.getItem('user_fullname').catch(() => null),
             AsyncStorage.getItem('user_email').catch(() => null),
@@ -169,6 +178,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             AsyncStorage.getItem('user_last_plan_review').catch(() => null),
             AsyncStorage.getItem('user_id').catch(() => null),
             AsyncStorage.getItem('user_notification_settings').catch(() => null),
+            AsyncStorage.getItem('user_role').catch(() => null),
           ]);
 
         // Load authentication data
@@ -226,6 +236,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.warn('[UserContext] Failed to parse notification settings:', e);
           }
         }
+        if (savedRole) setRoleState(savedRole as UserRole);
 
         // Set authentication state if tokens are valid
         if (tokens.accessToken && isTokenValid) {
@@ -253,6 +264,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Failed to save notification settings:', error)
     );
     authService.updateProfile({ profile: { notificationSettings: settings } }).catch(console.error);
+  }, []);
+
+  const setRole = useCallback((r: UserRole) => {
+    setRoleState(r);
+    AsyncStorage.setItem('user_role', r).catch((error) =>
+      console.log('Failed to save user role:', error)
+    );
   }, []);
 
   const setFullName = useCallback((name: string) => {
@@ -435,7 +453,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         AsyncStorage.removeItem('user_ai_enabled'),
         AsyncStorage.removeItem('user_last_plan_review'),
         AsyncStorage.removeItem('user_id'),
+        AsyncStorage.removeItem('user_role'),
       ]);
+      setRoleState('client');
     } catch (error) {
       console.error('Failed to logout:', error);
       throw error;
@@ -446,11 +466,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <UserContext.Provider value={{
       fullName,
       email,
+      role,
+      isAdmin: role === 'admin',
       weight,
       bodyFatPercentage,
       userMode,
       subscriptionPlan,
-      isCoach: subscriptionPlan === 'ProCoach',
+      isCoach: role === 'coach' || subscriptionPlan === 'ProCoach',
       experienceLevel,
       dietPreferences,
       coachId,
@@ -480,6 +502,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAIAssistantEnabled,
       updateLastPlanReview,
       setNotificationSettings,
+      setRole,
 
       // Authentication methods
       setAuthTokens,

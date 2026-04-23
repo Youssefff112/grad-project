@@ -19,7 +19,7 @@ import * as authService from '../services/auth.service';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens } = useUser();
+  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -74,8 +74,13 @@ export const SignInScreen = ({ navigation }: any) => {
         // TODO: Fetch actual subscription plan from backend profile
         setSubscriptionPlan('Free'); // Default for now, should come from backend
 
+        // Persist role to context + AsyncStorage
+        setRole(user.role as any);
+
         // Navigate based on role
-        if (user.role === 'coach') {
+        if (user.role === 'admin') {
+          navigation.navigate('AdminDashboard');
+        } else if (user.role === 'coach') {
           setSubscriptionPlan('ProCoach');
           navigation.navigate('CoachCommandCenter');
         } else {

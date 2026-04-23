@@ -52,6 +52,12 @@ import { WorkoutBuilderScreen } from './src/screens/client/WorkoutBuilderScreen'
 import { DailyTrackerScreen } from './src/screens/client/DailyTrackerScreen';
 import { ProgressScreen } from './src/screens/client/ProgressScreen';
 
+// Admin screens
+import { AdminDashboardScreen } from './src/screens/admin/AdminDashboardScreen';
+import { AdminUserManagementScreen } from './src/screens/admin/AdminUserManagementScreen';
+import { AdminCoachApprovalsScreen } from './src/screens/admin/AdminCoachApprovalsScreen';
+import { AdminSubscriptionScreen } from './src/screens/admin/AdminSubscriptionScreen';
+
 // Coach screens (new organised location)
 import { CoachCommandCenterScreen } from './src/screens/coach/CoachCommandCenterScreen';
 import { CoachSubscriptionScreen } from './src/screens/coach/CoachSubscriptionScreen';
@@ -72,12 +78,16 @@ const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
   const { isDark } = useTheme();
-  const { fullName, isLoading, subscriptionPlan } = useUser();
+  const { fullName, isLoading, subscriptionPlan, role } = useUser();
 
   const initialRouteName = isLoading
     ? 'Splash'
     : fullName
-      ? subscriptionPlan === 'ProCoach' ? 'CoachCommandCenter' : 'TraineeCommandCenter'
+      ? role === 'admin'
+        ? 'AdminDashboard'
+        : (role === 'coach' || subscriptionPlan === 'ProCoach')
+          ? 'CoachCommandCenter'
+          : 'TraineeCommandCenter'
       : 'Splash';
 
   return (
@@ -134,6 +144,12 @@ function AppNavigator() {
       <Stack.Screen name="CoachBrowsingScreen" component={CoachBrowsingScreen} />
       <Stack.Screen name="CoachProfileDetail" component={CoachProfileDetailScreen} />
       <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
+
+      {/* Admin flow */}
+      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <Stack.Screen name="AdminUsers" component={AdminUserManagementScreen} />
+      <Stack.Screen name="AdminCoaches" component={AdminCoachApprovalsScreen} />
+      <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionScreen} />
 
       {/* Coach flow */}
       <Stack.Screen name="CoachSubscription" component={CoachSubscriptionScreen} />
