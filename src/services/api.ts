@@ -9,7 +9,19 @@ import { environment } from '../config/environment';
 import * as tokenManager from '../utils/tokenManager';
 import * as offlineService from './offlineService';
 import * as syncQueueService from './syncQueueService';
+import type { OperationType } from './syncQueueService';
 import { getCurrentNetworkState } from './networkService';
+
+const URL_TO_OPERATION_TYPE: Record<string, OperationType> = {
+  messages: 'message',
+  message: 'message',
+  notifications: 'notification_read',
+  notification: 'notification_read',
+  workouts: 'workout_complete',
+  workout: 'workout_complete',
+  meals: 'meal_log',
+  meal: 'meal_log',
+};
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -62,6 +74,9 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
+    if (!error.config) {
+      return Promise.reject(error);
+    }
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const method = originalRequest.method?.toUpperCase() as 'POST' | 'PUT' | 'PATCH' | 'GET' | 'DELETE' | undefined;
 
@@ -71,12 +86,24 @@ apiClient.interceptors.response.use(
       const networkState = await getCurrentNetworkState();
       if (!networkState.isOnline) {
         console.log(`[Offline] Queuing ${writeMethod} request: ${originalRequest.url}`);
-        // Queue the operation for later sync
+        let payload: Record<string, any> = {};
+        try {
+          if (originalRequest.data) {
+            payload = typeof originalRequest.data === 'string'
+              ? JSON.parse(originalRequest.data)
+              : JSON.parse(JSON.stringify(originalRequest.data));
+          }
+        } catch {
+          payload = {};
+        }
+        // Derive operation type from URL (e.g. /messages → 'message', /workouts → 'workout_complete')
+        const urlSegment = (originalRequest.url || '').split('/').filter(Boolean)[0] || '';
+        const operationType: OperationType = URL_TO_OPERATION_TYPE[urlSegment] ?? 'message';
         await syncQueueService.enqueueOperation(
-          'message', // default type, can be overridden
+          operationType,
           originalRequest.url || '',
           writeMethod,
-          originalRequest.data ? JSON.parse(typeof originalRequest.data === 'string' ? originalRequest.data : JSON.stringify(originalRequest.data)) : {},
+          payload,
           2 // priority
         );
         return Promise.resolve({ data: { queued: true } } as any);

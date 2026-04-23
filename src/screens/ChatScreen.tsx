@@ -33,14 +33,19 @@ export const ChatScreen = ({ navigation, route }: any) => {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationId);
   const scrollViewRef = useRef<ScrollView>(null);
   const socketRef = useRef<Socket | null>(null);
-
-  // Initialize Socket and fetch messages
+  // Use a ref so the socket message handler always reads the latest value without triggering re-runs
+  const activeConversationIdRef = useRef<string | null>(activeConversationId);
   useEffect(() => {
-    let activeConvId = activeConversationId;
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  // Initialize Socket and fetch messages — runs once on mount only
+  useEffect(() => {
     const initData = async () => {
-      if (activeConvId) {
+      const convId = activeConversationIdRef.current;
+      if (convId) {
         try {
-          const res = await getMessages(activeConvId).catch(err => {
+          const res = await getMessages(convId).catch(() => {
             console.log('Chat API not available, returning empty state gracefully');
             return { messages: [], pagination: {} };
           });
@@ -66,9 +71,9 @@ export const ChatScreen = ({ navigation, route }: any) => {
 
       socketRef.current.on('new_message', (msg: ChatMessage) => {
         setMessages((prev) => [...prev, msg]);
-        if (!activeConvId) {
+        if (!activeConversationIdRef.current) {
           setActiveConversationId(msg.conversationId);
-          activeConvId = msg.conversationId;
+          activeConversationIdRef.current = msg.conversationId;
         }
       });
     };
@@ -78,7 +83,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
     };
-  }, [activeConversationId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

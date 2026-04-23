@@ -35,16 +35,16 @@ export interface Conversation {
 
 export const getConversations = async (): Promise<Conversation[]> => {
   const response: any = await apiGet('/messages');
-  return response.data.conversations;
+  return response.conversations || [];
 };
 
 export const getMessages = async (conversationId: string, page = 1): Promise<{messages: ChatMessage[], pagination: any}> => {
   const response: any = await apiGet(`/messages/${conversationId}/messages?page=${page}`);
-  return response.data;
+  return { messages: response.messages || [], pagination: response.pagination || {} };
 };
 
 export const sendMessage = async (conversationId: string | null, receiverId: number | null, text: string): Promise<ChatMessage> => {
   const endpoint = conversationId ? `/messages/${conversationId}/messages` : `/messages/send`;
   const response: any = await apiPost(endpoint, { text, receiverId });
-  return response.data.message;
+  return response.message;
 };

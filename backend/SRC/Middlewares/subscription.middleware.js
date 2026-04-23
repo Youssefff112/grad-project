@@ -23,8 +23,8 @@ export const requireAIPlan = (role = 'client') => {
       // First check if subscription is active
       await subscriptionService.requireActiveSubscription(req.user.id, role);
 
-      // Then check if plan is Premium or Elite
-      const subscription = await subscriptionService.getActiveSubscription(req.user.id);
+      // Then check if plan is Premium or Elite (same role so we get the exact same subscription)
+      const subscription = await subscriptionService.getActiveSubscription(req.user.id, role);
       const aiPlans = ['Premium', 'Elite'];
 
       if (!aiPlans.includes(subscription.planName)) {

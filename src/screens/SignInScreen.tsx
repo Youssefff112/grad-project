@@ -71,8 +71,7 @@ export const SignInScreen = ({ navigation }: any) => {
         setFullName(fullName);
         saveEmail(user.email);
 
-        // TODO: Fetch actual subscription plan from backend profile
-        setSubscriptionPlan('Free'); // Default for now, should come from backend
+        setSubscriptionPlan((user as any).subscriptionPlan ?? 'Free');
 
         // Persist role to context + AsyncStorage
         setRole(user.role as any);

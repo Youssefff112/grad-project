@@ -97,10 +97,21 @@ export const sendMessage = async (req, res, next) => {
     const { text, receiverId } = req.body;
     const senderId = req.user.id;
 
+    if (!text || !text.trim()) {
+      return next(new AppError('Message text is required', 400));
+    }
+
     let conversation;
 
     if (conversationId) {
       conversation = await Conversation.findByPk(conversationId);
+      if (!conversation) {
+        return next(new AppError('Conversation not found', 404));
+      }
+      // Verify sender is a participant in this conversation
+      if (conversation.clientId !== senderId && conversation.coachId !== senderId) {
+        return next(new AppError('Unauthorized access to this conversation', 403));
+      }
     } else if (receiverId) {
       // Find or create conversation
       const isClient = req.user.role === 'client';

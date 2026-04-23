@@ -24,7 +24,7 @@ const buildDisplayName = (coach: CoachDetail): string => {
 
 export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { isDark, accent } = useTheme();
-  const { coachId, coachName: routeCoachName } = route.params;
+  const { coachId, coachName: routeCoachName } = route?.params ?? {};
 
   const [coach, setCoach] = useState<CoachWithDisplay | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -37,6 +37,11 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
   useEffect(() => {
+    if (!coachId) {
+      setError('No coach ID provided.');
+      setLoading(false);
+      return;
+    }
     loadCoachData();
   }, [coachId]);
 

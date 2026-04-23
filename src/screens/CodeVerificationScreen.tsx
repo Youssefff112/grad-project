@@ -85,16 +85,18 @@ export const CodeVerificationScreen = ({ navigation, route }: any) => {
       return;
     }
 
+    if (!resetToken) {
+      Alert.alert('Error', 'Reset token is missing. Please restart the password reset process.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      if (resetToken) {
-        // Use the reset token from the forgot-password response
-        await apiPost(`/auth/reset-password/${resetToken}`, {
-          password: newPassword,
-          confirmPassword: confirmPassword,
-        });
-      }
+      await apiPost(`/auth/reset-password/${resetToken}`, {
+        password: newPassword,
+        confirmPassword: confirmPassword,
+      });
 
       Alert.alert('Success', 'Password reset successfully! Please sign in with your new password.');
       navigation.navigate('SignIn');

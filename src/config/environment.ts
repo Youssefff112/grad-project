@@ -1,16 +1,36 @@
 /**
  * Environment Configuration
  *
- * Priority order for backend URL:
- *  1. EXPO_PUBLIC_BACKEND_URL in .env  ← set this to your ngrok static domain
- *  2. Falls back to localhost (same-machine emulator only)
+ * Backend URL priority order:
+ *  1. EXPO_PUBLIC_BACKEND_URL in .env  ← use this for ngrok / production
+ *  2. Auto-detected from Expo's dev-server host (works for any device on LAN)
+ *  3. localhost fallback (same-machine emulator only)
  *
- * To make the app work from any device / network:
- *   - Run `npm run tunnel` in the backend folder
- *   - Copy the ngrok URL into .env as EXPO_PUBLIC_BACKEND_URL
- *   - Restart Expo with `npx expo start --clear`
+ * For LAN testing (physical device / emulator on same Wi-Fi):
+ *   Just run `npx expo start --clear` — the host is detected automatically.
+ *
+ * For cross-network / production:
+ *   Set EXPO_PUBLIC_BACKEND_URL=https://your-ngrok-or-prod-url in .env
  */
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+import Constants from 'expo-constants';
+
+const getBackendUrl = (): string => {
+  // Explicit override always wins (ngrok, production, etc.)
+  const explicit = process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (explicit) return explicit;
+
+  // In Expo Go / dev builds, hostUri is the Metro bundler's address.
+  // The backend runs on the same machine, so we reuse the host with port 5000.
+  const hostUri = Constants.expoConfig?.hostUri ?? (Constants as any).manifest?.debuggerHost;
+  if (hostUri) {
+    const host = hostUri.split(':')[0]; // strip the Metro port
+    return `http://${host}:5000`;
+  }
+
+  return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendUrl();
 const API_PREFIX = process.env.EXPO_PUBLIC_API_PREFIX || '/api/v1';
 const ENV = process.env.EXPO_PUBLIC_ENV || 'development';
 

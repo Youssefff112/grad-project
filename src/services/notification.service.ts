@@ -15,7 +15,7 @@ export interface AppNotification {
 
 export const getNotifications = async (): Promise<AppNotification[]> => {
   const response: any = await apiGet('/notifications');
-  return response.data.notifications || [];
+  return response.notifications || [];
 };
 
 export const markNotificationAsRead = async (id: number): Promise<boolean> => {

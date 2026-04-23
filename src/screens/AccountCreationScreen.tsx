@@ -102,15 +102,7 @@ export const AccountCreationScreen = ({ navigation }: any) => {
         const msg = error.response?.data?.message;
         errorMessage = msg || 'Invalid registration data. Please check your inputs.';
       } else if (error.message === 'Network Error' || !error.response) {
-        console.log('Backend unavailable, creating local-only account...');
-        setFullName(name);
-        saveEmail(email);
-        if (isCoachSignup) {
-          navigation.navigate('CoachSubscription');
-        } else {
-          navigation.navigate('SubscriptionSelection');
-        }
-        return;
+        errorMessage = 'Cannot reach the server. Please check your internet connection and try again.';
       }
 
       Alert.alert('Registration Error', errorMessage);

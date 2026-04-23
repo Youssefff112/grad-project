@@ -1,5 +1,6 @@
 // src/Modules/Auth/auth.controller.js
 import { authService } from './auth.service.js';
+import { subscriptionService } from '../Subscription/subscription.service.js';
 import { successResponse } from '../../Utils/successResponse.utils.js';
 
 export const authController = {
@@ -13,6 +14,8 @@ export const authController = {
       user.refreshToken = refreshToken;
       await user.save();
 
+      const activeSubscription = await subscriptionService.getActiveSubscription(user.id, user.role).catch(() => null);
+
       successResponse(res, 201, 'User registered successfully', {
         user: {
           id: user.id,
@@ -20,7 +23,9 @@ export const authController = {
           lastName: user.lastName,
           email: user.email,
           userType: user.userType,
-          role: user.role
+          role: user.role,
+          isActive: user.isActive,
+          subscriptionPlan: activeSubscription?.planName || null
         },
         token,
         refreshToken,
@@ -35,7 +40,9 @@ export const authController = {
     try {
       const { email, password } = req.body;
       const { user, token, refreshToken } = await authService.login(email, password);
-      
+
+      const activeSubscription = await subscriptionService.getActiveSubscription(user.id, user.role).catch(() => null);
+
       successResponse(res, 200, 'Login successful', {
         user: {
           id: user.id,
@@ -43,7 +50,9 @@ export const authController = {
           lastName: user.lastName,
           email: user.email,
           userType: user.userType,
-          role: user.role
+          role: user.role,
+          isActive: user.isActive,
+          subscriptionPlan: activeSubscription?.planName || null
         },
         token,
         refreshToken,
@@ -61,7 +70,8 @@ export const authController = {
       
       successResponse(res, 200, 'Token refreshed successfully', {
         token,
-        refreshToken: newRefreshToken
+        refreshToken: newRefreshToken,
+        expiresIn: 7 * 24 * 60 * 60 // 604800 seconds — matches JWT_EXPIRES_IN=7d
       });
     } catch (error) {
       next(error);

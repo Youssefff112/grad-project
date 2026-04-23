@@ -39,7 +39,7 @@ export const dietService = {
     } = data || {};
 
     const activePlan = dietPlanId
-      ? await DietPlan.findByPk(dietPlanId)
+      ? await DietPlan.findOne({ where: { id: dietPlanId, userId } })
       : await DietPlan.findOne({ where: { userId, isActive: true } });
 
     if (!activePlan) {

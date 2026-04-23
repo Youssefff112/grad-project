@@ -49,7 +49,7 @@ export const workoutService = {
   async startWorkoutSession(userId, data) {
     const { day, workoutPlanId } = data || {};
     const startTime = new Date();
-    const sessionDay = day || startTime.toLocaleDateString('en-US', { weekday: 'lowercase' });
+    const sessionDay = day || startTime.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
     const existingSession = await WorkoutLog.findOne({
       where: { userId, status: 'in_progress' }

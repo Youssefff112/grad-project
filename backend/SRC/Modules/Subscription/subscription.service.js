@@ -85,6 +85,9 @@ export const subscriptionService = {
     if (subscriptionId && (status || 'paid') === 'paid') {
       const subscription = await Subscription.findByPk(subscriptionId);
       if (subscription) {
+        if (subscription.userId !== userId) {
+          throw new AppError('Subscription does not belong to this user', 403);
+        }
         subscription.status = 'active';
         subscription.startDate = subscription.startDate || new Date();
         if (!subscription.endDate) {

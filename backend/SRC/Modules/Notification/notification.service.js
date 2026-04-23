@@ -8,7 +8,7 @@ import { Op } from 'sequelize';
 export const notificationService = {
   // Send workout reminders (FR-3.4)
   async sendWorkoutReminders() {
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'lowercase' });
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     
     // Find all active workout plans for today
     const plans = await WorkoutPlan.findAll({
