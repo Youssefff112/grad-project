@@ -25,11 +25,11 @@ export const requireAIPlan = (role = 'client') => {
 
       // Then check if plan is Premium or Elite (same role so we get the exact same subscription)
       const subscription = await subscriptionService.getActiveSubscription(req.user.id, role);
-      const aiPlans = ['Premium', 'Elite'];
+      const aiPlans = ['Standard', 'Elite'];
 
       if (!aiPlans.includes(subscription.planName)) {
         throw new AppError(
-          `AI features are only available on Premium and Elite plans. Your current plan (${subscription.planName}) does not have access to this feature.`,
+          `AI features are only available on Standard and Elite plans. Your current plan (${subscription.planName}) does not have access to this feature.`,
           403
         );
       }

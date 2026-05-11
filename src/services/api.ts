@@ -175,11 +175,6 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Handle 403 Forbidden
-    if (error.response?.status === 403) {
-      await tokenManager.clearTokens();
-    }
-
     return Promise.reject(error);
   }
 );

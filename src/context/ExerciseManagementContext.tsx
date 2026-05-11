@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COMMON_EXERCISES } from '../services/exerciseService';
 
 export interface Exercise {
   id: string;
@@ -55,10 +56,31 @@ export const ExerciseManagementProvider: React.FC<{ children: React.ReactNode }>
 
         if (exercisesData) {
           try {
-            setExercises(JSON.parse(exercisesData));
-          } catch (parseError) {
-            console.warn('[ExerciseContext] Failed to parse exercises:', parseError);
+            const parsed: Exercise[] = JSON.parse(exercisesData);
+            if (parsed.length > 0) {
+              setExercises(parsed);
+            } else {
+              throw new Error('empty');
+            }
+          } catch {
+            const seeded: Exercise[] = COMMON_EXERCISES.map((ex, i) => ({
+              ...ex,
+              id: `seed_${i}`,
+              source: 'api' as const,
+              createdAt: Date.now(),
+            }));
+            setExercises(seeded);
+            await AsyncStorage.setItem('exercises', JSON.stringify(seeded)).catch(() => {});
           }
+        } else {
+          const seeded: Exercise[] = COMMON_EXERCISES.map((ex, i) => ({
+            ...ex,
+            id: `seed_${i}`,
+            source: 'api' as const,
+            createdAt: Date.now(),
+          }));
+          setExercises(seeded);
+          await AsyncStorage.setItem('exercises', JSON.stringify(seeded)).catch(() => {});
         }
 
         if (workoutsData) {
