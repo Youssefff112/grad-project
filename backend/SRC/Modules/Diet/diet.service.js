@@ -240,6 +240,227 @@ export const dietService = {
     return weeklyPlan;
   },
 
+  // ─── Nutritional food database (per 100g / per unit as noted) ────────────────
+  // Mirrors the frontend FOOD_DATASET so meals are always built from real data.
+  _getFoodDb() {
+    return {
+      proteins: [
+        { name: 'Chicken Breast', cal: 165, protein: 31,  carbs: 0,    fat: 3.6,  unit: 'g',  vegan: false },
+        { name: 'Salmon',         cal: 208, protein: 20,  carbs: 0,    fat: 13,   unit: 'g',  vegan: false },
+        { name: 'Tuna (canned)',  cal: 116, protein: 25.5,carbs: 0,    fat: 1,    unit: 'g',  vegan: false },
+        { name: 'Turkey Breast',  cal: 135, protein: 30,  carbs: 0,    fat: 1,    unit: 'g',  vegan: false },
+        { name: 'Lean Beef',      cal: 215, protein: 26,  carbs: 0,    fat: 12,   unit: 'g',  vegan: false },
+        { name: 'Shrimp',         cal: 84,  protein: 18,  carbs: 0,    fat: 0.9,  unit: 'g',  vegan: false },
+        { name: 'Tilapia',        cal: 96,  protein: 20,  carbs: 0,    fat: 2,    unit: 'g',  vegan: false },
+        { name: 'Eggs',           cal: 78,  protein: 6,   carbs: 0.6,  fat: 5,    unit: 'egg (50g)', vegan: false },
+        { name: 'Egg Whites',     cal: 17,  protein: 3.6, carbs: 0.2,  fat: 0.1,  unit: 'g',  vegan: false },
+        { name: 'Greek Yogurt',   cal: 59,  protein: 10,  carbs: 3.6,  fat: 0.4,  unit: 'g',  vegan: false },
+        { name: 'Cottage Cheese', cal: 81,  protein: 11,  carbs: 3,    fat: 2,    unit: 'g',  vegan: false },
+        { name: 'Whey Protein',   cal: 120, protein: 24,  carbs: 3,    fat: 1.5,  unit: 'g',  vegan: false },
+        { name: 'Tofu',           cal: 76,  protein: 8,   carbs: 2,    fat: 4,    unit: 'g',  vegan: true  },
+        { name: 'Edamame',        cal: 121, protein: 11,  carbs: 9,    fat: 5,    unit: 'g',  vegan: true  },
+        { name: 'Lentils',        cal: 116, protein: 9,   carbs: 20,   fat: 0.4,  unit: 'g',  vegan: true  },
+        { name: 'Chickpeas',      cal: 164, protein: 8.9, carbs: 27,   fat: 2.6,  unit: 'g',  vegan: true  },
+        { name: 'Black Beans',    cal: 132, protein: 8.9, carbs: 24,   fat: 0.5,  unit: 'g',  vegan: true  },
+      ],
+      carbs: [
+        { name: 'Brown Rice',       cal: 112, protein: 2.6, carbs: 24, fat: 0.9, unit: 'g cooked' },
+        { name: 'White Rice',       cal: 130, protein: 2.7, carbs: 28, fat: 0.3, unit: 'g cooked' },
+        { name: 'Quinoa',           cal: 120, protein: 4.4, carbs: 22, fat: 1.9, unit: 'g cooked' },
+        { name: 'Oats',             cal: 389, protein: 17,  carbs: 66, fat: 7,   unit: 'g dry'    },
+        { name: 'Sweet Potato',     cal: 86,  protein: 1.6, carbs: 20, fat: 0.1, unit: 'g baked'  },
+        { name: 'Whole Wheat Pasta',cal: 124, protein: 5,   carbs: 27, fat: 0.5, unit: 'g cooked' },
+        { name: 'Whole Wheat Bread',cal: 247, protein: 13,  carbs: 41, fat: 4,   unit: 'g'        },
+        { name: 'Banana',           cal: 89,  protein: 1.1, carbs: 23, fat: 0.3, unit: 'g'        },
+      ],
+      fats: [
+        { name: 'Avocado',       cal: 160, fat: 15, unit: 'g'    },
+        { name: 'Almonds',       cal: 579, fat: 50, unit: 'g'    },
+        { name: 'Walnuts',       cal: 654, fat: 65, unit: 'g'    },
+        { name: 'Peanut Butter', cal: 588, fat: 50, unit: 'g'    },
+        { name: 'Almond Butter', cal: 614, fat: 56, unit: 'g'    },
+        { name: 'Olive Oil',     cal: 884, fat: 100,unit: 'ml'   },
+        { name: 'Chia Seeds',    cal: 486, fat: 31, unit: 'g'    },
+      ],
+      vegetables: [
+        { name: 'Broccoli',            cal: 34, unit: 'g' },
+        { name: 'Spinach',             cal: 23, unit: 'g' },
+        { name: 'Mixed Salad Greens',  cal: 20, unit: 'g' },
+        { name: 'Asparagus',           cal: 20, unit: 'g' },
+        { name: 'Zucchini',            cal: 17, unit: 'g' },
+        { name: 'Bell Pepper',         cal: 31, unit: 'g' },
+        { name: 'Cucumber',            cal: 15, unit: 'g' },
+        { name: 'Tomato',              cal: 18, unit: 'g' },
+        { name: 'Mushrooms',           cal: 22, unit: 'g' },
+        { name: 'Kale',                cal: 49, unit: 'g' },
+      ],
+      fruits: [
+        { name: 'Blueberries',  cal: 57 },
+        { name: 'Strawberries', cal: 32 },
+        { name: 'Banana',       cal: 89 },
+        { name: 'Apple',        cal: 52 },
+        { name: 'Orange',       cal: 47 },
+      ],
+      dairy: [
+        { name: 'Greek Yogurt',   cal: 59,  protein: 10,  carbs: 3.6, fat: 0.4, unit: 'g' },
+        { name: 'Cottage Cheese', cal: 81,  protein: 11,  carbs: 3,   fat: 2,   unit: 'g' },
+        { name: 'Skim Milk',      cal: 34,  protein: 3.4, carbs: 4.9, fat: 0.1, unit: 'ml' },
+        { name: 'Whole Milk',     cal: 61,  protein: 3.2, carbs: 4.8, fat: 3.3, unit: 'ml' },
+      ]
+    };
+  },
+
+  // Round grams to the nearest 5 for a clean display
+  _roundGrams(g) { return Math.round(g / 5) * 5 || 5; },
+
+  /**
+   * Compose one meal from real food-database items.
+   * Returns { name, servingSize, ingredients[], nutrition{} }
+   */
+  _composeMeal(targetCal, targetProtein, mealType, isVegan, isVegetarian, dayIndex) {
+    const db = this._getFoodDb();
+    const pick = (arr) => arr[dayIndex % arr.length];
+    const rg = (g) => this._roundGrams(g);
+    const ingredients = [];
+    let totalCal = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+
+    if (mealType === 'breakfast') {
+      // ── Protein source ──
+      if (isVegan) {
+        // vegan breakfast: oats + protein powder equivalent from seeds/nut butter
+        const oats = db.carbs.find(c => c.name === 'Oats');
+        const oatGrams = rg(targetCal * 0.45 / (oats.cal / 100));
+        ingredients.push(`${oatGrams}${oats.unit} ${oats.name}`);
+        totalCal += oats.cal * oatGrams / 100;
+        totalProt += oats.protein * oatGrams / 100;
+        totalCarbs += oats.carbs * oatGrams / 100;
+        totalFat += oats.fat * oatGrams / 100;
+
+        const nut = pick(db.fats.filter(f => f.name !== 'Olive Oil'));
+        const nutGrams = rg((targetCal * 0.15) / (nut.cal / 100));
+        ingredients.push(`${nutGrams}g ${nut.name}`);
+        totalCal += nut.cal * nutGrams / 100;
+        totalFat += nut.fat * nutGrams / 100;
+      } else if (isVegetarian) {
+        const dairy = pick(db.dairy);
+        const dairyG = rg(targetProtein * 0.7 / (dairy.protein / 100));
+        ingredients.push(`${dairyG}${dairy.unit} ${dairy.name}`);
+        totalCal += dairy.cal * dairyG / 100;
+        totalProt += dairy.protein * dairyG / 100;
+        totalCarbs += dairy.carbs * dairyG / 100;
+        totalFat += dairy.fat * dairyG / 100;
+      } else {
+        // eggs or whey + oats
+        const eggs = db.proteins.find(p => p.name === 'Eggs');
+        const eggCount = Math.max(2, Math.round(targetProtein * 0.5 / eggs.protein));
+        ingredients.push(`${eggCount} Eggs (${eggCount * 50}g)`);
+        totalCal += eggs.cal * eggCount;
+        totalProt += eggs.protein * eggCount;
+        totalCarbs += eggs.carbs * eggCount;
+        totalFat += eggs.fat * eggCount;
+      }
+
+      // ── Carb source ──
+      const carbBudget = targetCal - totalCal;
+      if (carbBudget > 50) {
+        const carbSrc = pick([db.carbs.find(c => c.name === 'Oats'), db.carbs.find(c => c.name === 'Banana'), db.carbs.find(c => c.name === 'Whole Wheat Bread')]);
+        const carbGrams = rg(carbBudget * 0.6 / (carbSrc.cal / 100));
+        ingredients.push(`${carbGrams}${carbSrc.unit} ${carbSrc.name}`);
+        totalCal += carbSrc.cal * carbGrams / 100;
+        totalCarbs += carbSrc.carbs * carbGrams / 100;
+        totalProt += carbSrc.protein * carbGrams / 100;
+      }
+
+      // ── Fruit topping ──
+      const fruit = pick(db.fruits);
+      const fruitGrams = rg(80);
+      ingredients.push(`${fruitGrams}g ${fruit.name}`);
+      totalCal += fruit.cal * fruitGrams / 100;
+
+      const mealNames = ['Breakfast Protein Bowl', 'Morning Fuel Plate', 'High-Protein Breakfast', 'Power Breakfast'];
+      return { name: pick(mealNames), servingSize: `1 bowl (≈${rg(ingredients.reduce((s, i) => { const m = i.match(/^(\d+)/); return s + (m ? parseInt(m[1]) : 0); }, 0))}g)`, ingredients, totalCal, totalProt, totalCarbs, totalFat };
+    }
+
+    if (mealType === 'lunch' || mealType === 'dinner') {
+      // ── Protein source ──
+      const protPool = isVegan
+        ? db.proteins.filter(p => p.vegan)
+        : isVegetarian
+        ? db.proteins.filter(p => p.vegan || ['Eggs', 'Greek Yogurt', 'Cottage Cheese'].includes(p.name))
+        : db.proteins.filter(p => !p.vegan);
+      const prot = pick(protPool);
+      const protGrams = rg(targetProtein * 0.85 / (prot.protein / 100));
+      ingredients.push(`${protGrams}g ${prot.name}`);
+      totalCal += prot.cal * protGrams / 100;
+      totalProt += prot.protein * protGrams / 100;
+      totalCarbs += prot.carbs * protGrams / 100;
+      totalFat += prot.fat * protGrams / 100;
+
+      // ── Carb source ──
+      const carbOptions = isVegan
+        ? db.carbs.filter(c => !['Whole Wheat Bread'].includes(c.name))
+        : db.carbs;
+      const carb = pick(carbOptions.filter(c => c.name !== 'Oats' && c.name !== 'Banana'));
+      const remainingForCarbs = targetCal - totalCal;
+      const carbGrams = rg(remainingForCarbs * 0.55 / (carb.cal / 100));
+      ingredients.push(`${carbGrams}${carb.unit} ${carb.name}`);
+      totalCal += carb.cal * carbGrams / 100;
+      totalCarbs += carb.carbs * carbGrams / 100;
+      totalProt += carb.protein * carbGrams / 100;
+      totalFat += carb.fat * carbGrams / 100;
+
+      // ── Vegetable ──
+      const veg = pick(db.vegetables);
+      const vegGrams = rg(120);
+      ingredients.push(`${vegGrams}g ${veg.name}`);
+      totalCal += veg.cal * vegGrams / 100;
+
+      // ── Fat/dressing ──
+      const fatRemaining = targetCal - totalCal;
+      if (fatRemaining > 30) {
+        const fatSrc = isVegan
+          ? pick([db.fats.find(f => f.name === 'Olive Oil'), db.fats.find(f => f.name === 'Avocado')])
+          : pick([db.fats.find(f => f.name === 'Olive Oil'), db.fats.find(f => f.name === 'Avocado')]);
+        const fatGrams = Math.max(5, rg(fatRemaining * 0.6 / (fatSrc.cal / 100)));
+        ingredients.push(`${fatGrams}${fatSrc.unit} ${fatSrc.name}`);
+        totalCal += fatSrc.cal * fatGrams / 100;
+        totalFat += fatSrc.fat * fatGrams / 100;
+      }
+
+      const names = mealType === 'lunch'
+        ? ['Protein Lunch Bowl', 'Midday Fuel Plate', 'Lean Lunch', 'Balanced Lunch Plate']
+        : ['Protein Dinner Plate', 'Evening Recovery Meal', 'Lean Dinner Bowl', 'Balanced Dinner'];
+      return { name: pick(names), servingSize: `1 plate (≈${rg(protGrams + (carbGrams || 0) + 120)}g)`, ingredients, totalCal, totalProt, totalCarbs, totalFat };
+    }
+
+    // ── Snack ──
+    const snackItems = isVegan
+      ? [db.fruits[dayIndex % db.fruits.length], null, db.fats.find(f => f.name === 'Almond Butter')]
+      : [db.dairy[dayIndex % db.dairy.length], db.fruits[dayIndex % db.fruits.length], null];
+
+    const snackProtein = snackItems[0];
+    if (snackProtein && snackProtein.protein) {
+      const g = rg(targetProtein * 0.8 / (snackProtein.protein / 100));
+      ingredients.push(`${g}${snackProtein.unit} ${snackProtein.name}`);
+      totalCal += snackProtein.cal * g / 100;
+      totalProt += snackProtein.protein * g / 100;
+    }
+    const snackFruit = snackItems[1];
+    if (snackFruit) {
+      ingredients.push(`80g ${snackFruit.name}`);
+      totalCal += snackFruit.cal * 80 / 100;
+    }
+    const snackNut = snackItems[2];
+    if (snackNut) {
+      ingredients.push(`20g ${snackNut.name}`);
+      totalCal += snackNut.cal * 20 / 100;
+      totalFat += snackNut.fat * 20 / 100;
+    }
+
+    const snackNames = ['Protein Snack', 'Recovery Snack', 'Afternoon Fuel', 'Post-Workout Snack'];
+    return { name: pick(snackNames), servingSize: '1 snack portion', ingredients, totalCal, totalProt, totalCarbs, totalFat };
+  },
+
   _getMealCatalog() {
     return {
       breakfast: [
@@ -394,53 +615,32 @@ export const dietService = {
   },
 
   _generateDailyMeals(dailyCalories, macros, dietaryPreference, dayIndex = 0) {
-    const catalog = this._getMealCatalog();
     const calorieDistribution = { breakfast: 0.25, lunch: 0.35, dinner: 0.30, snack: 0.10 };
+    const pref = (dietaryPreference || 'none').toLowerCase();
+    const isVegan = pref === 'vegan';
+    const isVegetarian = pref === 'vegetarian' || isVegan;
 
-    // Filter options by dietary preference, fall back to 'all' tagged options
-    const filterByDiet = (options) => {
-      const pref = (dietaryPreference || 'none').toLowerCase();
-      if (pref === 'none') return options;
-      const filtered = options.filter(m => m.tags.includes(pref));
-      return filtered.length > 0 ? filtered : options;
-    };
+    return ['breakfast', 'lunch', 'dinner', 'snack'].map((type, typeIdx) => {
+      const targetCal  = Math.round(dailyCalories * calorieDistribution[type]);
+      const targetProt = Math.round(macros.protein  * calorieDistribution[type]);
+      const targetCarb = Math.round(macros.carbs    * calorieDistribution[type]);
 
-    // Pick a meal option, rotating by dayIndex for variety across the week
-    const pick = (options) => {
-      const eligible = filterByDiet(options);
-      return eligible[dayIndex % eligible.length];
-    };
-
-    return ['breakfast', 'lunch', 'dinner', 'snack'].map(type => {
-      const meal = pick(catalog[type]);
-      const targetCal = Math.round(dailyCalories * calorieDistribution[type]);
-      const scale = meal.baseCal > 0 ? targetCal / meal.baseCal : 1;
-
-      // Build scaled ingredients list
-      const scaledIngredients = scale >= 1.2 || scale <= 0.85
-        ? meal.ingredients.map(ing => {
-            const numMatch = ing.match(/^(\d+(?:\.\d+)?)(g|ml)/);
-            if (numMatch) {
-              const scaled = Math.round(parseFloat(numMatch[1]) * scale);
-              return `${scaled}${numMatch[2]}${ing.slice(numMatch[0].length)}`;
-            }
-            return ing;
-          })
-        : meal.ingredients;
+      // Use a different rotation offset per meal type so each slot varies independently
+      const composed = this._composeMeal(targetCal, targetProt, type, isVegan, isVegetarian, dayIndex + typeIdx * 3);
 
       return {
         type,
-        name: meal.name,
-        description: `Serving: ${meal.servingSize}`,
-        servingSize: meal.servingSize,
-        ingredients: scaledIngredients,
+        name: composed.name,
+        description: `Serving: ${composed.servingSize}`,
+        servingSize: composed.servingSize,
+        ingredients: composed.ingredients,
         nutrition: {
-          calories: targetCal,
-          protein: Math.round(meal.baseProtein * scale),
-          carbs: Math.round(meal.baseCarbs * scale),
-          fats: Math.round(meal.baseFat * scale)
+          calories: Math.round(composed.totalCal) || targetCal,
+          protein:  Math.round(composed.totalProt) || targetProt,
+          carbs:    Math.round(composed.totalCarbs) || targetCarb,
+          fats:     Math.round(composed.totalFat)
         },
-        preparationTime: meal.prepTime
+        preparationTime: type === 'snack' ? 3 : type === 'breakfast' ? 10 : 25
       };
     });
   },
