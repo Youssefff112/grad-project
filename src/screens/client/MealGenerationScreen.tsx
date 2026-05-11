@@ -20,6 +20,13 @@ import * as dietService from '../../services/dietService';
 import { useFoodManagement } from '../../context/FoodManagementContext';
 
 // ── Built-in meal alternatives per time slot ──────────────────────────────────
+/** Converts snake_case / underscore enum values to Title Case for display */
+const prettyLabel = (s?: string) =>
+  (s || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim() || 'General';
+
 const MEAL_ALTERNATIVES: Record<string, Array<{ name: string; calories: number; protein: number; carbs: number; fat: number; serving: string }>> = {
   breakfast: [
     { name: 'Oatmeal with Berries', calories: 320, protein: 10, carbs: 58, fat: 6, serving: '1 bowl' },
@@ -83,10 +90,10 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status: 'pending' | 'appr
   const firstDay = plan.weeklyMealPlan?.[0];
   return {
     id: String(plan.id),
-    name: `${plan.goal || 'My'} Meal Plan`,
+    name: `${prettyLabel(plan.goal) || 'My'} Meal Plan`,
     dayCount: plan.weeklyMealPlan?.length || 7,
     totalCalories: plan.dailyCalorieTarget,
-    dietType: plan.dietaryPreference || 'balanced',
+    dietType: prettyLabel(plan.dietaryPreference) || 'Balanced',
     meals: (firstDay?.meals || []).map(m => ({
       time: m.type.charAt(0).toUpperCase() + m.type.slice(1),
       totalCalories: m.nutrition.calories,
@@ -590,6 +597,56 @@ export const MealGenerationScreen = ({ navigation }: any) => {
             )}
           </ScrollView>
 
+          {/* ── Substitute Sheet (overlay inside preview, avoids nested-Modal iOS bug) ── */}
+          {substituteTarget !== null && (
+            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', zIndex: 20 }}>
+              <View style={{ backgroundColor: bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '72%' }}>
+                <View style={tw`p-4`}>
+                  <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]} />
+                  <View style={tw`flex-row items-center justify-between mb-1`}>
+                    <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>Choose a Substitute</Text>
+                    <TouchableOpacity onPress={() => setSubstituteTarget(null)}>
+                      <MaterialIcons name="close" size={24} color={accent} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[tw`text-xs mb-3`, { color: textSecondary }]}>Tap to replace the selected item</Text>
+                </View>
+                <ScrollView contentContainerStyle={tw`px-4 pb-8 gap-2`} showsVerticalScrollIndicator={false}>
+                  {(() => {
+                    const meal = generatedMeal?.meals[substituteTarget.mealIdx];
+                    const timeKey = meal?.time?.toLowerCase() || 'snack';
+                    const alts =
+                      MEAL_ALTERNATIVES[timeKey] ||
+                      MEAL_ALTERNATIVES[Object.keys(MEAL_ALTERNATIVES).find((k) => timeKey.includes(k)) || 'snack'] ||
+                      MEAL_ALTERNATIVES.snack;
+                    return alts.map((alt, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => handleSubstituteMeal(substituteTarget.mealIdx, substituteTarget.itemIdx, alt)}
+                        style={[tw`p-4 rounded-xl`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
+                      >
+                        <View style={tw`flex-row items-start justify-between`}>
+                          <View style={tw`flex-1`}>
+                            <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{alt.name}</Text>
+                            <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>{alt.serving}</Text>
+                            <View style={tw`flex-row gap-3 mt-1`}>
+                              <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>P:{alt.protein}g</Text>
+                              <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>C:{alt.carbs}g</Text>
+                              <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>F:{alt.fat}g</Text>
+                            </View>
+                          </View>
+                          <View style={[tw`px-2 py-1 rounded-full ml-2`, { backgroundColor: accent + '18' }]}>
+                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>{alt.calories} cal</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ));
+                  })()}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
           <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
             {userMode === 'CoachAssisted' ? (
               <>
@@ -620,83 +677,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
         </SafeAreaView>
       </Modal>
 
-      {/* ── Meal Substitute Sheet ──────────────────────────────────────────── */}
-      <Modal
-        visible={substituteTarget !== null}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setSubstituteTarget(null)}
-      >
-        <View style={[tw`flex-1 justify-end`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <SafeAreaView style={[tw`rounded-t-3xl`, { backgroundColor: bg, maxHeight: '70%' }]}>
-            <View style={tw`p-4`}>
-              <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]} />
-              <View style={tw`flex-row items-center justify-between mb-2`}>
-                <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
-                  Choose a Substitute
-                </Text>
-                <TouchableOpacity onPress={() => setSubstituteTarget(null)}>
-                  <MaterialIcons name="close" size={24} color={accent} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[tw`text-xs mb-4`, { color: textSecondary }]}>
-                Tap to replace the selected meal item
-              </Text>
-            </View>
-
-            <ScrollView contentContainerStyle={tw`px-4 pb-6 gap-2`} showsVerticalScrollIndicator={false}>
-              {(() => {
-                if (substituteTarget === null || !generatedMeal) return null;
-                const meal = generatedMeal.meals[substituteTarget.mealIdx];
-                const timeKey = meal?.time?.toLowerCase() || 'snack';
-                const alts =
-                  MEAL_ALTERNATIVES[timeKey] ||
-                  MEAL_ALTERNATIVES[
-                    Object.keys(MEAL_ALTERNATIVES).find((k) => timeKey.includes(k)) || 'snack'
-                  ] ||
-                  MEAL_ALTERNATIVES.snack;
-                return alts.map((alt, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() =>
-                      handleSubstituteMeal(
-                        substituteTarget.mealIdx,
-                        substituteTarget.itemIdx,
-                        alt,
-                      )
-                    }
-                    style={[
-                      tw`p-4 rounded-xl`,
-                      { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
-                    ]}
-                  >
-                    <View style={tw`flex-row items-start justify-between`}>
-                      <View style={tw`flex-1`}>
-                        <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>
-                          {alt.name}
-                        </Text>
-                        <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
-                          {alt.serving}
-                        </Text>
-                        <View style={tw`flex-row gap-3 mt-1`}>
-                          <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>P:{alt.protein}g</Text>
-                          <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>C:{alt.carbs}g</Text>
-                          <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>F:{alt.fat}g</Text>
-                        </View>
-                      </View>
-                      <View style={[tw`px-2 py-1 rounded-full ml-2`, { backgroundColor: accent + '18' }]}>
-                        <Text style={[tw`text-xs font-bold`, { color: accent }]}>
-                          {alt.calories} cal
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ));
-              })()}
-            </ScrollView>
-          </SafeAreaView>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };

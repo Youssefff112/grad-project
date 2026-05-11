@@ -58,11 +58,17 @@ const mapExperienceToDifficulty = (level?: string): 'Easy' | 'Moderate' | 'Hard'
   return 'Moderate';
 };
 
+const prettyLabel = (s?: string) =>
+  (s || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim() || 'General';
+
 const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => {
   const workoutDays = plan.weeklySchedule?.filter((d) => !d.isRestDay) || [];
   return workoutDays.map((day) => ({
     id: `${plan.id}-${day.day}`,
-    name: `${day.day}: ${day.focus || 'Workout'}`,
+    name: `${prettyLabel(day.day)}: ${day.focus || 'Workout'}`,
     duration: day.duration || 60,
     difficulty: mapExperienceToDifficulty(plan.experienceLevel),
     focus: day.focus || 'Full Body',
@@ -72,7 +78,7 @@ const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => 
       reps: e.reps,
       rest: e.restTime,
     })),
-    notes: `${workoutDays.length} workout days per week · Goal: ${plan.goal || 'Fitness'}`,
+    notes: `${workoutDays.length} workout days per week · Goal: ${prettyLabel(plan.goal) || 'Fitness'}`,
     status: 'approved' as const,
   }));
 };
