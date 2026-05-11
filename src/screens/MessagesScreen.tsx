@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -27,6 +27,7 @@ export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { totalUnread } = useNotifications();
   const { userId, userMode, isCoach } = useUser();
+  const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
@@ -294,55 +295,106 @@ export const MessagesScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      {/* New Message Modal */}
-      {showNewMessage && (
-        <View
-          style={[
-            tw`absolute bottom-0 left-0 right-0 rounded-t-3xl p-5`,
-            { backgroundColor: cardBg, borderTopWidth: 1, borderColor: cardBorder },
-          ]}
+      {/* New Message Bottom Sheet */}
+      <Modal
+        visible={showNewMessage}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setShowNewMessage(false); setNewMessageText(''); }}
+      >
+        <KeyboardAvoidingView
+          style={tw`flex-1`}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={tw`flex-row items-center justify-between mb-4`}>
-            <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>New Message</Text>
-            <TouchableOpacity onPress={() => setShowNewMessage(false)}>
-              <MaterialIcons name="close" size={24} color={textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          <TextInput
-            style={[
-              tw`rounded-xl p-4 text-base mb-4`,
-              {
-                backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
-                color: textPrimary,
-                borderWidth: 1,
-                borderColor: cardBorder,
-                minHeight: 100 },
-            ]}
-            placeholder="Type your message..."
-            placeholderTextColor={textMuted}
-            value={newMessageText}
-            onChangeText={setNewMessageText}
-            multiline
-            numberOfLines={4}
+          <TouchableOpacity
+            style={[tw`flex-1`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+            activeOpacity={1}
+            onPress={() => { setShowNewMessage(false); setNewMessageText(''); }}
           />
+          <View
+            style={[
+              tw`rounded-t-3xl px-5 pt-4`,
+              {
+                backgroundColor: cardBg,
+                borderTopWidth: 1,
+                borderColor: cardBorder,
+                paddingBottom: insets.bottom + 16,
+              },
+            ]}
+          >
+            {/* Handle */}
+            <View style={[tw`w-10 h-1 rounded-full self-center mb-5`, { backgroundColor: isDark ? '#334155' : '#cbd5e1' }]} />
 
-          <View style={tw`flex-row gap-3`}>
-            <TouchableOpacity
-              style={[tw`flex-1 py-3 rounded-xl items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
-              onPress={() => setShowNewMessage(false)}
-            >
-              <Text style={[tw`font-bold`, { color: textPrimary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[tw`flex-1 py-3 rounded-xl items-center justify-center`, { backgroundColor: accent }]}
-              onPress={handleNewMessage}
-            >
-              <Text style={[tw`font-bold text-white`]}>Send</Text>
-            </TouchableOpacity>
+            {/* Header */}
+            <View style={tw`flex-row items-center justify-between mb-5`}>
+              <View>
+                <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>New Message</Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                  {isCoach ? 'Message your client' : 'Message your coach'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => { setShowNewMessage(false); setNewMessageText(''); }}
+                style={[tw`w-9 h-9 rounded-full items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+              >
+                <MaterialIcons name="close" size={18} color={textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Message input */}
+            <TextInput
+              style={[
+                tw`rounded-xl px-4 py-3 text-sm`,
+                {
+                  backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                  color: textPrimary,
+                  borderWidth: 1,
+                  borderColor: cardBorder,
+                  minHeight: 110,
+                  textAlignVertical: 'top',
+                },
+              ]}
+              placeholder="Write your message here…"
+              placeholderTextColor={textMuted}
+              value={newMessageText}
+              onChangeText={setNewMessageText}
+              multiline
+              autoFocus
+            />
+
+            {/* Character hint */}
+            <Text style={[tw`text-xs text-right mt-1 mb-4`, { color: textMuted }]}>
+              {newMessageText.length} / 500
+            </Text>
+
+            {/* Actions */}
+            <View style={tw`flex-row gap-3`}>
+              <TouchableOpacity
+                style={[
+                  tw`flex-1 py-3.5 rounded-xl items-center justify-center`,
+                  { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: cardBorder },
+                ]}
+                onPress={() => { setShowNewMessage(false); setNewMessageText(''); }}
+              >
+                <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  tw`flex-1 py-3.5 rounded-xl items-center justify-center flex-row gap-2`,
+                  { backgroundColor: newMessageText.trim() ? accent : (isDark ? '#1e293b' : '#e2e8f0') },
+                ]}
+                onPress={handleNewMessage}
+                disabled={!newMessageText.trim()}
+              >
+                <MaterialIcons name="send" size={16} color={newMessageText.trim() ? '#ffffff' : textMuted} />
+                <Text style={[tw`text-sm font-bold`, { color: newMessageText.trim() ? '#ffffff' : textMuted }]}>
+                  Send
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      )}
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Bottom Navigation */}
       {isCoach
