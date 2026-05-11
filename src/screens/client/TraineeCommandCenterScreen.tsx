@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,13 +13,52 @@ import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 import { Button } from '../../components/Button';
 import * as progressService from '../../services/progressService';
 import * as workoutService from '../../services/workoutService';
+import * as dietService from '../../services/dietService';
+import * as offlineService from '../../services/offlineService';
 import type { WorkoutPlan, WorkoutDay } from '../../services/workoutService';
+
+const prettyLabel = (s?: string) =>
+  (s || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+
+const WATER_TARGET_GLASSES = 8;
+const WATER_ML_PER_GLASS = 250;
+
+const getWorkoutImage = (focus?: string): string => {
+  const f = (focus || '').toLowerCase().replace(/[\s_]+/g, '_');
+  const map: Record<string, string> = {
+    chest:      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=900&q=80',
+    push:       'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=900&q=80',
+    back:       'https://images.unsplash.com/photo-1530822847156-5df684ec5ee1?w=900&q=80',
+    pull:       'https://images.unsplash.com/photo-1530822847156-5df684ec5ee1?w=900&q=80',
+    legs:       'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?w=900&q=80',
+    lower_body: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?w=900&q=80',
+    upper_body: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=900&q=80',
+    shoulders:  'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=900&q=80',
+    arms:       'https://images.unsplash.com/photo-1581009137042-c552e485697a?w=900&q=80',
+    cardio:     'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=900&q=80',
+    core:       'https://images.unsplash.com/photo-1571019613576-2b22c76fd955?w=900&q=80',
+    abs:        'https://images.unsplash.com/photo-1571019613576-2b22c76fd955?w=900&q=80',
+    full_body:  'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=900&q=80',
+  };
+  for (const key of Object.keys(map)) {
+    if (f.includes(key)) return map[key];
+  }
+  return map.full_body;
+};
 
 export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('home');
   const [weightInput, setWeightInput] = useState('');
   const [bodyFatInput, setBodyFatInput] = useState('');
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
+
+  // Daily progress
+  const [caloriesConsumed, setCaloriesConsumed] = useState(0);
+  const [calorieTarget, setCalorieTarget] = useState(2000);
+  const [waterGlasses, setWaterGlasses] = useState(0);
   const { isDark, accent } = useTheme();
   const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage } = useUser();
   const { totalUnread } = useNotifications();
@@ -40,6 +80,45 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       // no active plan
     }
   };
+
+  const loadDailyProgress = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const [cachedLog, { plan }] = await Promise.allSettled([
+        offlineService.getCachedMealLog(today),
+        dietService.getActiveDietPlan(),
+      ]).then(([logResult, planResult]) => [
+        logResult.status === 'fulfilled' ? logResult.value : null,
+        planResult.status === 'fulfilled' ? planResult.value : { plan: null },
+      ]);
+
+      if ((cachedLog as offlineService.DailyMealLog | null)?.waterGlasses !== undefined) {
+        setWaterGlasses((cachedLog as offlineService.DailyMealLog).waterGlasses);
+      }
+      if ((plan as dietService.DietPlan | null)?.dailyCalorieTarget) {
+        setCalorieTarget((plan as dietService.DietPlan).dailyCalorieTarget);
+      }
+
+      // Try to get today's consumed calories from diet history
+      try {
+        const { logs } = await dietService.getDietHistory(1, 5);
+        const todayLog = logs.find(l => l.date?.startsWith(today));
+        if (todayLog?.caloriesConsumed) {
+          setCaloriesConsumed(todayLog.caloriesConsumed);
+        }
+      } catch {
+        // no history yet
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDailyProgress();
+    }, [loadDailyProgress]),
+  );
 
   // Get today's workout day from the active plan
   const todayWorkoutDay = useMemo((): WorkoutDay | null => {
@@ -220,42 +299,63 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
           <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
             {/* Calories Card */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Meals')}
-              activeOpacity={0.7}
-              style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <View style={tw`flex-row items-center gap-2`}>
-                <MaterialIcons name="local-fire-department" size={20} color={accent} />
-                <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#475569' }]}>Calories</Text>
-              </View>
-              <Text style={[tw`text-xl font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                1,850 <Text style={[tw`text-xs font-normal`, { color: '#94a3b8' }]}>/ 2,400</Text>
-              </Text>
-              <View style={[tw`w-full h-1.5 rounded-full overflow-hidden mt-1`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
-                <View style={[tw`h-full rounded-full`, { backgroundColor: accent, width: '77%' }]} />
-              </View>
-              <Text style={tw`text-red-500 text-xs font-semibold`}>-550 kcal left</Text>
-            </TouchableOpacity>
+            {(() => {
+              const pct = calorieTarget > 0 ? Math.min(caloriesConsumed / calorieTarget, 1) : 0;
+              const remaining = calorieTarget - caloriesConsumed;
+              return (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Meals')}
+                  activeOpacity={0.7}
+                  style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                >
+                  <View style={tw`flex-row items-center gap-1.5`}>
+                    <MaterialIcons name="local-fire-department" size={18} color={accent} />
+                    <Text style={[tw`text-xs font-semibold uppercase tracking-wider`, { color: isDark ? '#64748b' : '#94a3b8' }]}>Calories</Text>
+                  </View>
+                  <Text style={[tw`text-2xl font-black leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                    {caloriesConsumed.toLocaleString()}
+                  </Text>
+                  <View style={[tw`w-full h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                    <View style={[tw`h-full rounded-full`, { backgroundColor: accent, width: `${Math.round(pct * 100)}%` }]} />
+                  </View>
+                  <Text style={[tw`text-xs font-semibold`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                    {remaining > 0 ? `${remaining.toLocaleString()} kcal left` : 'Goal reached!'}{'\n'}
+                    <Text style={{ color: isDark ? '#475569' : '#cbd5e1' }}>of {calorieTarget.toLocaleString()}</Text>
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
 
             {/* Water Card */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Meals')}
-              activeOpacity={0.7}
-              style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4 shadow-sm`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <View style={tw`flex-row items-center gap-2`}>
-                <MaterialIcons name="water-drop" size={20} color="#3b82f6" />
-                <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#475569' }]}>Water</Text>
-              </View>
-              <Text style={[tw`text-xl font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                1.2L <Text style={[tw`text-xs font-normal`, { color: '#94a3b8' }]}>/ 3.0L</Text>
-              </Text>
-              <View style={[tw`w-full h-1.5 rounded-full overflow-hidden mt-1`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
-                <View style={tw`bg-blue-500 h-full rounded-full w-[40%]`} />
-              </View>
-              <Text style={tw`text-green-500 text-xs font-semibold`}>+0.4L since 1h</Text>
-            </TouchableOpacity>
+            {(() => {
+              const waterMl = waterGlasses * WATER_ML_PER_GLASS;
+              const targetMl = WATER_TARGET_GLASSES * WATER_ML_PER_GLASS;
+              const pct = Math.min(waterGlasses / WATER_TARGET_GLASSES, 1);
+              const waterL = (waterMl / 1000).toFixed(1);
+              const targetL = (targetMl / 1000).toFixed(1);
+              return (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Meals')}
+                  activeOpacity={0.7}
+                  style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                >
+                  <View style={tw`flex-row items-center gap-1.5`}>
+                    <MaterialIcons name="water-drop" size={18} color="#3b82f6" />
+                    <Text style={[tw`text-xs font-semibold uppercase tracking-wider`, { color: isDark ? '#64748b' : '#94a3b8' }]}>Water</Text>
+                  </View>
+                  <Text style={[tw`text-2xl font-black leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                    {waterL}L
+                  </Text>
+                  <View style={[tw`w-full h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                    <View style={[tw`h-full rounded-full bg-blue-500`, { width: `${Math.round(pct * 100)}%` }]} />
+                  </View>
+                  <Text style={[tw`text-xs font-semibold`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                    {waterGlasses}/{WATER_TARGET_GLASSES} glasses{'\n'}
+                    <Text style={{ color: isDark ? '#475569' : '#cbd5e1' }}>of {targetL}L goal</Text>
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
 
             {/* Readiness Score */}
             <TouchableOpacity
@@ -385,50 +485,87 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           {todayWorkoutDay ? (
             <>
               <TouchableOpacity
-                style={[tw`relative overflow-hidden rounded-2xl shadow-md h-56 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
+                activeOpacity={0.9}
+                style={[tw`overflow-hidden rounded-2xl h-60 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
                 onPress={() => navigation.navigate('Calibration')}
               >
                 <ImageBackground
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDJ4HA56Mu3dyuNK4f9nB1SFPydEev27AOQn_-ewCXe9iCD5qxMTOfJgpXlQ-1tG5MTrt7NDEdQBU_VUwyL5jUSIvWoXiY6pXRIqBqTcFeVzwkm4pJXTij-TeqZRrPQqmeNFsr3s77CuXyiWBfXzRImn6hYZz5UkQ0_gcReSZy7CsJkJpqyO-yMgt5d10YU6ieEJtQTsH1ft3luYH5QwEfZsh0o4rW7aoCKGrrCJKWhBs2Difj4yw5edzCACz4ncL8qdGmvWjNf8Fs' }}
+                  source={{ uri: getWorkoutImage(todayWorkoutDay.focus) }}
                   style={tw`w-full h-full justify-end`}
-                  imageStyle={tw`opacity-75`}
+                  imageStyle={{ resizeMode: 'cover' }}
                 >
-                  <View style={tw`absolute inset-0 bg-black/50`} />
-                  <View style={tw`p-5 z-10`}>
-                    <View style={tw`flex-row items-center gap-2 mb-1`}>
-                      <View style={[tw`px-2 py-0.5 rounded`, { backgroundColor: accent }]}>
-                        <Text style={tw`text-white text-[10px] font-bold uppercase`}>Focus</Text>
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.52)' }} />
+                  <View style={tw`p-5`}>
+                    <View style={tw`flex-row items-center gap-2 mb-2`}>
+                      <View style={[tw`px-2.5 py-0.5 rounded-full`, { backgroundColor: accent }]}>
+                        <Text style={tw`text-white text-[10px] font-bold uppercase tracking-wider`}>Today</Text>
                       </View>
-                      <Text style={tw`text-slate-300 text-xs`}>{todayWorkoutDay.day} · {todayWorkoutDay.duration || 60} mins</Text>
+                      <Text style={tw`text-white/70 text-xs font-medium`}>
+                        {prettyLabel(todayWorkoutDay.day)} · {todayWorkoutDay.duration || 60} min
+                      </Text>
                     </View>
-                    <Text style={tw`text-white text-2xl font-bold mb-3`}>{todayWorkoutDay.focus || "Today's Workout"}</Text>
-                    <View style={tw`flex-row items-center justify-between mt-2`}>
-                      <Button title="Start Session" size="sm" onPress={() => navigation.navigate('Calibration')} containerStyle={tw`rounded-xl px-6`} />
+                    <Text style={tw`text-white text-2xl font-black mb-1`}>
+                      {prettyLabel(todayWorkoutDay.focus) || "Today's Workout"}
+                    </Text>
+                    <Text style={tw`text-white/60 text-xs mb-4`}>
+                      {(todayWorkoutDay.exercises || []).length} exercises
+                    </Text>
+                    <View style={tw`flex-row items-center gap-2`}>
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate('Calibration')}
+                        style={[tw`flex-row items-center gap-2 px-5 py-2.5 rounded-xl`, { backgroundColor: accent }]}
+                      >
+                        <MaterialIcons name="play-arrow" size={18} color="white" />
+                        <Text style={tw`text-white text-sm font-bold`}>Start Session</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate('VisionAnalysisLab')}
+                        style={[tw`flex-row items-center gap-1 px-4 py-2.5 rounded-xl`, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+                      >
+                        <Text style={tw`text-white text-xs font-semibold`}>View Plan</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </ImageBackground>
               </TouchableOpacity>
 
-              <View style={tw`mt-4 flex-col gap-3`}>
-                {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
-                    style={[tw`flex-row items-center justify-between p-4 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-                  >
-                    <View style={tw`flex-row items-center gap-3`}>
-                      <View style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '14' }]}>
-                        <MaterialIcons name="fitness-center" size={24} color={accent} />
+              {(todayWorkoutDay.exercises || []).length > 0 && (
+                <View style={tw`mt-3 gap-2`}>
+                  <Text style={[tw`text-xs font-semibold uppercase tracking-wider px-1 mb-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                    Today's Exercises
+                  </Text>
+                  {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
+                      style={[tw`flex-row items-center justify-between px-4 py-3 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}
+                    >
+                      <View style={tw`flex-row items-center gap-3`}>
+                        <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                          <Text style={[tw`text-xs font-black`, { color: accent }]}>{i + 1}</Text>
+                        </View>
+                        <View>
+                          <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{exercise.name}</Text>
+                          <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                            {exercise.sets} sets · {exercise.reps} reps · {exercise.restTime}s rest
+                          </Text>
+                        </View>
                       </View>
-                      <View>
-                        <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{exercise.name}</Text>
-                        <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>{exercise.sets} sets × {exercise.reps} reps</Text>
-                      </View>
-                    </View>
-                    <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <MaterialIcons name="chevron-right" size={20} color={isDark ? '#334155' : '#cbd5e1'} />
+                    </TouchableOpacity>
+                  ))}
+                  {(todayWorkoutDay.exercises || []).length > 3 && (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('VisionAnalysisLab')}
+                      style={[tw`items-center py-2.5 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#f1f5f9' }]}
+                    >
+                      <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                        +{(todayWorkoutDay.exercises || []).length - 3} more exercises
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </>
           ) : (
             <TouchableOpacity

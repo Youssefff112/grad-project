@@ -676,7 +676,14 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   onPress={handleApproveMealPlan}
                   icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
                 />
-                <TouchableOpacity style={tw`items-center py-3`} onPress={handleGenerateMealPlan}>
+                <TouchableOpacity
+                  style={tw`items-center py-3`}
+                  onPress={() => {
+                    setShowPreview(false);
+                    setGeneratedMeal(null);
+                    setTimeout(handleGenerateMealPlan, 300);
+                  }}
+                >
                   <Text style={[tw`font-bold text-base`, { color: accent }]}>Generate Another</Text>
                 </TouchableOpacity>
               </>

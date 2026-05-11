@@ -19,6 +19,12 @@ import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 import * as offlineService from '../../services/offlineService';
 import * as workoutService from '../../services/workoutService';
 import { COMMON_EXERCISES } from '../../services/exerciseService';
+
+const prettyLabel = (s?: string) =>
+  (s || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim() || '';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
@@ -96,7 +102,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
         ) || plan.weeklySchedule.find((d: any) => !d.isRestDay);
 
         if (todaySchedule?.exercises?.length) {
-          setPlanName(`${todaySchedule.day?.charAt(0).toUpperCase()}${todaySchedule.day?.slice(1)}: ${todaySchedule.focus || 'Workout'}`);
+          setPlanName(`${prettyLabel(todaySchedule.day)}: ${prettyLabel(todaySchedule.focus) || 'Workout'}`);
           setPlanExercises(
             todaySchedule.exercises.map((e: any) => ({
               name: e.name,
@@ -460,7 +466,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
                   <View style={tw`flex-1`}>
                     <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{candidate.name}</Text>
                     <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
-                      {candidate.muscleGroups.join(', ')} · {candidate.location}
+                      {candidate.muscleGroups.join(', ')} · {candidate.location === 'home' ? '🏠 Home' : '🏋️ Gym'}
                     </Text>
                   </View>
                   <View style={[tw`px-2 py-1 rounded-full ml-2`, { backgroundColor: accent + '18' }]}>

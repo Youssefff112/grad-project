@@ -68,10 +68,10 @@ const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => 
   const workoutDays = plan.weeklySchedule?.filter((d) => !d.isRestDay) || [];
   return workoutDays.map((day) => ({
     id: `${plan.id}-${day.day}`,
-    name: `${prettyLabel(day.day)}: ${day.focus || 'Workout'}`,
+    name: `${prettyLabel(day.day)}: ${prettyLabel(day.focus) || 'Workout'}`,
     duration: day.duration || 60,
     difficulty: mapExperienceToDifficulty(plan.experienceLevel),
-    focus: day.focus || 'Full Body',
+    focus: prettyLabel(day.focus) || 'Full Body',
     exercises: (day.exercises || []).map((e) => ({
       name: e.name,
       sets: e.sets,
@@ -793,9 +793,12 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         animationType="slide"
         transparent={false}
         onRequestClose={() => {
-          setShowPreview(false);
-          setGeneratedWorkout(null);
-          setSwapIndex(null);
+          if (swapIndex !== null) {
+            setSwapIndex(null);
+          } else {
+            setShowPreview(false);
+            setGeneratedWorkout(null);
+          }
         }}
       >
         <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]} edges={['left', 'right', 'bottom']}>
@@ -908,7 +911,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                       Exercises
                     </Text>
                     <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                      Swap or Track each exercise
+                      Tap Swap to customize
                     </Text>
                   </View>
                   <View style={tw`gap-2`}>
@@ -926,31 +929,19 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                           >
                             {idx + 1}. {exercise.name}
                           </Text>
-                          <View style={tw`flex-row gap-1`}>
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSwapIndex(idx);
-                                setSwapSearch('');
-                              }}
-                              style={[
-                                tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
-                                { backgroundColor: accent + '18' },
-                              ]}
-                            >
-                              <MaterialIcons name="swap-horiz" size={14} color={accent} />
-                              <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => navigation.navigate('VisionAnalysisLab', { exerciseName: exercise.name })}
-                              style={[
-                                tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
-                                { backgroundColor: '#4ade8018' },
-                              ]}
-                            >
-                              <MaterialIcons name="videocam" size={14} color="#4ade80" />
-                              <Text style={[tw`text-xs font-bold`, { color: '#4ade80' }]}>Track</Text>
-                            </TouchableOpacity>
-                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSwapIndex(idx);
+                              setSwapSearch('');
+                            }}
+                            style={[
+                              tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
+                              { backgroundColor: accent + '18' },
+                            ]}
+                          >
+                            <MaterialIcons name="swap-horiz" size={14} color={accent} />
+                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
+                          </TouchableOpacity>
                         </View>
                         <View style={tw`flex-row gap-4`}>
                           <Text style={[tw`text-xs`, { color: textSecondary }]}>
@@ -1016,80 +1007,87 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
               </>
             )}
           </View>
-        </SafeAreaView>
-      </Modal>
 
-      {/* ── Swap Exercise Sheet ───────────────────────────────────────────────── */}
-      <Modal
-        visible={swapIndex !== null}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setSwapIndex(null)}
-      >
-        <View style={[tw`flex-1 justify-end`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <SafeAreaView style={[tw`rounded-t-3xl`, { backgroundColor: bg, maxHeight: '75%' }]}>
-            <View style={tw`p-4`}>
-              <View
-                style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]}
+          {/* ── Swap Exercise Sheet (inside preview modal to avoid stacking modals) ── */}
+          {swapIndex !== null && (
+            <View
+              style={[
+                tw`absolute inset-0 justify-end`,
+                { backgroundColor: 'rgba(0,0,0,0.5)' },
+              ]}
+            >
+              <TouchableOpacity
+                style={tw`flex-1`}
+                activeOpacity={1}
+                onPress={() => setSwapIndex(null)}
               />
-              <View style={tw`flex-row items-center justify-between mb-4`}>
-                <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
-                  Swap Exercise
-                </Text>
-                <TouchableOpacity onPress={() => setSwapIndex(null)}>
-                  <MaterialIcons name="close" size={24} color={accent} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Search */}
               <View
                 style={[
-                  tw`flex-row items-center px-3 py-2 rounded-xl mb-3`,
-                  { backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder },
+                  tw`rounded-t-3xl`,
+                  { backgroundColor: bg, maxHeight: '75%' },
                 ]}
               >
-                <MaterialIcons name="search" size={18} color={textSecondary} />
-                <TextInput
-                  style={[tw`flex-1 ml-2 text-sm`, { color: textPrimary }]}
-                  placeholder="Search exercises..."
-                  placeholderTextColor={textSecondary}
-                  value={swapSearch}
-                  onChangeText={setSwapSearch}
-                />
+                <View style={tw`p-4`}>
+                  <View
+                    style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]}
+                  />
+                  <View style={tw`flex-row items-center justify-between mb-4`}>
+                    <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                      Swap Exercise
+                    </Text>
+                    <TouchableOpacity onPress={() => setSwapIndex(null)}>
+                      <MaterialIcons name="close" size={24} color={accent} />
+                    </TouchableOpacity>
+                  </View>
+                  <View
+                    style={[
+                      tw`flex-row items-center px-3 py-2 rounded-xl mb-3`,
+                      { backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder },
+                    ]}
+                  >
+                    <MaterialIcons name="search" size={18} color={textSecondary} />
+                    <TextInput
+                      style={[tw`flex-1 ml-2 text-sm`, { color: textPrimary }]}
+                      placeholder="Search exercises..."
+                      placeholderTextColor={textSecondary}
+                      value={swapSearch}
+                      onChangeText={setSwapSearch}
+                    />
+                  </View>
+                </View>
+                <ScrollView
+                  contentContainerStyle={tw`px-4 pb-6 gap-2`}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {swapCandidates.slice(0, 40).map((ex, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => handleSwapExercise(ex)}
+                      style={[
+                        tw`p-3 rounded-xl flex-row items-center gap-3`,
+                        { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                      ]}
+                    >
+                      <View style={tw`flex-1`}>
+                        <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>
+                          {ex.name}
+                        </Text>
+                        <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                          {ex.muscleGroups.join(', ')} •{' '}
+                          {ex.location === 'home' ? '🏠 Home' : '🏋️ Gym'}
+                        </Text>
+                      </View>
+                      <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                        {ex.defaultSets}×{ex.defaultReps}
+                      </Text>
+                      <MaterialIcons name="swap-horiz" size={18} color={accent} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             </View>
-
-            <ScrollView
-              contentContainerStyle={tw`px-4 pb-6 gap-2`}
-              showsVerticalScrollIndicator={false}
-            >
-              {swapCandidates.slice(0, 40).map((ex, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => handleSwapExercise(ex)}
-                  style={[
-                    tw`p-3 rounded-xl flex-row items-center gap-3`,
-                    { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
-                  ]}
-                >
-                  <View style={tw`flex-1`}>
-                    <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>
-                      {ex.name}
-                    </Text>
-                    <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
-                      {ex.muscleGroups.join(', ')} •{' '}
-                      {ex.location === 'home' ? '🏠 Home' : '🏋️ Gym'}
-                    </Text>
-                  </View>
-                  <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                    {ex.defaultSets}×{ex.defaultReps}
-                  </Text>
-                  <MaterialIcons name="swap-horiz" size={18} color={accent} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </SafeAreaView>
-        </View>
+          )}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );

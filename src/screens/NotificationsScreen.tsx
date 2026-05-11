@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
-import { useNotifications } from '../context/NotificationContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { getNotifications, markNotificationAsRead, markAllNotificationsRead, AppNotification } from '../services/notification.service';
 
@@ -111,7 +110,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
             <Text style={[tw`text-sm font-semibold mt-4`, { color: textMuted }]}>Loading alerts...</Text>
           </View>
         ) : filteredNotifications.length > 0 ? (
-          filteredNotifications.map((notification, index) => (
+          filteredNotifications.map((notification) => (
             <TouchableOpacity
               key={notification.id}
               onPress={() => handleMarkAsRead(notification.id)}
