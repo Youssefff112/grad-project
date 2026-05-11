@@ -69,6 +69,7 @@ interface MealItem {
   carbs: number;
   fat: number;
   serving: string;
+  ingredients?: string[];
 }
 
 interface GeneratedMealPlan {
@@ -102,8 +103,9 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status: 'pending' | 'appr
         calories: m.nutrition.calories,
         protein: m.nutrition.protein,
         carbs: m.nutrition.carbs,
-        fat: m.nutrition.fats,
-        serving: m.ingredients?.slice(0, 2).join(', ') || '1 serving',
+        fat: m.nutrition.fats ?? m.nutrition.fat ?? 0,
+        serving: m.servingSize || '1 serving',
+        ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
       }],
     })),
     status,
@@ -556,20 +558,28 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                                           <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
                                             {item.name}
                                           </Text>
-                                          <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                                          <Text style={[tw`text-xs mt-0.5 font-bold`, { color: accent }]}>
                                             {item.serving}
                                           </Text>
                                           <View style={tw`flex-row gap-3 mt-1`}>
-                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>
-                                              P:{item.protein}g
-                                            </Text>
-                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>
-                                              C:{item.carbs}g
-                                            </Text>
-                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>
-                                              F:{item.fat}g
-                                            </Text>
+                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>P:{item.protein}g</Text>
+                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>C:{item.carbs}g</Text>
+                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>F:{item.fat}g</Text>
                                           </View>
+                                          {/* Ingredient measurements */}
+                                          {item.ingredients && item.ingredients.length > 0 && (
+                                            <View style={[tw`mt-2 p-2 rounded-lg gap-0.5`, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }]}>
+                                              <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mb-1`, { color: textSecondary }]}>
+                                                Ingredients
+                                              </Text>
+                                              {item.ingredients.map((ing, ii) => (
+                                                <View key={ii} style={tw`flex-row items-start gap-1`}>
+                                                  <Text style={[tw`text-[10px]`, { color: accent }]}>•</Text>
+                                                  <Text style={[tw`text-[10px] flex-1`, { color: textSecondary }]}>{ing}</Text>
+                                                </View>
+                                              ))}
+                                            </View>
+                                          )}
                                         </View>
                                         <TouchableOpacity
                                           onPress={() => setSubstituteTarget({ mealIdx, itemIdx })}
@@ -579,9 +589,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                                           ]}
                                         >
                                           <MaterialIcons name="swap-horiz" size={13} color={accent} />
-                                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>
-                                            Sub
-                                          </Text>
+                                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>Sub</Text>
                                         </TouchableOpacity>
                                       </View>
                                     </View>

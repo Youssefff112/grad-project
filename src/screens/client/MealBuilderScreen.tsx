@@ -19,6 +19,33 @@ import { Food } from '../../context/FoodManagementContext';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
+/** Extract how many grams one serving of this food represents, or null if not gram-based */
+const getServingGrams = (servingSize?: string): number | null => {
+  if (!servingSize) return null;
+  // "100g", "100g cooked", "100g (≈2 slices)"
+  const direct = servingSize.match(/^(\d+(?:\.\d+)?)g/);
+  if (direct) return parseFloat(direct[1]);
+  // "1 scoop (30g)"
+  const paren = servingSize.match(/\((\d+(?:\.\d+)?)g\)/);
+  if (paren) return parseFloat(paren[1]);
+  return null;
+};
+
+/**
+ * Produce a human-readable measurement string.
+ * gram-based foods: "150g", count-based: "2 × 1 large egg"
+ */
+const formatQty = (quantity: number, servingSize?: string): string => {
+  const grams = getServingGrams(servingSize);
+  if (grams) {
+    const total = Math.round(quantity * grams);
+    return `${total}g`;
+  }
+  if (!servingSize) return `×${quantity.toFixed(1)}`;
+  if (quantity === Math.round(quantity)) return `${quantity} × ${servingSize}`;
+  return `${quantity.toFixed(1)} × ${servingSize}`;
+};
+
 export const MealBuilderScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
   const { foods, saveMealPlan, updateMealPlan } = useFoodManagement();
@@ -239,52 +266,59 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
                     <View
                       key={index}
                       style={[
-                        tw`p-3 rounded-lg flex-row items-center justify-between`,
+                        tw`p-3 rounded-lg`,
                         { backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder },
                       ]}
                     >
-                      <View style={tw`flex-1`}>
-                        <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                      {/* Top row: name + delete */}
+                      <View style={tw`flex-row items-center justify-between mb-1.5`}>
+                        <Text style={[tw`text-sm font-bold flex-1 mr-2`, { color: textPrimary }]} numberOfLines={1}>
                           {food.name}
                         </Text>
-                        <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
-                          {Math.round(food.calories * item.quantity)} cal
-                        </Text>
-                      </View>
-
-                      <View style={tw`flex-row items-center gap-2`}>
-                        {/* Quantity Adjuster */}
-                        <View style={tw`flex-row items-center gap-1`}>
-                          <TouchableOpacity
-                            onPress={() => handleUpdateQuantity(index, item.quantity - 0.25)}
-                            style={[
-                              tw`w-6 h-6 rounded items-center justify-center`,
-                              { backgroundColor: accent + '20' },
-                            ]}
-                          >
-                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>−</Text>
-                          </TouchableOpacity>
-                          <Text style={[tw`text-xs font-bold w-8 text-center`, { color: textPrimary }]}>
-                            {item.quantity.toFixed(2)}
-                          </Text>
-                          <TouchableOpacity
-                            onPress={() => handleUpdateQuantity(index, item.quantity + 0.25)}
-                            style={[
-                              tw`w-6 h-6 rounded items-center justify-center`,
-                              { backgroundColor: accent + '20' },
-                            ]}
-                          >
-                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>+</Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        {/* Delete Button */}
                         <TouchableOpacity
                           onPress={() => handleRemoveFood(index)}
                           style={[tw`w-6 h-6 rounded items-center justify-center`, { backgroundColor: '#ef444420' }]}
                         >
                           <MaterialIcons name="close" size={14} color="#ef4444" />
                         </TouchableOpacity>
+                      </View>
+
+                      {/* Bottom row: measurement + calories + stepper */}
+                      <View style={tw`flex-row items-center justify-between`}>
+                        <View style={tw`flex-1`}>
+                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                            {formatQty(item.quantity, food.servingSize)}
+                          </Text>
+                          <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                            {Math.round(food.calories * item.quantity)} kcal · P:{Math.round(food.protein * item.quantity)}g · C:{Math.round(food.carbs * item.quantity)}g · F:{Math.round(food.fats * item.quantity)}g
+                          </Text>
+                        </View>
+
+                        {/* Quantity Adjuster — 25g steps for gram-based, 0.5 steps otherwise */}
+                        {(() => {
+                          const grams = getServingGrams(food.servingSize);
+                          const step = grams ? 25 / grams : 0.5;
+                          const minQty = grams ? 25 / grams : 0.5;
+                          return (
+                            <View style={tw`flex-row items-center gap-1`}>
+                              <TouchableOpacity
+                                onPress={() => handleUpdateQuantity(index, Math.max(minQty, item.quantity - step))}
+                                style={[tw`w-7 h-7 rounded-lg items-center justify-center`, { backgroundColor: accent + '20' }]}
+                              >
+                                <Text style={[tw`text-sm font-bold`, { color: accent }]}>−</Text>
+                              </TouchableOpacity>
+                              <Text style={[tw`text-xs font-bold w-10 text-center`, { color: textPrimary }]}>
+                                {formatQty(item.quantity, food.servingSize)}
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => handleUpdateQuantity(index, item.quantity + step)}
+                                style={[tw`w-7 h-7 rounded-lg items-center justify-center`, { backgroundColor: accent + '20' }]}
+                              >
+                                <Text style={[tw`text-sm font-bold`, { color: accent }]}>+</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })()}
                       </View>
                     </View>
                   );
