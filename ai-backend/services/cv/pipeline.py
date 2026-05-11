@@ -1,4 +1,6 @@
 """CV pipeline: frame/video -> angles, score, structured feedback."""
+import os
+import tempfile
 from typing import Dict, List, Any, Optional
 import cv2
 import numpy as np
@@ -64,29 +66,28 @@ def analyze_video_full(
     score, mistakes_detected, improvement_notes (structured feedback).
     """
     pose = _get_pose_detector()
-    cap = None
-
-    if isinstance(video_source, (bytes, bytearray)):
-        import tempfile
-        import os
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
-            tmp.write(video_source)
-            tmp_path = tmp.name
-        cap = cv2.VideoCapture(tmp_path)
-    elif isinstance(video_source, str):
-        cap = cv2.VideoCapture(video_source)
-    else:
-        return _empty_video_result("Invalid video source")
-
-    if not cap.isOpened():
-        return _empty_video_result("Could not open video")
-
-    angle_samples: Dict[str, List[float]] = {}
-    scores: List[float] = []
-    all_feedback: List[str] = []
-    frame_count = 0
+    cap: Optional[cv2.VideoCapture] = None
+    tmp_path: Optional[str] = None
 
     try:
+        if isinstance(video_source, (bytes, bytearray)):
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+                tmp.write(video_source)
+                tmp_path = tmp.name
+            cap = cv2.VideoCapture(tmp_path)
+        elif isinstance(video_source, str):
+            cap = cv2.VideoCapture(video_source)
+        else:
+            return _empty_video_result("Invalid video source")
+
+        if not cap.isOpened():
+            return _empty_video_result("Could not open video")
+
+        angle_samples: Dict[str, List[float]] = {}
+        scores: List[float] = []
+        all_feedback: List[str] = []
+        frame_count = 0
+
         while frame_count < max_frames:
             ret, frame = cap.read()
             if not ret:
@@ -104,21 +105,9 @@ def analyze_video_full(
                 scores.append(score)
                 all_feedback.extend(feedback)
                 for k, v in angles.items():
-                    if k not in angle_samples:
-                        angle_samples[k] = []
-                    angle_samples[k].append(float(v))
+                    angle_samples.setdefault(k, []).append(float(v))
 
             frame_count += 1
-
-        pose.close()
-        cap.release()
-
-        if isinstance(video_source, (bytes, bytearray)):
-            try:
-                import os
-                os.unlink(tmp_path)
-            except Exception:
-                pass
 
         angles_summary = {}
         for k, v in angle_samples.items():
@@ -134,9 +123,10 @@ def analyze_video_full(
         scorer = get_scorer(exercise_name)
         structured = scorer.get_structured_feedback(all_feedback, avg_score)
 
-        summary_lines = []
-        for k, v in angles_summary.items():
-            summary_lines.append(f"{k}: min={v['min']}° max={v['max']}° avg={v['avg']}°")
+        summary_lines = [
+            f"{k}: min={v['min']}° max={v['max']}° avg={v['avg']}°"
+            for k, v in angles_summary.items()
+        ]
         summary = "Your angles: " + "; ".join(summary_lines[:5]) if summary_lines else "No pose detected."
 
         return {
@@ -149,13 +139,19 @@ def analyze_video_full(
             "improvement_notes": "; ".join(structured["next_reps"]),
             "done_well": structured["done_well"],
         }
+
     except Exception as e:
-        try:
-            pose.close()
-            cap.release()
-        except Exception:
-            pass
         return _empty_video_result(str(e))
+
+    finally:
+        pose.close()
+        if cap is not None:
+            cap.release()
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def _empty_video_result(msg: str) -> Dict:
