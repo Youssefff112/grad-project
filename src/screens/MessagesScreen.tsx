@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Modal, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,7 +9,13 @@ import { useNotifications } from '../context/NotificationContext';
 import { useUser } from '../context/UserContext';
 import { TraineeBottomNav } from '../components/TraineeBottomNav';
 import { CoachBottomNav } from '../components/coach/CoachBottomNav';
-import { getConversations, Conversation as ApiConversation } from '../services/messaging.service';
+import {
+  getConversations,
+  sendMessage,
+  getCoachClients,
+  CoachClient,
+  Conversation as ApiConversation,
+} from '../services/messaging.service';
 
 // We map the backend schema to this UI schema on load
 interface UIConversation {
@@ -26,7 +32,7 @@ interface UIConversation {
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { totalUnread } = useNotifications();
-  const { userId, userMode, isCoach } = useUser();
+  const { userId, userMode, isCoach, coachId, coachName } = useUser();
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -34,6 +40,10 @@ export const MessagesScreen = ({ navigation }: any) => {
   const [isLoading, setIsLoading] = useState(true);
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [newMessageText, setNewMessageText] = useState('');
+  const [selectedRecipient, setSelectedRecipient] = useState<CoachClient | null>(null);
+  const [coachClients, setCoachClients] = useState<CoachClient[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -129,11 +139,47 @@ export const MessagesScreen = ({ navigation }: any) => {
     navigation.navigate('Chat', { conversationId: conversation.id, conversationName: conversation.name });
   };
 
-  const handleNewMessage = () => {
-    if (newMessageText.trim()) {
-      // Here you would send the message to backend
-      setNewMessageText('');
-      setShowNewMessage(false);
+  const closeNewMessage = () => {
+    setShowNewMessage(false);
+    setNewMessageText('');
+    setSelectedRecipient(null);
+  };
+
+  const openNewMessage = async () => {
+    setShowNewMessage(true);
+    setNewMessageText('');
+    setSelectedRecipient(null);
+
+    if (isCoach) {
+      setLoadingClients(true);
+      try {
+        const clients = await getCoachClients();
+        setCoachClients(clients);
+      } catch {
+        setCoachClients([]);
+      } finally {
+        setLoadingClients(false);
+      }
+    } else {
+      // Client: pre-select their coach
+      if (coachId && coachName) {
+        setSelectedRecipient({ id: Number(coachId), firstName: coachName.split(' ')[0], lastName: coachName.split(' ').slice(1).join(' '), email: '' });
+      }
+    }
+  };
+
+  const handleNewMessage = async () => {
+    if (!newMessageText.trim() || !selectedRecipient) return;
+    setSending(true);
+    try {
+      const msg = await sendMessage(null, selectedRecipient.id, newMessageText.trim());
+      closeNewMessage();
+      const recipientName = `${selectedRecipient.firstName} ${selectedRecipient.lastName}`.trim();
+      navigation.navigate('Chat', { conversationId: msg.conversationId, conversationName: recipientName });
+    } catch (e: any) {
+      Alert.alert('Failed to send', e?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -170,7 +216,7 @@ export const MessagesScreen = ({ navigation }: any) => {
                   )}
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowNewMessage(true)}>
+              <TouchableOpacity onPress={openNewMessage}>
                 <View
                   style={[
                     tw`w-12 h-12 rounded-full items-center justify-center`,
@@ -300,7 +346,7 @@ export const MessagesScreen = ({ navigation }: any) => {
         visible={showNewMessage}
         transparent
         animationType="slide"
-        onRequestClose={() => { setShowNewMessage(false); setNewMessageText(''); }}
+        onRequestClose={closeNewMessage}
       >
         <KeyboardAvoidingView
           style={tw`flex-1`}
@@ -309,87 +355,141 @@ export const MessagesScreen = ({ navigation }: any) => {
           <TouchableOpacity
             style={[tw`flex-1`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             activeOpacity={1}
-            onPress={() => { setShowNewMessage(false); setNewMessageText(''); }}
+            onPress={closeNewMessage}
           />
           <View
             style={[
               tw`rounded-t-3xl px-5 pt-4`,
-              {
-                backgroundColor: cardBg,
-                borderTopWidth: 1,
-                borderColor: cardBorder,
-                paddingBottom: insets.bottom + 16,
-              },
+              { backgroundColor: cardBg, borderTopWidth: 1, borderColor: cardBorder, paddingBottom: insets.bottom + 16 },
             ]}
           >
             {/* Handle */}
             <View style={[tw`w-10 h-1 rounded-full self-center mb-5`, { backgroundColor: isDark ? '#334155' : '#cbd5e1' }]} />
 
             {/* Header */}
-            <View style={tw`flex-row items-center justify-between mb-5`}>
+            <View style={tw`flex-row items-center justify-between mb-4`}>
               <View>
                 <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>New Message</Text>
                 <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
-                  {isCoach ? 'Message your client' : 'Message your coach'}
+                  {isCoach ? 'Select a client to message' : 'Send a message to your coach'}
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => { setShowNewMessage(false); setNewMessageText(''); }}
+                onPress={closeNewMessage}
                 style={[tw`w-9 h-9 rounded-full items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
               >
                 <MaterialIcons name="close" size={18} color={textSecondary} />
               </TouchableOpacity>
             </View>
 
+            {/* To: recipient row */}
+            <View style={[tw`rounded-xl px-4 py-3 mb-3 flex-row items-center gap-3`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: cardBorder }]}>
+              <Text style={[tw`text-sm font-semibold`, { color: textMuted, minWidth: 28 }]}>To:</Text>
+
+              {isCoach ? (
+                loadingClients ? (
+                  <ActivityIndicator size="small" color={accent} />
+                ) : selectedRecipient ? (
+                  <TouchableOpacity
+                    onPress={() => setSelectedRecipient(null)}
+                    style={[tw`flex-row items-center gap-1.5 px-3 py-1 rounded-full`, { backgroundColor: accent + '20' }]}
+                  >
+                    <Text style={[tw`text-sm font-bold`, { color: accent }]}>
+                      {selectedRecipient.firstName} {selectedRecipient.lastName}
+                    </Text>
+                    <MaterialIcons name="close" size={14} color={accent} />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={[tw`text-sm`, { color: textMuted }]}>Tap a client below</Text>
+                )
+              ) : selectedRecipient ? (
+                <View style={[tw`flex-row items-center gap-2 px-3 py-1 rounded-full`, { backgroundColor: accent + '20' }]}>
+                  <MaterialIcons name="fitness-center" size={14} color={accent} />
+                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>
+                    {selectedRecipient.firstName} {selectedRecipient.lastName}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[tw`text-sm`, { color: '#ef4444' }]}>No coach assigned</Text>
+              )}
+            </View>
+
+            {/* Client picker (coach only) */}
+            {isCoach && !selectedRecipient && (
+              <View style={[tw`rounded-xl mb-3 overflow-hidden`, { borderWidth: 1, borderColor: cardBorder, maxHeight: 160 }]}>
+                {coachClients.length === 0 ? (
+                  <View style={tw`py-4 items-center`}>
+                    <Text style={[tw`text-sm`, { color: textMuted }]}>No clients found</Text>
+                  </View>
+                ) : (
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    {coachClients.map((client, i) => (
+                      <TouchableOpacity
+                        key={client.id}
+                        onPress={() => setSelectedRecipient(client)}
+                        style={[
+                          tw`flex-row items-center gap-3 px-4 py-3`,
+                          i > 0 && { borderTopWidth: 1, borderColor: cardBorder },
+                          { backgroundColor: cardBg },
+                        ]}
+                      >
+                        <View style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                          <Text style={[tw`text-xs font-black`, { color: accent }]}>
+                            {client.firstName[0]}{client.lastName[0]}
+                          </Text>
+                        </View>
+                        <View style={tw`flex-1`}>
+                          <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                            {client.firstName} {client.lastName}
+                          </Text>
+                          <Text style={[tw`text-xs`, { color: textMuted }]}>{client.email}</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={18} color={textMuted} />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            )}
+
             {/* Message input */}
             <TextInput
               style={[
-                tw`rounded-xl px-4 py-3 text-sm`,
-                {
-                  backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
-                  color: textPrimary,
-                  borderWidth: 1,
-                  borderColor: cardBorder,
-                  minHeight: 110,
-                  textAlignVertical: 'top',
-                },
+                tw`rounded-xl px-4 py-3 text-sm mb-1`,
+                { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', color: textPrimary, borderWidth: 1, borderColor: cardBorder, minHeight: 100, textAlignVertical: 'top' },
               ]}
-              placeholder="Write your message here…"
+              placeholder="Write your message…"
               placeholderTextColor={textMuted}
               value={newMessageText}
-              onChangeText={setNewMessageText}
+              onChangeText={(t) => setNewMessageText(t.slice(0, 500))}
               multiline
-              autoFocus
+              autoFocus={!isCoach}
             />
-
-            {/* Character hint */}
-            <Text style={[tw`text-xs text-right mt-1 mb-4`, { color: textMuted }]}>
-              {newMessageText.length} / 500
-            </Text>
+            <Text style={[tw`text-xs text-right mb-4`, { color: textMuted }]}>{newMessageText.length}/500</Text>
 
             {/* Actions */}
             <View style={tw`flex-row gap-3`}>
               <TouchableOpacity
-                style={[
-                  tw`flex-1 py-3.5 rounded-xl items-center justify-center`,
-                  { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: cardBorder },
-                ]}
-                onPress={() => { setShowNewMessage(false); setNewMessageText(''); }}
+                style={[tw`flex-1 py-3.5 rounded-xl items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: cardBorder }]}
+                onPress={closeNewMessage}
               >
                 <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   tw`flex-1 py-3.5 rounded-xl items-center justify-center flex-row gap-2`,
-                  { backgroundColor: newMessageText.trim() ? accent : (isDark ? '#1e293b' : '#e2e8f0') },
+                  { backgroundColor: (newMessageText.trim() && selectedRecipient && !sending) ? accent : (isDark ? '#1e293b' : '#e2e8f0') },
                 ]}
                 onPress={handleNewMessage}
-                disabled={!newMessageText.trim()}
+                disabled={!newMessageText.trim() || !selectedRecipient || sending}
               >
-                <MaterialIcons name="send" size={16} color={newMessageText.trim() ? '#ffffff' : textMuted} />
-                <Text style={[tw`text-sm font-bold`, { color: newMessageText.trim() ? '#ffffff' : textMuted }]}>
-                  Send
-                </Text>
+                {sending
+                  ? <ActivityIndicator size="small" color="#ffffff" />
+                  : <>
+                      <MaterialIcons name="send" size={16} color={(newMessageText.trim() && selectedRecipient) ? '#ffffff' : textMuted} />
+                      <Text style={[tw`text-sm font-bold`, { color: (newMessageText.trim() && selectedRecipient) ? '#ffffff' : textMuted }]}>Send</Text>
+                    </>
+                }
               </TouchableOpacity>
             </View>
           </View>

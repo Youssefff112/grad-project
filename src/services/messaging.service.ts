@@ -46,5 +46,29 @@ export const getMessages = async (conversationId: string, page = 1): Promise<{me
 export const sendMessage = async (conversationId: string | null, receiverId: number | null, text: string): Promise<ChatMessage> => {
   const endpoint = conversationId ? `/messages/${conversationId}/messages` : `/messages/send`;
   const response: any = await apiPost(endpoint, { text, receiverId });
-  return response.message;
+  return response.data?.message ?? response.message;
+};
+
+export interface CoachClient {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export const getCoachClients = async (): Promise<CoachClient[]> => {
+  const response: any = await apiGet('/coach/clients');
+  // Backend returns { success, message, data: [{ profile, user }, ...] }
+  const raw: any[] = Array.isArray(response.data) ? response.data : [];
+  return raw
+    .map((c: any) => {
+      const u = c.user ?? c;
+      return {
+        id: u.id ?? c.profile?.userId,
+        firstName: u.firstName ?? '',
+        lastName: u.lastName ?? '',
+        email: u.email ?? '',
+      };
+    })
+    .filter((c) => c.id != null);
 };
