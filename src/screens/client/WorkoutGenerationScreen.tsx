@@ -193,21 +193,54 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
   };
 
   // ── Swap helpers ─────────────────────────────────────────────────────────────
+  // Muscle groups of the exercise currently being swapped (for same-group filtering)
+  const swapTargetMuscleGroups = useMemo<string[]>(() => {
+    if (swapIndex === null || !generatedWorkout) return [];
+    const currentName = generatedWorkout.exercises[swapIndex]?.name ?? '';
+    const found = COMMON_EXERCISES.find(
+      (e) => e.name.toLowerCase() === currentName.toLowerCase(),
+    );
+    // If the exercise isn't in our catalog, try substring match on the primary muscle group
+    if (!found) {
+      const lower = currentName.toLowerCase();
+      const inferred = ['Chest', 'Shoulders', 'Back', 'Biceps', 'Triceps', 'Legs'].find(
+        (g) => lower.includes(g.toLowerCase()),
+      );
+      return inferred ? [inferred] : [];
+    }
+    return found.muscleGroups;
+  }, [swapIndex, generatedWorkout]);
+
   const swapCandidates = useMemo(() => {
     let pool = COMMON_EXERCISES;
+
+    // Exclude the exercise being swapped out
+    if (swapIndex !== null && generatedWorkout) {
+      const currentName = generatedWorkout.exercises[swapIndex]?.name ?? '';
+      pool = pool.filter((e) => e.name.toLowerCase() !== currentName.toLowerCase());
+    }
+
+    // Filter by location when known
     if (workoutLocation) {
       pool = pool.filter((e) => e.location === workoutLocation);
     }
+
     if (swapSearch.trim()) {
+      // When searching, match name or muscle group across everything
       const q = swapSearch.toLowerCase();
       pool = pool.filter(
         (e) =>
           e.name.toLowerCase().includes(q) ||
           e.muscleGroups.some((m) => m.toLowerCase().includes(q)),
       );
+    } else if (swapTargetMuscleGroups.length > 0) {
+      // No search term → limit to exercises that share the primary muscle group
+      const primary = swapTargetMuscleGroups[0];
+      pool = pool.filter((e) => e.muscleGroups.includes(primary));
     }
+
     return pool;
-  }, [workoutLocation, swapSearch]);
+  }, [workoutLocation, swapSearch, swapIndex, swapTargetMuscleGroups]);
 
   const handleSwapExercise = (candidate: typeof COMMON_EXERCISES[0]) => {
     if (swapIndex === null || !generatedWorkout) return;

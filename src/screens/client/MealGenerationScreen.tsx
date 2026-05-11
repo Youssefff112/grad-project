@@ -599,7 +599,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
 
           {/* ── Substitute Sheet (overlay inside preview, avoids nested-Modal iOS bug) ── */}
           {substituteTarget !== null && (
-            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', zIndex: 20 }}>
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', zIndex: 20 }}>
               <View style={{ backgroundColor: bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '72%' }}>
                 <View style={tw`p-4`}>
                   <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]} />

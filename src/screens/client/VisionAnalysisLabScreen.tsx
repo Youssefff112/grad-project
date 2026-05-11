@@ -121,17 +121,44 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
     finally { setHistoryLoading(false); }
   };
 
-  // All custom exercises flattened for the swap list
+  // Primary muscle groups of the exercise being swapped (for same-group filtering)
+  const swapTargetMuscleGroups = useMemo<string[]>(() => {
+    if (swapTarget === null) return [];
+    const currentName = planExercises[swapTarget]?.name ?? '';
+    const found = COMMON_EXERCISES.find(
+      (e) => e.name.toLowerCase() === currentName.toLowerCase()
+    );
+    if (!found) {
+      const lower = currentName.toLowerCase();
+      const inferred = ['Chest', 'Shoulders', 'Back', 'Biceps', 'Triceps', 'Legs'].find(
+        (g) => lower.includes(g.toLowerCase())
+      );
+      return inferred ? [inferred] : [];
+    }
+    return found.muscleGroups;
+  }, [swapTarget, planExercises]);
+
   const swapCandidates = useMemo(() => {
     let pool = COMMON_EXERCISES;
+
+    // Exclude the exercise being swapped out
+    if (swapTarget !== null) {
+      const currentName = planExercises[swapTarget]?.name ?? '';
+      pool = pool.filter((e) => e.name.toLowerCase() !== currentName.toLowerCase());
+    }
+
     if (swapSearch.trim()) {
       const q = swapSearch.toLowerCase();
       pool = pool.filter(
         (e) => e.name.toLowerCase().includes(q) || e.muscleGroups.some((m) => m.toLowerCase().includes(q))
       );
+    } else if (swapTargetMuscleGroups.length > 0) {
+      const primary = swapTargetMuscleGroups[0];
+      pool = pool.filter((e) => e.muscleGroups.includes(primary));
     }
+
     return pool;
-  }, [swapSearch]);
+  }, [swapSearch, swapTarget, swapTargetMuscleGroups, planExercises]);
 
   const handleSwap = (candidate: typeof COMMON_EXERCISES[0]) => {
     if (swapTarget === null) return;
