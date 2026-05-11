@@ -1,5 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -9,62 +18,133 @@ import { useNotifications } from '../../context/NotificationContext';
 import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 import * as offlineService from '../../services/offlineService';
 import * as workoutService from '../../services/workoutService';
+import { COMMON_EXERCISES } from '../../services/exerciseService';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
+
+interface PlanExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  rest: number;
+  source: 'plan' | 'custom';
+  workoutName?: string;
+}
 
 export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
   const { subscriptionPlan } = useUser();
   const { totalUnread } = useNotifications();
-  const { workouts } = useExerciseManagement();
+  const { workouts, exercises: customExercises } = useExerciseManagement();
+
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
   const preselectedExercise: string | undefined = route?.params?.exerciseName;
+
+  // Active workout plan exercises
+  const [planExercises, setPlanExercises] = useState<PlanExercise[]>([]);
+  const [planLoading, setPlanLoading] = useState(true);
+  const [planName, setPlanName] = useState<string | null>(null);
+
+  // Swap state
+  const [swapTarget, setSwapTarget] = useState<number | null>(null);
+  const [swapSearch, setSwapSearch] = useState('');
+
+  // History
   const [cachedHistory, setCachedHistory] = useState<Array<{
-    date: string;
-    type: string;
-    duration: string;
-    score: string;
-    exercises: number;
+    date: string; type: string; duration: string; score: string; exercises: number;
   }> | null>(null);
   const [apiHistory, setApiHistory] = useState<workoutService.WorkoutSession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Load cached workout history on mount
+  const bg = isDark ? '#0a0a12' : '#f8f7f5';
+  const cardBg = isDark ? '#111128' : '#ffffff';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
+  const textSecondary = isDark ? '#94a3b8' : '#64748b';
+  const inputBg = isDark ? '#1e293b' : '#f1f5f9';
+
+  // Load active plan exercises on mount
   useEffect(() => {
-    const loadCachedWorkouts = async () => {
-      try {
-        const cached = await offlineService.getCachedWorkoutHistory();
-        if (cached && cached.length > 0) {
-          setCachedHistory(cached);
-        }
-      } catch (error) {
-        console.error('Error loading cached workouts:', error);
-      }
-    };
-    loadCachedWorkouts();
+    loadActivePlanExercises();
   }, []);
 
-  // Load real API history when history tab is opened
   useEffect(() => {
-    if (activeTab === 'history') {
-      loadWorkoutHistory();
-    }
+    if (activeTab === 'history') loadWorkoutHistory();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (preselectedExercise) loadCached();
+  }, []);
+
+  const loadCached = async () => {
+    try {
+      const cached = await offlineService.getCachedWorkoutHistory();
+      if (cached?.length) setCachedHistory(cached);
+    } catch { /* ignore */ }
+  };
+
+  const loadActivePlanExercises = async () => {
+    setPlanLoading(true);
+    try {
+      const { plan } = await workoutService.getActiveWorkoutPlan();
+      if (plan?.weeklySchedule) {
+        const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        const todaySchedule = plan.weeklySchedule.find(
+          (d: any) => d.day?.toLowerCase() === today && !d.isRestDay
+        ) || plan.weeklySchedule.find((d: any) => !d.isRestDay);
+
+        if (todaySchedule?.exercises?.length) {
+          setPlanName(`${todaySchedule.day?.charAt(0).toUpperCase()}${todaySchedule.day?.slice(1)}: ${todaySchedule.focus || 'Workout'}`);
+          setPlanExercises(
+            todaySchedule.exercises.map((e: any) => ({
+              name: e.name,
+              sets: e.sets,
+              reps: e.reps,
+              rest: e.restTime ?? e.rest ?? 60,
+              source: 'plan' as const,
+            }))
+          );
+        }
+      }
+    } catch { /* no plan yet */ }
+    finally { setPlanLoading(false); }
+  };
 
   const loadWorkoutHistory = async () => {
     setHistoryLoading(true);
     try {
       const { logs } = await workoutService.getWorkoutHistory();
       setApiHistory(logs || []);
-    } catch {
-      // fall back to cached
-    } finally {
-      setHistoryLoading(false);
-    }
+    } catch { /* fallback */ }
+    finally { setHistoryLoading(false); }
   };
 
-  // Check if user has access to computer vision
+  // All custom exercises flattened for the swap list
+  const swapCandidates = useMemo(() => {
+    let pool = COMMON_EXERCISES;
+    if (swapSearch.trim()) {
+      const q = swapSearch.toLowerCase();
+      pool = pool.filter(
+        (e) => e.name.toLowerCase().includes(q) || e.muscleGroups.some((m) => m.toLowerCase().includes(q))
+      );
+    }
+    return pool;
+  }, [swapSearch]);
+
+  const handleSwap = (candidate: typeof COMMON_EXERCISES[0]) => {
+    if (swapTarget === null) return;
+    setPlanExercises((prev) =>
+      prev.map((ex, i) =>
+        i === swapTarget
+          ? { ...ex, name: candidate.name, sets: candidate.defaultSets, reps: candidate.defaultReps, rest: candidate.defaultRest }
+          : ex
+      )
+    );
+    setSwapTarget(null);
+    setSwapSearch('');
+  };
+
   if (!hasFeatureAccess(subscriptionPlan, 'hasComputerVision')) {
     return (
       <FeatureLocked
@@ -79,26 +159,25 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
       {/* Header */}
-      <View style={[tw`flex-row items-center p-4 justify-between z-10`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+      <View style={[tw`flex-row items-center p-4 justify-between z-10`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor: cardBorder }]}>
         <View style={tw`flex-row items-center gap-3`}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <MaterialIcons name="arrow-back" size={24} color={accent} />
           </TouchableOpacity>
-          <Text style={[tw`text-lg font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-            Workouts
-          </Text>
+          <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>Workouts</Text>
         </View>
-        <TouchableOpacity style={[tw`flex items-center justify-center rounded-lg h-10 w-10`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]} onPress={() => {
-          setActiveTab('history');
-        }}>
+        <TouchableOpacity
+          style={[tw`flex items-center justify-center rounded-lg h-10 w-10`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]}
+          onPress={() => setActiveTab('history')}
+        >
           <MaterialIcons name="history" size={22} color={accent} />
         </TouchableOpacity>
       </View>
 
-      {/* Tab Switcher */}
-      <View style={[tw`flex-row px-4 gap-2 py-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
+      {/* Tabs */}
+      <View style={[tw`flex-row px-4 gap-2 py-3`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor: cardBorder }]}>
         {[
           { id: 'live' as const, label: 'Live Session', icon: 'videocam' },
           { id: 'history' as const, label: 'Past Sessions', icon: 'history' },
@@ -108,12 +187,11 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
             onPress={() => setActiveTab(tab.id)}
             style={[
               tw`flex-1 flex-row items-center justify-center gap-2 py-3 rounded-xl`,
-              {
-                backgroundColor: activeTab === tab.id ? accent : isDark ? '#1e293b' : '#f1f5f9' },
+              { backgroundColor: activeTab === tab.id ? accent : (isDark ? '#1e293b' : '#f1f5f9') },
             ]}
           >
-            <MaterialIcons name={tab.icon as any} size={18} color={activeTab === tab.id ? '#ffffff' : isDark ? '#94a3b8' : '#64748b'} />
-            <Text style={[tw`text-sm font-bold`, { color: activeTab === tab.id ? '#ffffff' : isDark ? '#94a3b8' : '#64748b' }]}>
+            <MaterialIcons name={tab.icon as any} size={18} color={activeTab === tab.id ? '#ffffff' : textSecondary} />
+            <Text style={[tw`text-sm font-bold`, { color: activeTab === tab.id ? '#ffffff' : textSecondary }]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -122,7 +200,8 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
 
       {activeTab === 'live' ? (
         <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-32`}>
-          {/* Generate Workout Button */}
+
+          {/* Generate Workout shortcut */}
           <View style={tw`px-4 pt-4 pb-2`}>
             <TouchableOpacity
               onPress={() => navigation.navigate('WorkoutGeneration')}
@@ -130,206 +209,245 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
             >
               <MaterialIcons name="auto-awesome" size={24} color={accent} />
               <View style={tw`flex-1`}>
-                <Text style={[tw`font-bold text-sm`, { color: accent }]}>Generate Workout</Text>
-                <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Create AI-powered plan</Text>
+                <Text style={[tw`font-bold text-sm`, { color: accent }]}>Generate / Manage Workout Plan</Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>AI-powered plan generation</Text>
               </View>
               <MaterialIcons name="arrow-forward" size={20} color={accent} />
             </TouchableOpacity>
           </View>
 
-          {/* Custom Workouts Section */}
-          {workouts.length > 0 && (
-            <View style={tw`px-4 pt-3 pb-2 gap-2`}>
-              <View style={tw`flex-row items-center justify-between`}>
-                <Text style={[tw`text-sm font-bold uppercase tracking-wider`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-                  My Workouts ({workouts.length})
+          {/* ── Active Plan Exercises ── */}
+          <View style={tw`px-4 pt-2`}>
+            <View style={tw`flex-row items-center justify-between mb-3`}>
+              <Text style={[tw`text-sm font-bold uppercase`, { color: textSecondary }]}>
+                {planName ? planName : "Today's Plan"}
+              </Text>
+              <TouchableOpacity onPress={loadActivePlanExercises}>
+                <MaterialIcons name="refresh" size={18} color={accent} />
+              </TouchableOpacity>
+            </View>
+
+            {planLoading ? (
+              <View style={tw`items-center py-6`}>
+                <ActivityIndicator color={accent} />
+              </View>
+            ) : planExercises.length > 0 ? (
+              <View style={tw`gap-2`}>
+                {planExercises.map((ex, idx) => (
+                  <View
+                    key={idx}
+                    style={[tw`rounded-xl p-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
+                  >
+                    <View style={tw`flex-row items-center justify-between`}>
+                      <View style={tw`flex-1 mr-2`}>
+                        <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{ex.name}</Text>
+                        <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                          {ex.sets} sets · {ex.reps} reps · {ex.rest}s rest
+                        </Text>
+                      </View>
+                      <View style={tw`flex-row gap-1`}>
+                        <TouchableOpacity
+                          onPress={() => { setSwapTarget(idx); setSwapSearch(''); }}
+                          style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: accent + '18' }]}
+                        >
+                          <MaterialIcons name="swap-horiz" size={14} color={accent} />
+                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => navigation.navigate('Calibration', { exerciseName: ex.name })}
+                          style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#4ade8018' }]}
+                        >
+                          <MaterialIcons name="videocam" size={14} color="#4ade80" />
+                          <Text style={[tw`text-xs font-bold`, { color: '#4ade80' }]}>Track</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={[tw`rounded-xl p-5 items-center gap-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
+                <MaterialIcons name="fitness-center" size={32} color={textSecondary} />
+                <Text style={[tw`text-sm font-bold text-center`, { color: textSecondary }]}>No active plan yet</Text>
+                <Text style={[tw`text-xs text-center`, { color: textSecondary }]}>
+                  Generate a workout plan to see your exercises here
                 </Text>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('WorkoutBuilder')}
-                  style={tw`px-2 py-1`}
+                  onPress={() => navigation.navigate('WorkoutGeneration')}
+                  style={[tw`mt-2 px-4 py-2 rounded-lg`, { backgroundColor: accent }]}
                 >
+                  <Text style={tw`text-white text-xs font-bold`}>Generate Plan</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* ── Custom Workouts ── */}
+          {workouts.length > 0 && (
+            <View style={tw`px-4 pt-5`}>
+              <View style={tw`flex-row items-center justify-between mb-3`}>
+                <Text style={[tw`text-sm font-bold uppercase`, { color: textSecondary }]}>
+                  My Custom Workouts
+                </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('WorkoutBuilder')}>
                   <MaterialIcons name="add" size={18} color={accent} />
                 </TouchableOpacity>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 px-4`}>
-                <View style={tw`flex-row gap-2`}>
-                  {workouts.map((workout) => (
-                    <TouchableOpacity
-                      key={workout.id}
-                      onPress={() => navigation.navigate('Calibration', { workout })}
-                      style={[
-                        tw`rounded-xl p-4 min-w-[160px]`,
-                        { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }
-                      ]}
-                    >
-                      <View style={tw`flex-row items-center justify-between mb-2`}>
-                        <Text style={[tw`text-xs font-bold px-2 py-1 rounded-full`, { backgroundColor: accent + '20', color: accent }]}>
-                          {workout.difficulty}
-                        </Text>
-                      </View>
-                      <Text style={[tw`text-sm font-bold mb-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]} numberOfLines={2}>
-                        {workout.name}
+              {workouts.map((workout) => (
+                <View
+                  key={workout.id}
+                  style={[tw`rounded-xl mb-3 overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
+                >
+                  {/* Workout header */}
+                  <View style={[tw`flex-row items-center justify-between px-3 py-2.5`, { backgroundColor: accent + '10', borderBottomWidth: 1, borderColor: cardBorder }]}>
+                    <View>
+                      <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{workout.name}</Text>
+                      <Text style={[tw`text-xs mt-0.5 capitalize`, { color: textSecondary }]}>
+                        {workout.difficulty} · {workout.totalExercises} exercises · ~{workout.estimatedDuration} min
                       </Text>
-                      <View style={[tw`gap-1 mt-2 pt-2 border-t`, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
-                        <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-                          {workout.totalExercises} exercises
-                        </Text>
-                        <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-                          ~{workout.estimatedDuration} mins
-                        </Text>
-                      </View>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('Calibration', { workoutName: workout.name })}
+                      style={[tw`px-3 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: accent }]}
+                    >
+                      <MaterialIcons name="play-arrow" size={16} color="white" />
+                      <Text style={tw`text-white text-xs font-bold`}>Start All</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          )}
-          {/* Button to Create Workout if none exist */}
-          {!workouts.length && (
-            <View style={tw`px-4 pt-2 pb-2`}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('WorkoutBuilder')}
-                style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: (isDark ? '#1e293b' : '#f1f5f9'), borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-              >
-                <MaterialIcons name="add-circle" size={24} color={accent} />
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`font-bold text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Create Custom Workout</Text>
-                  <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Build your own routine</Text>
-                </View>
-                <MaterialIcons name="arrow-forward" size={20} color={isDark ? '#cbd5e1' : '#475569'} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Camera Viewport - Empty for CV */}
-          <View style={[tw`mx-4 mt-4 mb-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: preselectedExercise ? accent : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'), minHeight: 280 }]}>
-            <View style={tw`items-center gap-6 flex-1 justify-center py-6`}>
-              <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: accent + '18' }]}>
-                <MaterialIcons name="videocam" size={40} color={accent} />
-              </View>
-
-              {preselectedExercise ? (
-                <>
-                  <View style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: accent + '20' }]}>
-                    <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-1 text-center`, { color: accent }]}>
-                      Tracking Form For
-                    </Text>
-                    <Text style={[tw`text-lg font-black text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                      {preselectedExercise}
-                    </Text>
                   </View>
-                  <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    AI will track your form and give real-time feedback
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Camera Feed</Text>
-                  <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    Computer vision will render here during your workout session
-                  </Text>
-                </>
-              )}
 
-              <View style={tw`flex-row items-center gap-2`}>
-                <View style={tw`w-2 h-2 rounded-full bg-green-500`} />
-                <Text style={[tw`text-xs font-bold uppercase tracking-widest`, { color: '#4ade80' }]}>CV Engine Ready</Text>
-              </View>
-
-              {/* Start Button */}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Calibration', preselectedExercise ? { exerciseName: preselectedExercise } : undefined)}
-                style={[tw`flex-row items-center justify-center gap-3 py-4 px-8 rounded-2xl mt-2`, { backgroundColor: accent, minWidth: 200 }]}
-              >
-                <MaterialIcons name="play-arrow" size={28} color="white" />
-                <Text style={tw`text-white text-lg font-black uppercase tracking-widest`}>
-                  {preselectedExercise ? 'Start Tracking' : 'Start Workout'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Controls */}
-          <View style={tw`px-4 py-4 gap-3`}>
-            {/* Quick Stats Row */}
-            <View style={tw`flex-row gap-3`}>
-              {[
-                { icon: 'timer', label: 'Duration', value: '00:00' },
-                { icon: 'fitness-center', label: 'Exercise', value: 'Ready' },
-                { icon: 'straighten', label: 'Form Score', value: '--' },
-              ].map((stat) => (
-                <View key={stat.label} style={[tw`flex-1 items-center py-3 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                  <MaterialIcons name={stat.icon as any} size={18} color={accent} />
-                  <Text style={[tw`text-sm font-black mt-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{stat.value}</Text>
-                  <Text style={[tw`text-[9px] font-bold uppercase tracking-wider`, { color: '#94a3b8' }]}>{stat.label}</Text>
+                  {/* Individual exercises */}
+                  <View style={tw`py-1`}>
+                    {workout.exercises.map((item, eIdx) => {
+                      const ex = customExercises.find((e) => e.id === item.exerciseId);
+                      const name = ex?.name ?? item.exerciseId;
+                      return (
+                        <View
+                          key={eIdx}
+                          style={[tw`flex-row items-center justify-between py-2`, eIdx > 0 && { borderTopWidth: 1, borderColor: cardBorder }]}
+                        >
+                          <View style={tw`flex-1 mr-2`}>
+                            <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{name}</Text>
+                            <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                              {item.sets} sets · {item.reps} reps · {item.restSeconds}s rest
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => navigation.navigate('Calibration', { exerciseName: name })}
+                            style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#4ade8018' }]}
+                          >
+                            <MaterialIcons name="videocam" size={14} color="#4ade80" />
+                            <Text style={[tw`text-xs font-bold`, { color: '#4ade80' }]}>Track</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
               ))}
             </View>
-          </View>
+          )}
         </ScrollView>
       ) : (
+        /* ── History Tab ── */
         <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 gap-3 pb-32`}>
           {historyLoading ? (
             <View style={tw`flex-1 items-center justify-center py-12`}>
               <ActivityIndicator color={accent} />
-              <Text style={[tw`mt-2 text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Loading history...</Text>
+              <Text style={[tw`mt-2 text-xs`, { color: textSecondary }]}>Loading history...</Text>
             </View>
           ) : apiHistory.length > 0 ? (
             apiHistory.map((session, i) => (
               <TouchableOpacity
                 key={session.id || i}
                 onPress={() => navigation.navigate('WorkoutSessionDetail', { session })}
-                style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
               >
                 <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
                   <MaterialIcons name="fitness-center" size={24} color={accent} />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{session.day || 'Workout'}</Text>
+                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{session.day || 'Workout'}</Text>
                   <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>
                     {session.date ? new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                     {session.duration ? ` · ${session.duration}m` : ''}
                     {session.exercises?.length ? ` · ${session.exercises.length} exercises` : ''}
                   </Text>
                 </View>
-                <View style={tw`items-end`}>
-                  <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, { backgroundColor: accent + '20', color: accent }]}>
-                    {session.status === 'completed' ? 'Done' : session.status || '--'}
-                  </Text>
-                </View>
+                <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, { backgroundColor: accent + '20', color: accent }]}>
+                  {session.status === 'completed' ? 'Done' : session.status || '--'}
+                </Text>
               </TouchableOpacity>
             ))
           ) : (
-            /* Fallback to cached or placeholder */
-            (cachedHistory || [
-              { date: 'No history yet', type: 'Start a workout to see history', duration: '--', score: '--', exercises: 0 },
-            ]).map((session, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => session.exercises > 0 && navigation.navigate('WorkoutSessionDetail', { session })}
-                style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-              >
+            (cachedHistory || [{ date: 'No history yet', type: 'Start a workout to see history', duration: '--', score: '--', exercises: 0 }]).map((session, i) => (
+              <View key={i} style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
                 <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
                   <MaterialIcons name="fitness-center" size={24} color={accent} />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{session.type}</Text>
-                  <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{session.date}{session.duration !== '--' ? ` - ${session.duration}` : ''}{session.exercises > 0 ? ` - ${session.exercises} exercises` : ''}</Text>
+                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{session.type}</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{session.date}</Text>
                 </View>
-                {session.score !== '--' && (
-                  <View style={tw`items-end`}>
-                    <Text style={[tw`text-lg font-black`, { color: accent }]}>{session.score}</Text>
-                    <Text style={[tw`text-[9px] font-bold uppercase`, { color: '#94a3b8' }]}>Form</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              </View>
             ))
           )}
         </ScrollView>
       )}
 
+      {/* ── Swap Exercise Sheet ── */}
+      <Modal
+        visible={swapTarget !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSwapTarget(null)}
+      >
+        <View style={[tw`flex-1 justify-end`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <SafeAreaView style={[tw`rounded-t-3xl`, { backgroundColor: bg, maxHeight: '75%' }]}>
+            <View style={tw`p-4`}>
+              <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]} />
+              <View style={tw`flex-row items-center justify-between mb-3`}>
+                <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>Swap Exercise</Text>
+                <TouchableOpacity onPress={() => setSwapTarget(null)}>
+                  <MaterialIcons name="close" size={22} color={textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <View style={[tw`flex-row items-center gap-2 px-3 py-2 rounded-xl mb-3`, { backgroundColor: inputBg }]}>
+                <MaterialIcons name="search" size={18} color={textSecondary} />
+                <TextInput
+                  style={[tw`flex-1 text-sm`, { color: textPrimary }]}
+                  placeholder="Search exercises…"
+                  placeholderTextColor={textSecondary}
+                  value={swapSearch}
+                  onChangeText={setSwapSearch}
+                />
+              </View>
+            </View>
+            <ScrollView style={tw`px-4`} contentContainerStyle={tw`gap-2 pb-6`}>
+              {swapCandidates.slice(0, 40).map((candidate, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => handleSwap(candidate)}
+                  style={[tw`p-3 rounded-xl flex-row items-center justify-between`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
+                >
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{candidate.name}</Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                      {candidate.muscleGroups.join(', ')} · {candidate.location}
+                    </Text>
+                  </View>
+                  <View style={[tw`px-2 py-1 rounded-full ml-2`, { backgroundColor: accent + '18' }]}>
+                    <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                      {candidate.defaultSets}×{candidate.defaultReps}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
       <TraineeBottomNav activeId="workouts" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };
-

@@ -853,16 +853,13 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                       Exercises
                     </Text>
                     <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                      Tap an exercise to track form
+                      Swap or Track each exercise
                     </Text>
                   </View>
                   <View style={tw`gap-2`}>
                     {generatedWorkout.exercises.map((exercise, idx) => (
-                      <TouchableOpacity
+                      <View
                         key={idx}
-                        onPress={() => {
-                          navigation.navigate('VisionAnalysisLab', { exerciseName: exercise.name });
-                        }}
                         style={[
                           tw`rounded-xl p-3`,
                           { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
@@ -876,8 +873,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                           </Text>
                           <View style={tw`flex-row gap-1`}>
                             <TouchableOpacity
-                              onPress={(e) => {
-                                e.stopPropagation();
+                              onPress={() => {
                                 setSwapIndex(idx);
                                 setSwapSearch('');
                               }}
@@ -890,10 +886,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                               <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                navigation.navigate('VisionAnalysisLab', { exerciseName: exercise.name });
-                              }}
+                              onPress={() => navigation.navigate('VisionAnalysisLab', { exerciseName: exercise.name })}
                               style={[
                                 tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
                                 { backgroundColor: '#4ade8018' },
@@ -915,7 +908,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                             {exercise.rest}s rest
                           </Text>
                         </View>
-                      </TouchableOpacity>
+                      </View>
                     ))}
                   </View>
                 </View>
