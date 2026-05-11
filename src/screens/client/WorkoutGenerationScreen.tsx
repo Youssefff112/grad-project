@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -81,6 +81,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, experienceLevel } = useUser();
   const { workouts: customWorkouts, deleteWorkout } = useExerciseManagement();
+  const insets = useSafeAreaInsets();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
@@ -286,15 +287,23 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
       {/* Header */}
       <View
         style={[
-          tw`p-4 flex-row items-center gap-4`,
-          { backgroundColor: bg, borderBottomWidth: 1, borderColor: cardBorder },
+          tw`flex-row items-center gap-4`,
+          {
+            backgroundColor: bg,
+            borderBottomWidth: 1,
+            borderColor: cardBorder,
+            paddingHorizontal: 16,
+            paddingBottom: 14,
+            paddingTop: Math.max(insets.top, 16),
+            minHeight: 64,
+          },
         ]}
       >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={tw`flex size-10 items-center justify-center`}
+          style={[tw`items-center justify-center rounded-xl`, { width: 44, height: 44, backgroundColor: accent + '14' }]}
         >
-          <MaterialIcons name="arrow-back" size={24} color={accent} />
+          <MaterialIcons name="arrow-back" size={22} color={accent} />
         </TouchableOpacity>
         <Text style={[tw`text-xl font-bold flex-1`, { color: textPrimary }]}>
           Generate Workout
@@ -750,11 +759,18 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
           setSwapIndex(null);
         }}
       >
-        <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]} edges={['left', 'right', 'bottom']}>
           <View
             style={[
-              tw`p-4 flex-row items-center justify-between`,
-              { borderBottomWidth: 1, borderColor: cardBorder },
+              tw`flex-row items-center justify-between`,
+              {
+                borderBottomWidth: 1,
+                borderColor: cardBorder,
+                paddingHorizontal: 16,
+                paddingBottom: 14,
+                paddingTop: Math.max(insets.top + 8, 20),
+                minHeight: 64,
+              },
             ]}
           >
             <TouchableOpacity
@@ -763,14 +779,14 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                 setGeneratedWorkout(null);
                 setSwapIndex(null);
               }}
-              style={tw`flex size-10 items-center justify-center`}
+              style={[tw`items-center justify-center rounded-xl`, { width: 44, height: 44, backgroundColor: accent + '14' }]}
             >
-              <MaterialIcons name="close" size={24} color={accent} />
+              <MaterialIcons name="close" size={22} color={accent} />
             </TouchableOpacity>
             <Text style={[tw`text-lg font-bold flex-1 text-center`, { color: textPrimary }]}>
               Workout Preview
             </Text>
-            <View style={tw`w-10`} />
+            <View style={{ width: 44 }} />
           </View>
 
           <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>

@@ -9,7 +9,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -37,6 +37,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   const { subscriptionPlan } = useUser();
   const { totalUnread } = useNotifications();
   const { workouts, exercises: customExercises } = useExerciseManagement();
+  const insets = useSafeAreaInsets();
 
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
   const preselectedExercise: string | undefined = route?.params?.exerciseName;
@@ -161,15 +162,15 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
       {/* Header */}
-      <View style={[tw`flex-row items-center p-4 justify-between z-10`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor: cardBorder }]}>
+      <View style={[tw`flex-row items-center justify-between z-10`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor: cardBorder, paddingHorizontal: 16, paddingBottom: 14, paddingTop: Math.max(insets.top, 16), minHeight: 64 }]}>
         <View style={tw`flex-row items-center gap-3`}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <MaterialIcons name="arrow-back" size={24} color={accent} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[tw`items-center justify-center rounded-xl`, { width: 44, height: 44, backgroundColor: accent + '14' }]}>
+            <MaterialIcons name="arrow-back" size={22} color={accent} />
           </TouchableOpacity>
           <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>Workouts</Text>
         </View>
         <TouchableOpacity
-          style={[tw`flex items-center justify-center rounded-lg h-10 w-10`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]}
+          style={[tw`items-center justify-center rounded-xl`, { width: 44, height: 44, backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]}
           onPress={() => setActiveTab('history')}
         >
           <MaterialIcons name="history" size={22} color={accent} />

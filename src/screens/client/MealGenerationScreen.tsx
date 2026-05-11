@@ -8,7 +8,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -107,6 +107,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, dietPreferences } = useUser();
   const { customMeals, deleteMealPlan } = useFoodManagement();
+  const insets = useSafeAreaInsets();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
@@ -242,9 +243,9 @@ export const MealGenerationScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
-      <View style={[tw`p-4 flex-row items-center gap-4`, { backgroundColor: bg, borderBottomWidth: 1, borderColor: cardBorder }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center`}>
-          <MaterialIcons name="arrow-back" size={24} color={accent} />
+      <View style={[tw`flex-row items-center gap-4`, { backgroundColor: bg, borderBottomWidth: 1, borderColor: cardBorder, paddingHorizontal: 16, paddingBottom: 14, paddingTop: Math.max(insets.top, 16), minHeight: 64 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[tw`items-center justify-center rounded-xl`, { width: 44, height: 44, backgroundColor: accent + '14' }]}>
+          <MaterialIcons name="arrow-back" size={22} color={accent} />
         </TouchableOpacity>
         <Text style={[tw`text-xl font-bold flex-1`, { color: textPrimary }]}>
           Generate Meal Plan
@@ -478,15 +479,15 @@ export const MealGenerationScreen = ({ navigation }: any) => {
 
       {/* Meal Plan Preview Modal */}
       <Modal visible={showPreview} animationType="slide" transparent onRequestClose={() => { setShowPreview(false); setGeneratedMeal(null); }}>
-        <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-          <View style={[tw`p-4 flex-row items-center justify-between`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-            <TouchableOpacity onPress={() => { setShowPreview(false); setGeneratedMeal(null); }} style={tw`flex size-10 items-center justify-center`}>
-              <MaterialIcons name="close" size={24} color={accent} />
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]} edges={['left', 'right', 'bottom']}>
+          <View style={[tw`flex-row items-center justify-between`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', paddingHorizontal: 16, paddingBottom: 14, paddingTop: Math.max(insets.top + 8, 20), minHeight: 64 }]}>
+            <TouchableOpacity onPress={() => { setShowPreview(false); setGeneratedMeal(null); }} style={[tw`items-center justify-center rounded-xl`, { width: 44, height: 44, backgroundColor: accent + '14' }]}>
+              <MaterialIcons name="close" size={22} color={accent} />
             </TouchableOpacity>
             <Text style={[tw`text-lg font-bold flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
               Meal Plan Preview
             </Text>
-            <View style={tw`w-10`} />
+            <View style={{ width: 44 }} />
           </View>
 
           <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
