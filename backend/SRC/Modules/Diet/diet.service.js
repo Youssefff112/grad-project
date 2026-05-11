@@ -119,7 +119,12 @@ export const dietService = {
       throw new AppError('Please complete your profile first', 400);
     }
 
-    const { currentWeight, height, age, gender } = user.profile;
+    // Coerce biometrics to numbers; use safe fallbacks so we never pass NaN to the DB
+    const weight  = parseFloat(user.profile.currentWeight)  || 70;   // kg
+    const height  = parseFloat(user.profile.height)          || 170;  // cm
+    const age     = parseInt(user.profile.age, 10)            || 25;
+    const gender  = user.profile.gender || 'male';
+
     // Normalize raw goal to a valid DB enum value
     const goal = this._normalizeGoal(user.profile.goal);
     const rawDietPref = user.profile.dietaryPreference || user.profile.dietaryPreferences;
@@ -132,7 +137,7 @@ export const dietService = {
     );
 
     // Calculate daily calorie target
-    const bmr = this._calculateBMR(currentWeight, height, age, gender);
+    const bmr = this._calculateBMR(weight, height, age, gender);
     const tdee = this._calculateTDEE(bmr, 'moderate'); // Assuming moderate activity
     const dailyCalorieTarget = this._adjustCaloriesForGoal(tdee, goal);
 
@@ -163,7 +168,10 @@ export const dietService = {
 
   // BMR calculation (Mifflin-St Jeor)
   _calculateBMR(weight, height, age, gender) {
-    const baseRate = 10 * weight + 6.25 * height - 5 * age;
+    const w = parseFloat(weight)  || 70;
+    const h = parseFloat(height)  || 170;
+    const a = parseFloat(age)     || 25;
+    const baseRate = 10 * w + 6.25 * h - 5 * a;
     return gender === 'male' ? baseRate + 5 : baseRate - 161;
   },
 
@@ -187,7 +195,8 @@ export const dietService = {
       maintenance: 0,
       endurance: 200
     };
-    return Math.round(tdee + (adjustments[goal] || 0));
+    const result = Math.round((parseFloat(tdee) || 2000) + (adjustments[goal] || 0));
+    return isNaN(result) ? 2000 : result;
   },
 
   // Calculate macros
@@ -208,10 +217,11 @@ export const dietService = {
       fatsPercent = 0.30;
     }
 
+    const safe = parseFloat(calories) || 2000;
     return {
-      protein: Math.round((calories * proteinPercent) / 4),
-      carbs: Math.round((calories * carbsPercent) / 4),
-      fats: Math.round((calories * fatsPercent) / 9)
+      protein: Math.round((safe * proteinPercent) / 4) || 0,
+      carbs:   Math.round((safe * carbsPercent)   / 4) || 0,
+      fats:    Math.round((safe * fatsPercent)    / 9) || 0
     };
   },
 
@@ -316,7 +326,8 @@ export const dietService = {
   // Maps any dietary preference string to a valid DB enum value
   _normalizeDietaryPreference(raw) {
     if (!raw) return 'none';
-    const p = String(raw).toLowerCase();
+    const p = String(raw).toLowerCase().trim();
+    if (p === 'other' || p === '' || p === 'n/a') return 'none';
     if (p.includes('vegan')) return 'vegan';
     if (p.includes('vegetar')) return 'vegetarian';
     if (p.includes('gluten')) return 'gluten_free';
