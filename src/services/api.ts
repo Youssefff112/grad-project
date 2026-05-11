@@ -120,6 +120,15 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // Handle 429 Too Many Requests — surface a readable error message
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers?.['retry-after'];
+      const msg = retryAfter
+        ? `Too many requests. Please wait ${retryAfter}s and try again.`
+        : 'Too many requests. Please wait a moment and try again.';
+      return Promise.reject(new Error(msg));
+    }
+
     // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

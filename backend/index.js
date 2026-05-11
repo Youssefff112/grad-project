@@ -51,11 +51,13 @@ app.use(cors({
   credentials: process.env.NODE_ENV === 'production'
 }));
 
-// Rate Limiting
+// Rate Limiting — relaxed in development so testing doesn't hit the ceiling
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 300 : 2000,
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
