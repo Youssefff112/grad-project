@@ -164,7 +164,7 @@ export const ActiveSetScreen = ({ navigation }: any) => {
               onPress={() => navigation.navigate('TraineeCommandCenter')}
             >
               <MaterialIcons name="stop-circle" size={24} color="black" />
-              <Text style={tw`text-black font-black uppercase tracking-widest`}>Finish Set</Text>
+              <Text style={tw`text-base text-black font-black uppercase tracking-widest`}>Finish Set</Text>
             </TouchableOpacity>
             <TouchableOpacity style={tw`h-14 w-14 flex items-center justify-center rounded-xl bg-white/10 border border-white/10`} onPress={() => {
               setIsPaused(!isPaused);

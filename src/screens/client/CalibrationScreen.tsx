@@ -52,25 +52,31 @@ export const CalibrationScreen = ({ navigation }: any) => {
       {/* Camera View */}
       <View style={tw`relative flex-1`}>
         {permission?.granted ? (
-          <CameraView
-            ref={cameraRef}
-            style={tw`flex-1`}
-            onCameraReady={() => setCameraReady(true)}
-            facing="front"
-          >
-            {/* Camera Ready Indicator */}
-            {cameraReady && (
-              <View style={[tw`absolute top-4 right-4 flex-row items-center gap-2 px-3 py-1.5 rounded-full`, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-                <View style={tw`h-2 w-2 bg-green-500 rounded-full`} />
-                <Text style={tw`text-xs font-bold text-white uppercase`}>Ready</Text>
-              </View>
-            )}
+          <>
+            {/* CameraView must have no children — overlays go on the sibling View */}
+            <CameraView
+              ref={cameraRef}
+              style={tw`flex-1`}
+              onCameraReady={() => setCameraReady(true)}
+              facing="front"
+            />
 
-            {/* Crosshair Overlay */}
-            <View style={tw`absolute inset-0 items-center justify-center`}>
-              <View style={[tw`w-32 h-32 border-2 border-dashed rounded-2xl`, { borderColor: accent + '80' }]} />
+            {/* Overlays using absolute positioning outside CameraView */}
+            <View style={tw`absolute inset-0`} pointerEvents="none">
+              {/* Crosshair */}
+              <View style={tw`flex-1 items-center justify-center`}>
+                <View style={[tw`w-32 h-32 border-2 border-dashed rounded-2xl`, { borderColor: accent + '80' }]} />
+              </View>
+
+              {/* Camera Ready Indicator */}
+              {cameraReady && (
+                <View style={[tw`absolute top-4 right-4 flex-row items-center gap-2 px-3 py-1.5 rounded-full`, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                  <View style={tw`h-2 w-2 bg-green-500 rounded-full`} />
+                  <Text style={tw`text-xs font-bold text-white uppercase`}>Ready</Text>
+                </View>
+              )}
             </View>
-          </CameraView>
+          </>
         ) : (
           <View style={tw`flex-1 items-center justify-center`}>
             <MaterialIcons name="camera-alt" size={48} color={isDark ? '#94a3b8' : '#64748b'} />
