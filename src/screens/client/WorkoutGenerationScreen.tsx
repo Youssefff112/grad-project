@@ -19,6 +19,7 @@ import { FeatureLocked } from '../../components/FeatureLocked';
 import { Button } from '../../components/Button';
 import * as workoutService from '../../services/workoutService';
 import { COMMON_EXERCISES } from '../../services/exerciseService';
+import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 
 interface GeneratedExercise {
   name: string;
@@ -79,6 +80,7 @@ const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => 
 export const WorkoutGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, experienceLevel } = useUser();
+  const { workouts: customWorkouts, deleteWorkout } = useExerciseManagement();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
@@ -478,6 +480,60 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
             <Text style={[tw`text-xs mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
               Loading your plan...
             </Text>
+          </View>
+        )}
+
+        {/* ── Custom Workouts Section ─────────────────────────────────────────── */}
+        {customWorkouts && customWorkouts.length > 0 && (
+          <View style={tw`mt-8`}>
+            <View style={tw`flex-row items-center justify-between mb-4`}>
+              <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                My Custom Workouts
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('WorkoutBuilder')}
+                style={[tw`px-3 py-1.5 rounded-lg`, { backgroundColor: accent + '20' }]}
+              >
+                <Text style={[tw`text-xs font-bold`, { color: accent }]}>+ New</Text>
+              </TouchableOpacity>
+            </View>
+            {customWorkouts.map((cw) => (
+              <View
+                key={cw.id}
+                style={[
+                  tw`rounded-xl p-4 mb-3`,
+                  { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                ]}
+              >
+                <View style={tw`flex-row items-start justify-between`}>
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>{cw.name}</Text>
+                    <Text style={[tw`text-xs mt-1 capitalize`, { color: textSecondary }]}>
+                      {cw.difficulty} · {cw.totalExercises} exercises · ~{cw.estimatedDuration} min
+                    </Text>
+                  </View>
+                  <View style={tw`flex-row gap-2`}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('WorkoutBuilder', { workout: cw })}
+                      style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '20' }]}
+                    >
+                      <MaterialIcons name="edit" size={16} color={accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        Alert.alert('Delete Workout', `Delete "${cw.name}"?`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => deleteWorkout(cw.id) },
+                        ])
+                      }
+                      style={[tw`p-2 rounded-lg`, { backgroundColor: '#ef444420' }]}
+                    >
+                      <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>

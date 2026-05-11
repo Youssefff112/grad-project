@@ -48,17 +48,17 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
         price: planData.price,
         autoRenew: true,
       });
-      if (planData.price > 0) {
-        await subscriptionService.recordPayment(subscription.id, {
-          amount: planData.price,
-          provider: 'manual',
-          status: 'paid',
-        });
-      }
+      // Always record a payment (even $0 for Free) so the subscription becomes 'active'
+      await subscriptionService.recordPayment(subscription.id, {
+        amount: planData.price,
+        provider: 'manual',
+        status: 'paid',
+      });
       setSubscriptionPlan(selectedPlan);
       navigation.navigate('OnboardingPreferences');
-    } catch {
-      Alert.alert('Error', 'Could not activate plan. Please try again.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Unknown error';
+      Alert.alert('Error', `Could not activate plan: ${msg}`);
     } finally {
       setIsConfirming(false);
     }

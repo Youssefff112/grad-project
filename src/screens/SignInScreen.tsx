@@ -16,8 +16,10 @@ import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
-import { validateMockUser, MOCK_USERS } from '../data/mockUsers';
+import { validateMockUser, MOCK_USERS, MockUser } from '../data/mockUsers';
 import * as authService from '../services/auth.service';
+import * as subscriptionService from '../services/subscriptionService';
+import { PLAN_FEATURES } from '../constants/plans';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -45,6 +47,26 @@ export const SignInScreen = ({ navigation }: any) => {
     }
 
     return newErrors;
+  };
+
+  // Ensures a mock demo user has an active subscription for their plan tier.
+  // Called after successful login/auto-register so AI features work immediately.
+  const _ensureMockSubscription = async (mockUser: MockUser) => {
+    const { subscription: existing } = await subscriptionService.getActiveSubscription('client').catch(() => ({ subscription: null }));
+    if (existing?.status === 'active') return; // already active — nothing to do
+
+    const planData = PLAN_FEATURES[mockUser.subscriptionPlan];
+    const { subscription } = await subscriptionService.createSubscription({
+      role: 'client',
+      planName: mockUser.subscriptionPlan,
+      price: planData.price,
+      autoRenew: true,
+    });
+    await subscriptionService.recordPayment(subscription.id, {
+      amount: planData.price,
+      provider: 'demo',
+      status: 'paid',
+    });
   };
 
   const handleSignIn = async () => {
@@ -167,15 +189,39 @@ export const SignInScreen = ({ navigation }: any) => {
                       setPassword(user.password);
                       setIsLoading(true);
                       try {
-                        // Real login so the device gets a JWT for all protected endpoints
-                        const response = await authService.login({ email: user.email, password: user.password });
-                        if (response.success && response.data?.user && response.data?.token) {
-                          const u = response.data.user;
+                        // Try real login first so the device gets a JWT for all protected endpoints
+                        let loginResp = await authService.login({ email: user.email, password: user.password }).catch(async (err: any) => {
+                          // User doesn't exist in DB yet — auto-register them
+                          if (err?.response?.status === 401) {
+                            const [first, ...rest] = user.fullName.split(' ');
+                            await authService.register({
+                              firstName: first,
+                              lastName: rest.join(' ') || 'Demo',
+                              email: user.email,
+                              password: user.password,
+                              confirmPassword: user.password,
+                              userType: 'onsite',
+                              role: user.role === 'coach' ? 'coach' : 'client',
+                            });
+                            // Retry login after registration
+                            return authService.login({ email: user.email, password: user.password });
+                          }
+                          throw err;
+                        });
+
+                        if (loginResp?.success && loginResp.data?.user && loginResp.data?.token) {
+                          const u = loginResp.data.user;
                           const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
-                          await setAuthTokens(response.data.token, response.data.refreshToken);
+                          await setAuthTokens(loginResp.data.token, loginResp.data.refreshToken);
                           setFullName(fullName);
                           saveEmail(u.email);
                           setRole(u.role as any);
+
+                          // Ensure the mock user has an active subscription for their plan
+                          if (u.role === 'client' || u.role === 'coach') {
+                            await _ensureMockSubscription(user).catch(() => {/* silent — subscription may already exist */});
+                          }
+
                           if (u.role === 'admin') {
                             navigation.navigate('AdminDashboard');
                           } else if (u.role === 'coach') {

@@ -17,6 +17,7 @@ import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { Button } from '../../components/Button';
 import * as dietService from '../../services/dietService';
+import { useFoodManagement } from '../../context/FoodManagementContext';
 
 // ── Built-in meal alternatives per time slot ──────────────────────────────────
 const MEAL_ALTERNATIVES: Record<string, Array<{ name: string; calories: number; protein: number; carbs: number; fat: number; serving: string }>> = {
@@ -105,6 +106,7 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status: 'pending' | 'appr
 export const MealGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, dietPreferences } = useUser();
+  const { customMeals, deleteMealPlan } = useFoodManagement();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
@@ -391,6 +393,60 @@ export const MealGenerationScreen = ({ navigation }: any) => {
           <View style={tw`items-center py-6`}>
             <ActivityIndicator color={accent} />
             <Text style={[tw`text-xs mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Loading your plan...</Text>
+          </View>
+        )}
+
+        {/* ── Custom Meals Section ──────────────────────────────────────────────── */}
+        {customMeals && customMeals.length > 0 && (
+          <View style={tw`mt-8`}>
+            <View style={tw`flex-row items-center justify-between mb-4`}>
+              <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                My Custom Meals
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('MealBuilder')}
+                style={[tw`px-3 py-1.5 rounded-lg`, { backgroundColor: accent + '20' }]}
+              >
+                <Text style={[tw`text-xs font-bold`, { color: accent }]}>+ New</Text>
+              </TouchableOpacity>
+            </View>
+            {customMeals.map((cm) => (
+              <View
+                key={cm.id}
+                style={[
+                  tw`rounded-xl p-4 mb-3`,
+                  { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+                ]}
+              >
+                <View style={tw`flex-row items-start justify-between`}>
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{cm.name}</Text>
+                    <Text style={[tw`text-xs mt-1 capitalize`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                      {cm.mealType} · {cm.totalCalories} kcal · P:{cm.totalMacros.protein}g C:{cm.totalMacros.carbs}g F:{cm.totalMacros.fats}g
+                    </Text>
+                  </View>
+                  <View style={tw`flex-row gap-2`}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('MealBuilder', { meal: cm })}
+                      style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '20' }]}
+                    >
+                      <MaterialIcons name="edit" size={16} color={accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        Alert.alert('Delete Meal', `Delete "${cm.name}"?`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => deleteMealPlan(cm.id) },
+                        ])
+                      }
+                      style={[tw`p-2 rounded-lg`, { backgroundColor: '#ef444420' }]}
+                    >
+                      <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
