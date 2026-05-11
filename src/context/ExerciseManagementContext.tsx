@@ -11,6 +11,7 @@ export interface Exercise {
   sets: number;
   reps: string; // e.g., "8-12" or "5"
   restSeconds: number;
+  location?: 'home' | 'gym';
   source: 'user' | 'api';
   apiId?: string;
   createdAt: number;
@@ -45,42 +46,57 @@ export const ExerciseManagementProvider: React.FC<{ children: React.ReactNode }>
   const [workouts, setWorkouts] = useState<CustomWorkout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Bump this version whenever COMMON_EXERCISES is updated to force a re-seed
+  const EXERCISES_SEED_VERSION = '2';
+
+  const buildSeeded = (): Exercise[] =>
+    COMMON_EXERCISES.map((ex, i) => ({
+      ...ex,
+      id: `seed_${i}`,
+      sets: ex.defaultSets,
+      reps: ex.defaultReps,
+      restSeconds: ex.defaultRest,
+      source: 'api' as const,
+      createdAt: Date.now(),
+    }));
+
   // Load all data from AsyncStorage on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [exercisesData, workoutsData] = await Promise.all([
+        const [exercisesData, workoutsData, seedVersion] = await Promise.all([
           AsyncStorage.getItem('exercises').catch(() => null),
           AsyncStorage.getItem('workouts').catch(() => null),
+          AsyncStorage.getItem('exercises_seed_version').catch(() => null),
         ]);
 
-        if (exercisesData) {
+        const needsReseed = seedVersion !== EXERCISES_SEED_VERSION;
+
+        if (!needsReseed && exercisesData) {
           try {
             const parsed: Exercise[] = JSON.parse(exercisesData);
-            if (parsed.length > 0) {
-              setExercises(parsed);
-            } else {
-              throw new Error('empty');
-            }
+            // Keep user-added exercises (source === 'user') and merge with fresh seed
+            const userExercises = parsed.filter((e) => e.source === 'user');
+            const freshSeed = buildSeeded();
+            setExercises([...freshSeed, ...userExercises]);
           } catch {
-            const seeded: Exercise[] = COMMON_EXERCISES.map((ex, i) => ({
-              ...ex,
-              id: `seed_${i}`,
-              source: 'api' as const,
-              createdAt: Date.now(),
-            }));
-            setExercises(seeded);
-            await AsyncStorage.setItem('exercises', JSON.stringify(seeded)).catch(() => {});
+            setExercises(buildSeeded());
           }
         } else {
-          const seeded: Exercise[] = COMMON_EXERCISES.map((ex, i) => ({
-            ...ex,
-            id: `seed_${i}`,
-            source: 'api' as const,
-            createdAt: Date.now(),
-          }));
+          // Re-seed: preserve user-created exercises
+          let userExercises: Exercise[] = [];
+          if (exercisesData) {
+            try {
+              const parsed: Exercise[] = JSON.parse(exercisesData);
+              userExercises = parsed.filter((e) => e.source === 'user');
+            } catch { /* ignore */ }
+          }
+          const seeded = [...buildSeeded(), ...userExercises];
           setExercises(seeded);
-          await AsyncStorage.setItem('exercises', JSON.stringify(seeded)).catch(() => {});
+          await Promise.all([
+            AsyncStorage.setItem('exercises', JSON.stringify(seeded)).catch(() => {}),
+            AsyncStorage.setItem('exercises_seed_version', EXERCISES_SEED_VERSION).catch(() => {}),
+          ]);
         }
 
         if (workoutsData) {

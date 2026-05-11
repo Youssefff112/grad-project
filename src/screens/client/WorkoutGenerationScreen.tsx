@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -17,6 +18,14 @@ import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { Button } from '../../components/Button';
 import * as workoutService from '../../services/workoutService';
+import { COMMON_EXERCISES } from '../../services/exerciseService';
+
+interface GeneratedExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  rest: number;
+}
 
 interface GeneratedWorkout {
   id: string;
@@ -24,16 +33,23 @@ interface GeneratedWorkout {
   duration: number;
   difficulty: 'Easy' | 'Moderate' | 'Hard';
   focus: string;
-  exercises: Array<{
-    name: string;
-    sets: number;
-    reps: string;
-    rest: number;
-  }>;
+  exercises: GeneratedExercise[];
   notes: string;
   status: 'pending' | 'approved' | 'rejected';
   approvedBy?: string;
 }
+
+type WorkoutLocation = 'home' | 'gym';
+
+const HOME_EQUIPMENT_OPTIONS = [
+  { id: 'dumbbells', label: 'Dumbbells' },
+  { id: 'resistance_bands', label: 'Resistance Bands' },
+  { id: 'pullup_bar', label: 'Pull-up Bar' },
+  { id: 'bench', label: 'Bench / Chair' },
+  { id: 'barbell', label: 'Barbell + Weights' },
+  { id: 'kettlebell', label: 'Kettlebell' },
+  { id: 'none', label: 'Nothing (Bodyweight Only)' },
+];
 
 const mapExperienceToDifficulty = (level?: string): 'Easy' | 'Moderate' | 'Hard' => {
   if (level === 'beginner') return 'Easy';
@@ -42,14 +58,14 @@ const mapExperienceToDifficulty = (level?: string): 'Easy' | 'Moderate' | 'Hard'
 };
 
 const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => {
-  const workoutDays = plan.weeklySchedule?.filter(d => !d.isRestDay) || [];
-  return workoutDays.map(day => ({
+  const workoutDays = plan.weeklySchedule?.filter((d) => !d.isRestDay) || [];
+  return workoutDays.map((day) => ({
     id: `${plan.id}-${day.day}`,
     name: `${day.day}: ${day.focus || 'Workout'}`,
     duration: day.duration || 60,
     difficulty: mapExperienceToDifficulty(plan.experienceLevel),
     focus: day.focus || 'Full Body',
-    exercises: (day.exercises || []).map(e => ({
+    exercises: (day.exercises || []).map((e) => ({
       name: e.name,
       sets: e.sets,
       reps: e.reps,
@@ -64,12 +80,30 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, experienceLevel } = useUser();
 
-  // All hooks must be declared before any conditional return
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [availableWorkouts, setAvailableWorkouts] = useState<GeneratedWorkout[]>([]);
+
+  // Location questionnaire state
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationStep, setLocationStep] = useState<1 | 2>(1);
+  const [workoutLocation, setWorkoutLocation] = useState<WorkoutLocation | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+
+  // Swap exercise state
+  const [swapIndex, setSwapIndex] = useState<number | null>(null);
+  const [swapSearch, setSwapSearch] = useState('');
+
+  // ── Derived colors ───────────────────────────────────────────────────────────
+  const bg = isDark ? '#0a0a12' : '#f8f7f5';
+  const cardBg = isDark ? '#111128' : '#ffffff';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
+  const textSecondary = isDark ? '#cbd5e1' : '#475569';
+  const inputBg = isDark ? '#1e293b' : '#f1f5f9';
+  const inputBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
 
   useEffect(() => {
     if (hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration')) {
@@ -104,10 +138,27 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleGenerateWorkout = async () => {
+  // ── Step 1: open questionnaire ───────────────────────────────────────────────
+  const handleOpenQuestionnaire = () => {
+    setWorkoutLocation(null);
+    setSelectedEquipment([]);
+    setLocationStep(1);
+    setShowLocationModal(true);
+  };
+
+  // ── Step 2: confirm & generate ───────────────────────────────────────────────
+  const handleConfirmAndGenerate = async () => {
+    setShowLocationModal(false);
+    await runGeneration();
+  };
+
+  const runGeneration = async (
+    loc: WorkoutLocation | null = workoutLocation,
+    equip: string[] = selectedEquipment,
+  ) => {
     setIsGenerating(true);
     try {
-      const { plan } = await workoutService.generateWorkoutPlan();
+      const { plan } = await workoutService.generateWorkoutPlan(loc, equip);
       if (plan) {
         const workouts = planToWorkout(plan);
         const first = workouts[0];
@@ -122,14 +173,48 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         throw new Error('No plan returned');
       }
     } catch (error: any) {
-      Alert.alert(
-        'Generation Failed',
-        error?.message || 'Unable to generate workout plan. Make sure your profile is complete and you have an active subscription.',
-        [{ text: 'OK' }]
-      );
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to generate workout plan. Make sure your profile is complete and you have an active subscription.';
+      Alert.alert('Generation Failed', msg, [{ text: 'OK' }]);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // ── Swap helpers ─────────────────────────────────────────────────────────────
+  const swapCandidates = useMemo(() => {
+    let pool = COMMON_EXERCISES;
+    if (workoutLocation) {
+      pool = pool.filter((e) => e.location === workoutLocation);
+    }
+    if (swapSearch.trim()) {
+      const q = swapSearch.toLowerCase();
+      pool = pool.filter(
+        (e) =>
+          e.name.toLowerCase().includes(q) ||
+          e.muscleGroups.some((m) => m.toLowerCase().includes(q)),
+      );
+    }
+    return pool;
+  }, [workoutLocation, swapSearch]);
+
+  const handleSwapExercise = (candidate: typeof COMMON_EXERCISES[0]) => {
+    if (swapIndex === null || !generatedWorkout) return;
+    const updated = generatedWorkout.exercises.map((ex, i) =>
+      i === swapIndex
+        ? {
+            name: candidate.name,
+            sets: candidate.defaultSets,
+            reps: candidate.defaultReps,
+            rest: candidate.defaultRest,
+          }
+        : ex,
+    );
+    setGeneratedWorkout({ ...generatedWorkout, exercises: updated });
+    setSwapIndex(null);
+    setSwapSearch('');
   };
 
   const handleApproveWorkout = () => {
@@ -148,7 +233,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         onPress: () => {
           setShowPreview(false);
           setGeneratedWorkout(null);
-          handleGenerateWorkout();
+          handleOpenQuestionnaire();
         },
       },
     ]);
@@ -169,7 +254,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
             setGeneratedWorkout(null);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -182,23 +267,49 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
     }
   };
 
+  const toggleEquipment = (id: string) => {
+    if (id === 'none') {
+      setSelectedEquipment(['none']);
+      return;
+    }
+    setSelectedEquipment((prev) => {
+      const without = prev.filter((e) => e !== 'none');
+      return without.includes(id) ? without.filter((e) => e !== id) : [...without, id];
+    });
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      <View style={[tw`p-4 flex-row items-center gap-4`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center`}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
+      {/* Header */}
+      <View
+        style={[
+          tw`p-4 flex-row items-center gap-4`,
+          { backgroundColor: bg, borderBottomWidth: 1, borderColor: cardBorder },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={tw`flex size-10 items-center justify-center`}
+        >
           <MaterialIcons name="arrow-back" size={24} color={accent} />
         </TouchableOpacity>
-        <Text style={[tw`text-xl font-bold flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+        <Text style={[tw`text-xl font-bold flex-1`, { color: textPrimary }]}>
           Generate Workout
         </Text>
       </View>
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6`}>
         {/* Mode Info Banner */}
-        <View style={[tw`mb-6 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
+        <View
+          style={[
+            tw`mb-6 rounded-xl p-4`,
+            { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' },
+          ]}
+        >
           <View style={tw`flex-row items-start gap-3 mb-2`}>
             <MaterialIcons name="info" size={20} color={accent} />
-            <Text style={[tw`flex-1 text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            <Text style={[tw`flex-1 text-sm font-bold`, { color: textPrimary }]}>
               {userMode === 'CoachAssisted'
                 ? 'Coach Review Required'
                 : userMode === 'AIDriven'
@@ -206,50 +317,56 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                 : 'Browse Workouts'}
             </Text>
           </View>
-          <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+          <Text style={[tw`text-sm`, { color: textSecondary }]}>
             {userMode === 'CoachAssisted'
               ? `Generated workouts will be reviewed by ${coachName} before appearing in your routine.`
               : userMode === 'AIDriven'
-              ? 'Your AI generates personalized workouts based on your fitness level and goals.'
+              ? 'Your AI generates personalized workouts based on your fitness level, goals, and location.'
               : 'You can browse our exercise library and create custom workouts.'}
           </Text>
         </View>
 
         {/* Experience Level Info */}
-        <View style={[tw`mb-6 rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+        <View
+          style={[
+            tw`mb-6 rounded-xl p-4 flex-row items-center gap-3`,
+            { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+          ]}
+        >
           <MaterialIcons name="fitness-center" size={24} color={accent} />
           <View style={tw`flex-1`}>
-            <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              Experience Level
-            </Text>
-            <Text style={[tw`text-xs mt-1 capitalize`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+            <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>Experience Level</Text>
+            <Text style={[tw`text-xs mt-1 capitalize`, { color: textSecondary }]}>
               {experienceLevel || 'Not set'}
             </Text>
           </View>
         </View>
 
-        {/* Generation Section */}
+        {/* Create New Workout */}
         {!generatedWorkout && (
           <View>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: textPrimary }]}>
               Create New Workout
             </Text>
 
             <View style={tw`gap-3 mb-6`}>
               <TouchableOpacity
                 disabled={isGenerating}
-                onPress={handleGenerateWorkout}
-                style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+                onPress={handleOpenQuestionnaire}
+                style={[
+                  tw`rounded-xl p-4 flex-row items-center gap-3`,
+                  { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' },
+                ]}
               >
                 <View style={[tw`p-3 rounded-lg`, { backgroundColor: accent }]}>
                   <MaterialIcons name="auto-awesome" size={24} color="white" />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
                     Generate Auto
                   </Text>
-                  <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                    Let AI create a workout plan for you
+                  <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
+                    Let AI create a workout plan tailored to your location
                   </Text>
                 </View>
                 {isGenerating && <ActivityIndicator color={accent} />}
@@ -257,35 +374,43 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('WorkoutBuilder')}
-                style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                style={[
+                  tw`rounded-xl p-4 flex-row items-center gap-3`,
+                  { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                ]}
               >
-                <View style={[tw`p-3 rounded-lg`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                <View style={[tw`p-3 rounded-lg`, { backgroundColor: inputBg }]}>
                   <MaterialIcons name="edit" size={24} color={accent} />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                  <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
                     Build Custom
                   </Text>
-                  <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                    Choose exercises manually
+                  <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
+                    Choose exercises manually from the full library
                   </Text>
                 </View>
               </TouchableOpacity>
             </View>
 
-            <View style={[tw`rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-              <Text style={[tw`font-bold text-sm mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            <View
+              style={[
+                tw`rounded-xl p-4`,
+                { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+              ]}
+            >
+              <Text style={[tw`font-bold text-sm mb-3`, { color: textPrimary }]}>
                 💡 Quick Tips
               </Text>
               <View style={tw`gap-2`}>
-                <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  • {userMode === 'CoachAssisted' ? 'Your coach customizes workouts' : 'AI learns from your preferences'}
+                <Text style={[tw`text-sm`, { color: textSecondary }]}>
+                  • AI will ask where you workout and what equipment you have
                 </Text>
-                <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                <Text style={[tw`text-sm`, { color: textSecondary }]}>
+                  • You can swap any exercise in the generated plan before saving
+                </Text>
+                <Text style={[tw`text-sm`, { color: textSecondary }]}>
                   • Generating a new plan replaces your current one
-                </Text>
-                <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  • All changes are saved to your profile automatically
                 </Text>
               </View>
             </View>
@@ -295,7 +420,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         {/* Active Workout Plan Days */}
         {!isLoadingPlan && availableWorkouts.length > 0 && (
           <View style={tw`mt-8`}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: textPrimary }]}>
               Your Current Plan
             </Text>
             {availableWorkouts.map((workout) => (
@@ -305,27 +430,40 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   setGeneratedWorkout(workout);
                   setShowPreview(true);
                 }}
-                style={[tw`rounded-xl p-4 mb-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                style={[
+                  tw`rounded-xl p-4 mb-3`,
+                  { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                ]}
               >
                 <View style={tw`flex-row items-start justify-between mb-2`}>
                   <View style={tw`flex-1`}>
-                    <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                    <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
                       {workout.name}
                     </Text>
-                    <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                    <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
                       {workout.focus} • {workout.duration} mins
                     </Text>
                   </View>
-                  <View style={[tw`px-2 py-1 rounded`, { backgroundColor: getDifficultyColor(workout.difficulty) + '20' }]}>
-                    <Text style={[tw`text-xs font-bold`, { color: getDifficultyColor(workout.difficulty) }]}>
+                  <View
+                    style={[
+                      tw`px-2 py-1 rounded`,
+                      { backgroundColor: getDifficultyColor(workout.difficulty) + '20' },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        tw`text-xs font-bold`,
+                        { color: getDifficultyColor(workout.difficulty) },
+                      ]}
+                    >
                       {workout.difficulty}
                     </Text>
                   </View>
                 </View>
-                <View style={[tw`w-full h-px`, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} />
+                <View style={[tw`w-full h-px`, { backgroundColor: cardBorder }]} />
                 <View style={tw`mt-2 flex-row items-center gap-1`}>
                   <MaterialIcons name="fitness-center" size={14} color={accent} />
-                  <Text style={[tw`text-xs`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  <Text style={[tw`text-xs`, { color: textSecondary }]}>
                     {workout.exercises.length} exercises
                   </Text>
                 </View>
@@ -337,19 +475,212 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         {isLoadingPlan && (
           <View style={tw`items-center py-6`}>
             <ActivityIndicator color={accent} />
-            <Text style={[tw`text-xs mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Loading your plan...</Text>
+            <Text style={[tw`text-xs mt-2`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              Loading your plan...
+            </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Workout Preview Modal */}
-      <Modal visible={showPreview} animationType="slide" transparent onRequestClose={() => { setShowPreview(false); setGeneratedWorkout(null); }}>
-        <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-          <View style={[tw`p-4 flex-row items-center justify-between`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-            <TouchableOpacity onPress={() => { setShowPreview(false); setGeneratedWorkout(null); }} style={tw`flex size-10 items-center justify-center`}>
+      {/* ── Location / Equipment Questionnaire Modal ─────────────────────────── */}
+      <Modal
+        visible={showLocationModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={[tw`flex-1 justify-end`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View
+            style={[
+              tw`rounded-t-3xl p-6`,
+              { backgroundColor: bg, maxHeight: '85%' },
+            ]}
+          >
+            {/* Handle */}
+            <View style={[tw`w-10 h-1 rounded-full self-center mb-6`, { backgroundColor: cardBorder }]} />
+
+            {locationStep === 1 ? (
+              <>
+                <Text style={[tw`text-xl font-bold mb-2`, { color: textPrimary }]}>
+                  Where will you workout?
+                </Text>
+                <Text style={[tw`text-sm mb-6`, { color: textSecondary }]}>
+                  This helps us select exercises that match your environment.
+                </Text>
+
+                <View style={tw`gap-3`}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setWorkoutLocation('home');
+                      setLocationStep(2);
+                    }}
+                    style={[
+                      tw`p-5 rounded-2xl flex-row items-center gap-4`,
+                      {
+                        backgroundColor: workoutLocation === 'home' ? accent + '20' : cardBg,
+                        borderWidth: 2,
+                        borderColor: workoutLocation === 'home' ? accent : cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={tw`text-3xl`}>🏠</Text>
+                    <View style={tw`flex-1`}>
+                      <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
+                        At Home
+                      </Text>
+                      <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
+                        Bodyweight, bands, dumbbells & more
+                      </Text>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={24} color={accent} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setWorkoutLocation('gym');
+                      setSelectedEquipment([]);
+                      handleConfirmAndGenerate();
+                    }}
+                    style={[
+                      tw`p-5 rounded-2xl flex-row items-center gap-4`,
+                      {
+                        backgroundColor: workoutLocation === 'gym' ? accent + '20' : cardBg,
+                        borderWidth: 2,
+                        borderColor: workoutLocation === 'gym' ? accent : cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={tw`text-3xl`}>🏋️</Text>
+                    <View style={tw`flex-1`}>
+                      <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
+                        At the Gym
+                      </Text>
+                      <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
+                        Full equipment access
+                      </Text>
+                    </View>
+                    {isGenerating && <ActivityIndicator color={accent} />}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setShowLocationModal(false)}
+                  style={tw`items-center mt-5 py-3`}
+                >
+                  <Text style={[tw`font-bold`, { color: accent }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <TouchableOpacity
+                  onPress={() => setLocationStep(1)}
+                  style={tw`flex-row items-center gap-2 mb-4`}
+                >
+                  <MaterialIcons name="arrow-back" size={20} color={accent} />
+                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>Back</Text>
+                </TouchableOpacity>
+
+                <Text style={[tw`text-xl font-bold mb-2`, { color: textPrimary }]}>
+                  What equipment do you have?
+                </Text>
+                <Text style={[tw`text-sm mb-5`, { color: textSecondary }]}>
+                  Select all that apply so we tailor your exercises.
+                </Text>
+
+                <View style={tw`gap-2 mb-6`}>
+                  {HOME_EQUIPMENT_OPTIONS.map((opt) => {
+                    const selected = selectedEquipment.includes(opt.id);
+                    return (
+                      <TouchableOpacity
+                        key={opt.id}
+                        onPress={() => toggleEquipment(opt.id)}
+                        style={[
+                          tw`p-4 rounded-xl flex-row items-center gap-3`,
+                          {
+                            backgroundColor: selected ? accent + '18' : cardBg,
+                            borderWidth: 2,
+                            borderColor: selected ? accent : cardBorder,
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            tw`w-5 h-5 rounded border-2 items-center justify-center`,
+                            {
+                              borderColor: selected ? accent : textSecondary,
+                              backgroundColor: selected ? accent : 'transparent',
+                            },
+                          ]}
+                        >
+                          {selected && (
+                            <MaterialIcons name="check" size={12} color="white" />
+                          )}
+                        </View>
+                        <Text style={[tw`text-sm font-bold flex-1`, { color: textPrimary }]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleConfirmAndGenerate}
+                  style={[tw`py-4 rounded-xl items-center`, { backgroundColor: accent }]}
+                >
+                  {isGenerating ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={tw`font-bold text-white text-base`}>Generate My Workout</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedEquipment([]);
+                    handleConfirmAndGenerate();
+                  }}
+                  style={tw`items-center mt-3 py-3`}
+                >
+                  <Text style={[tw`text-sm`, { color: textSecondary }]}>
+                    Skip — no equipment
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Workout Preview Modal ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showPreview}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {
+          setShowPreview(false);
+          setGeneratedWorkout(null);
+          setSwapIndex(null);
+        }}
+      >
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
+          <View
+            style={[
+              tw`p-4 flex-row items-center justify-between`,
+              { borderBottomWidth: 1, borderColor: cardBorder },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => {
+                setShowPreview(false);
+                setGeneratedWorkout(null);
+                setSwapIndex(null);
+              }}
+              style={tw`flex size-10 items-center justify-center`}
+            >
               <MaterialIcons name="close" size={24} color={accent} />
             </TouchableOpacity>
-            <Text style={[tw`text-lg font-bold flex-1 text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+            <Text style={[tw`text-lg font-bold flex-1 text-center`, { color: textPrimary }]}>
               Workout Preview
             </Text>
             <View style={tw`w-10`} />
@@ -358,18 +689,32 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
           <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
             {generatedWorkout && (
               <>
+                {/* Header */}
                 <View>
                   <View style={tw`flex-row items-start justify-between mb-3`}>
                     <View style={tw`flex-1`}>
-                      <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                      <Text style={[tw`text-2xl font-bold`, { color: textPrimary }]}>
                         {generatedWorkout.name}
                       </Text>
-                      <Text style={[tw`text-sm mt-2`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                      <Text style={[tw`text-sm mt-2`, { color: textSecondary }]}>
                         {generatedWorkout.focus}
                       </Text>
                     </View>
-                    <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: getDifficultyColor(generatedWorkout.difficulty) + '20' }]}>
-                      <Text style={[tw`text-xs font-bold`, { color: getDifficultyColor(generatedWorkout.difficulty) }]}>
+                    <View
+                      style={[
+                        tw`px-3 py-1 rounded-full`,
+                        {
+                          backgroundColor:
+                            getDifficultyColor(generatedWorkout.difficulty) + '20',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          tw`text-xs font-bold`,
+                          { color: getDifficultyColor(generatedWorkout.difficulty) },
+                        ]}
+                      >
                         {generatedWorkout.difficulty}
                       </Text>
                     </View>
@@ -378,59 +723,106 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   <View style={tw`flex-row gap-6 mt-4`}>
                     <View style={tw`flex-row items-center gap-2`}>
                       <MaterialIcons name="schedule" size={18} color={accent} />
-                      <Text style={[tw`text-sm font-bold`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                      <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>
                         {generatedWorkout.duration} min
                       </Text>
                     </View>
                     <View style={tw`flex-row items-center gap-2`}>
                       <MaterialIcons name="fitness-center" size={18} color={accent} />
-                      <Text style={[tw`text-sm font-bold`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                      <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>
                         {generatedWorkout.exercises.length} exercises
                       </Text>
                     </View>
+                    {workoutLocation && (
+                      <View style={tw`flex-row items-center gap-1`}>
+                        <Text style={tw`text-sm`}>
+                          {workoutLocation === 'home' ? '🏠' : '🏋️'}
+                        </Text>
+                        <Text style={[tw`text-sm font-bold capitalize`, { color: textSecondary }]}>
+                          {workoutLocation}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
                 {generatedWorkout.notes && (
-                  <View style={[tw`rounded-xl p-4`, { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' }]}>
-                    <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  <View
+                    style={[
+                      tw`rounded-xl p-4`,
+                      { backgroundColor: accent + '0a', borderWidth: 1, borderColor: accent + '18' },
+                    ]}
+                  >
+                    <Text style={[tw`text-sm`, { color: textSecondary }]}>
                       {generatedWorkout.notes}
                     </Text>
                   </View>
                 )}
 
+                {/* Exercises */}
                 <View>
-                  <Text style={[tw`text-lg font-bold mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                    Exercises
-                  </Text>
+                  <View style={tw`flex-row items-center justify-between mb-3`}>
+                    <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                      Exercises
+                    </Text>
+                    <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                      Tap swap to substitute
+                    </Text>
+                  </View>
                   <View style={tw`gap-2`}>
-                    {generatedWorkout?.exercises && Array.isArray(generatedWorkout.exercises) ? generatedWorkout.exercises.map((exercise, idx) => (
-                      <View key={idx} style={[tw`rounded-xl p-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                    {generatedWorkout.exercises.map((exercise, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          tw`rounded-xl p-3`,
+                          { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                        ]}
+                      >
                         <View style={tw`flex-row items-start justify-between mb-2`}>
-                          <Text style={[tw`font-bold text-sm flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                          <Text
+                            style={[tw`font-bold text-sm flex-1 mr-2`, { color: textPrimary }]}
+                          >
                             {idx + 1}. {exercise.name}
                           </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSwapIndex(idx);
+                              setSwapSearch('');
+                            }}
+                            style={[
+                              tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
+                              { backgroundColor: accent + '18' },
+                            ]}
+                          >
+                            <MaterialIcons name="swap-horiz" size={14} color={accent} />
+                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
+                          </TouchableOpacity>
                         </View>
-                        <View style={tw`flex-row gap-4 text-xs`}>
-                          <Text style={[tw`text-xs`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                        <View style={tw`flex-row gap-4`}>
+                          <Text style={[tw`text-xs`, { color: textSecondary }]}>
                             {exercise.sets} sets
                           </Text>
-                          <Text style={[tw`text-xs`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                          <Text style={[tw`text-xs`, { color: textSecondary }]}>
                             {exercise.reps} reps
                           </Text>
-                          <Text style={[tw`text-xs`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                          <Text style={[tw`text-xs`, { color: textSecondary }]}>
                             {exercise.rest}s rest
                           </Text>
                         </View>
                       </View>
-                    )) : null}
+                    ))}
                   </View>
                 </View>
               </>
             )}
           </ScrollView>
 
-          <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+          <View
+            style={[
+              tw`p-6 gap-3`,
+              { backgroundColor: bg, borderTopWidth: 1, borderColor: cardBorder },
+            ]}
+          >
             {userMode === 'CoachAssisted' ? (
               <>
                 <Button
@@ -439,7 +831,13 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   onPress={handleSubmitForApproval}
                   icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
                 />
-                <TouchableOpacity style={tw`items-center py-3`} onPress={() => { setShowPreview(false); setGeneratedWorkout(null); }}>
+                <TouchableOpacity
+                  style={tw`items-center py-3`}
+                  onPress={() => {
+                    setShowPreview(false);
+                    setGeneratedWorkout(null);
+                  }}
+                >
                   <Text style={[tw`font-bold text-base`, { color: accent }]}>Cancel</Text>
                 </TouchableOpacity>
               </>
@@ -451,13 +849,93 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   onPress={handleApproveWorkout}
                   icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
                 />
-                <TouchableOpacity style={tw`items-center py-3`} onPress={handleGenerateWorkout}>
+                <TouchableOpacity
+                  style={tw`items-center py-3`}
+                  onPress={() => {
+                    setShowPreview(false);
+                    setGeneratedWorkout(null);
+                    handleOpenQuestionnaire();
+                  }}
+                >
                   <Text style={[tw`font-bold text-base`, { color: accent }]}>Generate Another</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
         </SafeAreaView>
+      </Modal>
+
+      {/* ── Swap Exercise Sheet ───────────────────────────────────────────────── */}
+      <Modal
+        visible={swapIndex !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSwapIndex(null)}
+      >
+        <View style={[tw`flex-1 justify-end`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <SafeAreaView style={[tw`rounded-t-3xl`, { backgroundColor: bg, maxHeight: '75%' }]}>
+            <View style={tw`p-4`}>
+              <View
+                style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]}
+              />
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                  Swap Exercise
+                </Text>
+                <TouchableOpacity onPress={() => setSwapIndex(null)}>
+                  <MaterialIcons name="close" size={24} color={accent} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Search */}
+              <View
+                style={[
+                  tw`flex-row items-center px-3 py-2 rounded-xl mb-3`,
+                  { backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder },
+                ]}
+              >
+                <MaterialIcons name="search" size={18} color={textSecondary} />
+                <TextInput
+                  style={[tw`flex-1 ml-2 text-sm`, { color: textPrimary }]}
+                  placeholder="Search exercises..."
+                  placeholderTextColor={textSecondary}
+                  value={swapSearch}
+                  onChangeText={setSwapSearch}
+                />
+              </View>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={tw`px-4 pb-6 gap-2`}
+              showsVerticalScrollIndicator={false}
+            >
+              {swapCandidates.slice(0, 40).map((ex, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => handleSwapExercise(ex)}
+                  style={[
+                    tw`p-3 rounded-xl flex-row items-center gap-3`,
+                    { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                  ]}
+                >
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>
+                      {ex.name}
+                    </Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                      {ex.muscleGroups.join(', ')} •{' '}
+                      {ex.location === 'home' ? '🏠 Home' : '🏋️ Gym'}
+                    </Text>
+                  </View>
+                  <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                    {ex.defaultSets}×{ex.defaultReps}
+                  </Text>
+                  <MaterialIcons name="swap-horiz" size={18} color={accent} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

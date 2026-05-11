@@ -6,7 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView } from 'react-native';
+  KeyboardAvoidingView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -35,6 +36,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
   const actualAccent = forcedAccent || accent;
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [locationFilter, setLocationFilter] = useState<'all' | 'home' | 'gym'>('all');
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('8-10');
@@ -49,10 +51,18 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
   const inputBorder = actualDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
 
   const filteredExercises = useMemo(() => {
-    if (!searchQuery.trim()) return exercises;
+    let list = exercises;
+    if (locationFilter !== 'all') {
+      list = list.filter((ex) => !ex.location || ex.location === locationFilter);
+    }
+    if (!searchQuery.trim()) return list;
     const query = searchQuery.toLowerCase();
-    return exercises.filter((ex) => ex.name.toLowerCase().includes(query) || ex.muscleGroups.some((m) => m.toLowerCase().includes(query)));
-  }, [exercises, searchQuery]);
+    return list.filter(
+      (ex) =>
+        ex.name.toLowerCase().includes(query) ||
+        ex.muscleGroups.some((m) => m.toLowerCase().includes(query)),
+    );
+  }, [exercises, searchQuery, locationFilter]);
 
   const selectedExercise = selectedExerciseId ? exercises.find((ex) => ex.id === selectedExerciseId) : null;
 
@@ -251,13 +261,41 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
                 )}
               </View>
 
+              {/* Location Filter Tabs */}
+              <View style={[tw`flex-row mx-4 mt-3 gap-2`]}>
+                {(['all', 'home', 'gym'] as const).map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setLocationFilter(tab)}
+                    style={[
+                      tw`flex-1 py-2 rounded-full items-center`,
+                      locationFilter === tab
+                        ? { backgroundColor: actualAccent }
+                        : { backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        tw`text-xs font-bold capitalize`,
+                        { color: locationFilter === tab ? '#fff' : textSecondary },
+                      ]}
+                    >
+                      {tab === 'all' ? 'All' : tab === 'home' ? '🏠 Home' : '🏋️ Gym'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* Exercises List */}
               <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-4`}>
                 {filteredExercises.length > 0 ? (
                   filteredExercises.map((exercise) => (
-                    <TouchableOpacity key={exercise.id} onPress={() => handleSelectExercise(exercise)}>
-                      <ExerciseCard exercise={exercise} showActions={false} />
-                    </TouchableOpacity>
+                    <ExerciseCard
+                      key={exercise.id}
+                      exercise={exercise}
+                      showActions={false}
+                      onPress={() => handleSelectExercise(exercise)}
+                    />
                   ))
                 ) : (
                   <View style={tw`flex-1 items-center justify-center py-8 gap-2`}>

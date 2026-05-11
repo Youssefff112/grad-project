@@ -100,11 +100,52 @@ export async function syncUserProfileToAi(user) {
 // ─── Workout Plan ─────────────────────────────────────────────────────────────
 
 /**
+ * Resolve the equipment string the AI backend expects.
+ * @param {string|null} location   - 'home' | 'gym' | null
+ * @param {string[]}    equipment  - list of equipment IDs from the frontend
+ * @param {object}      user       - User model instance (fallback)
+ */
+function resolveEquipmentForAi(location, equipment, user) {
+  if (location === 'gym') return 'full_gym';
+  if (location === 'home') {
+    if (!equipment || equipment.length === 0 || equipment.includes('none')) return 'none';
+    if (equipment.includes('barbell')) return 'barbell';
+    if (equipment.includes('dumbbells')) return 'dumbbells';
+    if (equipment.includes('resistance_bands')) return 'resistance_bands';
+    return 'bodyweight';
+  }
+  // fallback to user's stored type
+  const profile = user.profile || {};
+  const equipmentMap = {
+    onsite: 'full_gym',
+    offline: profile.homeEquipment?.length ? 'dumbbells' : 'none',
+  };
+  return equipmentMap[user.userType] || 'full_gym';
+}
+
+/**
  * Generate a workout plan via the Python AI backend.
  * Returns an array of day plans matching the WorkoutPlan.weeklySchedule schema.
+ * @param {object}      user       - User model instance
+ * @param {number}      daysPerWeek
+ * @param {string|null} location   - 'home' | 'gym' | null (from frontend questionnaire)
+ * @param {string[]}    equipment  - list of equipment IDs (from frontend questionnaire)
  */
-export async function generateAiWorkoutPlan(user, daysPerWeek = 4) {
+export async function generateAiWorkoutPlan(user, daysPerWeek = 4, location = null, equipment = null) {
   const aiId = await getOrCreateAiClientId(user);
+
+  // Temporarily override equipment in the AI profile for this request
+  const resolvedEquipment = resolveEquipmentForAi(location, equipment || [], user);
+  const profile = mapUserToAiProfile(user);
+  profile.equipment = resolvedEquipment;
+
+  // Sync updated profile to AI backend before generating
+  try {
+    await aiClient.put(`/clients/${aiId}`, profile);
+  } catch {
+    // non-fatal — the generate call may still succeed with existing profile
+  }
+
   const res = await aiClient.post(`/clients/${aiId}/exercise-plan?days_per_week=${daysPerWeek}`);
   const aiPlans = res.data.plans || [];
   return mapAiPlansToWeeklySchedule(aiPlans, daysPerWeek);

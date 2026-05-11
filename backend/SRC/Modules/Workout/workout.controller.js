@@ -4,7 +4,8 @@ import { successResponse } from '../../Utils/successResponse.utils.js';
 export const workoutController = {
   async generatePlan(req, res, next) {
     try {
-      const plan = await workoutService.generateWorkoutPlan(req.user.id);
+      const { location, equipment } = req.body || {};
+      const plan = await workoutService.generateWorkoutPlan(req.user.id, location, equipment);
       successResponse(res, 201, 'Workout plan generated successfully', { plan });
     } catch (error) {
       next(error);

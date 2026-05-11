@@ -18,6 +18,42 @@ import { FeatureLocked } from '../../components/FeatureLocked';
 import { Button } from '../../components/Button';
 import * as dietService from '../../services/dietService';
 
+// ── Built-in meal alternatives per time slot ──────────────────────────────────
+const MEAL_ALTERNATIVES: Record<string, Array<{ name: string; calories: number; protein: number; carbs: number; fat: number; serving: string }>> = {
+  breakfast: [
+    { name: 'Oatmeal with Berries', calories: 320, protein: 10, carbs: 58, fat: 6, serving: '1 bowl' },
+    { name: 'Greek Yogurt Parfait', calories: 280, protein: 18, carbs: 35, fat: 7, serving: '1 cup' },
+    { name: 'Scrambled Eggs + Toast', calories: 350, protein: 20, carbs: 30, fat: 14, serving: '2 eggs, 2 slices' },
+    { name: 'Protein Smoothie', calories: 300, protein: 25, carbs: 38, fat: 5, serving: '1 large' },
+    { name: 'Avocado Toast', calories: 310, protein: 8, carbs: 35, fat: 16, serving: '2 slices' },
+    { name: 'Protein Pancakes', calories: 380, protein: 28, carbs: 40, fat: 10, serving: '3 pancakes' },
+  ],
+  lunch: [
+    { name: 'Grilled Chicken Salad', calories: 380, protein: 35, carbs: 18, fat: 18, serving: '1 plate' },
+    { name: 'Turkey Wrap', calories: 420, protein: 30, carbs: 45, fat: 12, serving: '1 wrap' },
+    { name: 'Quinoa Bowl', calories: 450, protein: 22, carbs: 62, fat: 12, serving: '1 bowl' },
+    { name: 'Tuna Sandwich', calories: 390, protein: 32, carbs: 40, fat: 9, serving: '1 sandwich' },
+    { name: 'Brown Rice + Chicken', calories: 460, protein: 35, carbs: 55, fat: 8, serving: '1 plate' },
+    { name: 'Lentil Soup', calories: 300, protein: 18, carbs: 48, fat: 4, serving: '1 bowl' },
+  ],
+  dinner: [
+    { name: 'Grilled Salmon + Veggies', calories: 480, protein: 40, carbs: 20, fat: 24, serving: '1 fillet' },
+    { name: 'Chicken Stir Fry', calories: 430, protein: 38, carbs: 35, fat: 12, serving: '1 plate' },
+    { name: 'Turkey Meatballs + Pasta', calories: 520, protein: 35, carbs: 58, fat: 14, serving: '1 bowl' },
+    { name: 'Baked Chicken Breast', calories: 380, protein: 42, carbs: 28, fat: 8, serving: '1 breast' },
+    { name: 'Beef & Broccoli', calories: 450, protein: 38, carbs: 30, fat: 16, serving: '1 plate' },
+    { name: 'Vegetable Curry + Rice', calories: 420, protein: 14, carbs: 65, fat: 12, serving: '1 bowl' },
+  ],
+  snack: [
+    { name: 'Apple + Peanut Butter', calories: 220, protein: 6, carbs: 28, fat: 10, serving: '1 apple + 2 tbsp' },
+    { name: 'Protein Bar', calories: 200, protein: 20, carbs: 22, fat: 6, serving: '1 bar' },
+    { name: 'Mixed Nuts', calories: 180, protein: 5, carbs: 8, fat: 16, serving: '1 oz' },
+    { name: 'Greek Yogurt', calories: 150, protein: 15, carbs: 12, fat: 4, serving: '3/4 cup' },
+    { name: 'Hummus + Veggies', calories: 160, protein: 7, carbs: 18, fat: 8, serving: '1/4 cup + veggies' },
+    { name: 'Cottage Cheese', calories: 170, protein: 24, carbs: 6, fat: 4, serving: '3/4 cup' },
+  ],
+};
+
 interface MealItem {
   name: string;
   calories: number;
@@ -70,12 +106,20 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { userMode, subscriptionPlan, coachId, coachName, dietPreferences } = useUser();
 
-  // All hooks must be declared before any conditional return
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
   const [generatedMeal, setGeneratedMeal] = useState<GeneratedMealPlan | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [availableMeals, setAvailableMeals] = useState<GeneratedMealPlan[]>([]);
+
+  // Substitute modal: { mealIdx, itemIdx }
+  const [substituteTarget, setSubstituteTarget] = useState<{ mealIdx: number; itemIdx: number } | null>(null);
+
+  const bg = isDark ? '#0a0a12' : '#f8f7f5';
+  const cardBg = isDark ? '#111128' : '#ffffff';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
+  const textSecondary = isDark ? '#cbd5e1' : '#475569';
 
   useEffect(() => {
     if (hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
@@ -125,12 +169,32 @@ export const MealGenerationScreen = ({ navigation }: any) => {
       }
     } catch (error: any) {
       setIsGenerating(false);
-      Alert.alert(
-        'Generation Failed',
-        error?.message || 'Unable to generate meal plan. Make sure your profile is complete and you have an active subscription.',
-        [{ text: 'OK' }]
-      );
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to generate meal plan. Make sure your profile is complete and you have an active subscription.';
+      Alert.alert('Generation Failed', msg, [{ text: 'OK' }]);
     }
+  };
+
+  const handleSubstituteMeal = (
+    mealIdx: number,
+    itemIdx: number,
+    alt: typeof MEAL_ALTERNATIVES[string][0],
+  ) => {
+    if (!generatedMeal) return;
+    const updatedMeals = generatedMeal.meals.map((meal, mi) => {
+      if (mi !== mealIdx) return meal;
+      const updatedItems = meal.items.map((item, ii) =>
+        ii === itemIdx
+          ? { name: alt.name, calories: alt.calories, protein: alt.protein, carbs: alt.carbs, fat: alt.fat, serving: alt.serving }
+          : item,
+      );
+      const newTotal = updatedItems.reduce((s, it) => s + it.calories, 0);
+      return { ...meal, items: updatedItems, totalCalories: newTotal };
+    });
+    setGeneratedMeal({ ...generatedMeal, meals: updatedMeals });
+    setSubstituteTarget(null);
   };
 
   const handleApproveMealPlan = () => {
@@ -175,12 +239,12 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      <View style={[tw`p-4 flex-row items-center gap-4`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: bg }]}>
+      <View style={[tw`p-4 flex-row items-center gap-4`, { backgroundColor: bg, borderBottomWidth: 1, borderColor: cardBorder }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center`}>
           <MaterialIcons name="arrow-back" size={24} color={accent} />
         </TouchableOpacity>
-        <Text style={[tw`text-xl font-bold flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+        <Text style={[tw`text-xl font-bold flex-1`, { color: textPrimary }]}>
           Generate Meal Plan
         </Text>
       </View>
@@ -368,44 +432,76 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                 </View>
 
                 <View>
-                  <Text style={[tw`text-lg font-bold mb-3`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                    Sample Day
-                  </Text>
+                  <View style={tw`flex-row items-center justify-between mb-3`}>
+                    <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                      Sample Day
+                    </Text>
+                    <Text style={[tw`text-xs`, { color: textSecondary }]}>
+                      Tap substitute to change
+                    </Text>
+                  </View>
                   <View style={tw`gap-3`}>
-                    {generatedMeal?.meals && Array.isArray(generatedMeal.meals) ? generatedMeal.meals.map((meal, mealIdx) => (
-                      <View key={mealIdx} style={[tw`rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                        <View style={tw`flex-row items-center justify-between mb-3`}>
-                          <Text style={[tw`font-bold text-base`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                            {meal.time}
-                          </Text>
-                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>
-                            {meal.totalCalories} cal
-                          </Text>
-                        </View>
-                        <View style={tw`gap-2`}>
-                          {meal?.items && Array.isArray(meal.items) ? meal.items.map((item, itemIdx) => (
-                            <View key={itemIdx} style={tw`flex-row items-center justify-between py-2`}>
-                              <View style={tw`flex-1`}>
-                                <Text style={[tw`text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                                  {item.name} • {item.serving}
-                                </Text>
-                                <View style={tw`flex-row gap-4 mt-1 text-xs`}>
-                                  <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#94a3b8' }]}>
-                                    P: {item.protein}g
-                                  </Text>
-                                  <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#94a3b8' }]}>
-                                    C: {item.carbs}g
-                                  </Text>
-                                  <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#94a3b8' }]}>
-                                    F: {item.fat}g
-                                  </Text>
-                                </View>
-                              </View>
+                    {generatedMeal?.meals && Array.isArray(generatedMeal.meals)
+                      ? generatedMeal.meals.map((meal, mealIdx) => (
+                          <View
+                            key={mealIdx}
+                            style={[
+                              tw`rounded-xl p-4`,
+                              { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                            ]}
+                          >
+                            <View style={tw`flex-row items-center justify-between mb-3`}>
+                              <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
+                                {meal.time}
+                              </Text>
+                              <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                                {meal.totalCalories} cal
+                              </Text>
                             </View>
-                          )) : null}
-                        </View>
-                      </View>
-                    )) : null}
+                            <View style={tw`gap-2`}>
+                              {meal?.items && Array.isArray(meal.items)
+                                ? meal.items.map((item, itemIdx) => (
+                                    <View key={itemIdx}>
+                                      <View style={tw`flex-row items-start justify-between`}>
+                                        <View style={tw`flex-1 mr-2`}>
+                                          <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                                            {item.name}
+                                          </Text>
+                                          <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                                            {item.serving}
+                                          </Text>
+                                          <View style={tw`flex-row gap-3 mt-1`}>
+                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>
+                                              P:{item.protein}g
+                                            </Text>
+                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>
+                                              C:{item.carbs}g
+                                            </Text>
+                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>
+                                              F:{item.fat}g
+                                            </Text>
+                                          </View>
+                                        </View>
+                                        <TouchableOpacity
+                                          onPress={() => setSubstituteTarget({ mealIdx, itemIdx })}
+                                          style={[
+                                            tw`px-2 py-1 rounded-lg flex-row items-center gap-1 mt-1`,
+                                            { backgroundColor: accent + '18' },
+                                          ]}
+                                        >
+                                          <MaterialIcons name="swap-horiz" size={13} color={accent} />
+                                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                                            Sub
+                                          </Text>
+                                        </TouchableOpacity>
+                                      </View>
+                                    </View>
+                                  ))
+                                : null}
+                            </View>
+                          </View>
+                        ))
+                      : null}
                   </View>
                 </View>
               </>
@@ -440,6 +536,84 @@ export const MealGenerationScreen = ({ navigation }: any) => {
             )}
           </View>
         </SafeAreaView>
+      </Modal>
+
+      {/* ── Meal Substitute Sheet ──────────────────────────────────────────── */}
+      <Modal
+        visible={substituteTarget !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSubstituteTarget(null)}
+      >
+        <View style={[tw`flex-1 justify-end`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <SafeAreaView style={[tw`rounded-t-3xl`, { backgroundColor: bg, maxHeight: '70%' }]}>
+            <View style={tw`p-4`}>
+              <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: cardBorder }]} />
+              <View style={tw`flex-row items-center justify-between mb-2`}>
+                <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                  Choose a Substitute
+                </Text>
+                <TouchableOpacity onPress={() => setSubstituteTarget(null)}>
+                  <MaterialIcons name="close" size={24} color={accent} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[tw`text-xs mb-4`, { color: textSecondary }]}>
+                Tap to replace the selected meal item
+              </Text>
+            </View>
+
+            <ScrollView contentContainerStyle={tw`px-4 pb-6 gap-2`} showsVerticalScrollIndicator={false}>
+              {(() => {
+                if (substituteTarget === null || !generatedMeal) return null;
+                const meal = generatedMeal.meals[substituteTarget.mealIdx];
+                const timeKey = meal?.time?.toLowerCase() || 'snack';
+                const alts =
+                  MEAL_ALTERNATIVES[timeKey] ||
+                  MEAL_ALTERNATIVES[
+                    Object.keys(MEAL_ALTERNATIVES).find((k) => timeKey.includes(k)) || 'snack'
+                  ] ||
+                  MEAL_ALTERNATIVES.snack;
+                return alts.map((alt, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() =>
+                      handleSubstituteMeal(
+                        substituteTarget.mealIdx,
+                        substituteTarget.itemIdx,
+                        alt,
+                      )
+                    }
+                    style={[
+                      tw`p-4 rounded-xl`,
+                      { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                    ]}
+                  >
+                    <View style={tw`flex-row items-start justify-between`}>
+                      <View style={tw`flex-1`}>
+                        <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>
+                          {alt.name}
+                        </Text>
+                        <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
+                          {alt.serving}
+                        </Text>
+                        <View style={tw`flex-row gap-3 mt-1`}>
+                          <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>P:{alt.protein}g</Text>
+                          <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>C:{alt.carbs}g</Text>
+                          <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>F:{alt.fat}g</Text>
+                        </View>
+                      </View>
+                      <View style={[tw`px-2 py-1 rounded-full ml-2`, { backgroundColor: accent + '18' }]}>
+                        <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                          {alt.calories} cal
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ));
+              })()}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

@@ -82,9 +82,17 @@ export interface LogWorkoutRequest {
 /**
  * Trigger AI/rule-based workout plan generation for the current user.
  * Requires: active subscription + complete user profile with goal & experienceLevel.
+ * @param location   'home' | 'gym' — where the user will work out
+ * @param equipment  list of available equipment IDs (e.g. ['dumbbells', 'resistance_bands'])
  */
-export const generateWorkoutPlan = async (): Promise<{ plan: WorkoutPlan }> => {
-  const response: any = await apiPost('/workout/generate', {});
+export const generateWorkoutPlan = async (
+  location?: 'home' | 'gym' | null,
+  equipment?: string[],
+): Promise<{ plan: WorkoutPlan }> => {
+  const response: any = await apiPost('/workout/generate', {
+    location: location ?? undefined,
+    equipment: equipment && equipment.length > 0 ? equipment : undefined,
+  });
   return { plan: response.data?.plan };
 };
 
