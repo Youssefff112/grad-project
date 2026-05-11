@@ -8,7 +8,7 @@
  * this frontend call will automatically use the AI-generated plans.
  */
 
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiDelete } from './api';
 
 export interface MacroNutrients {
   protein: number;
@@ -87,6 +87,10 @@ export const generateDietPlan = async (): Promise<{ plan: DietPlan }> => {
 export const getActiveDietPlan = async (): Promise<{ plan: DietPlan }> => {
   const response: any = await apiGet('/diet/active');
   return { plan: response.data?.plan };
+};
+
+export const deleteActiveDietPlan = async (): Promise<void> => {
+  await apiDelete('/diet/active');
 };
 
 /**

@@ -355,9 +355,34 @@ export const MealGenerationScreen = ({ navigation }: any) => {
         {/* Active Meal Plans */}
         {!isLoadingPlan && availableMeals.length > 0 && (
           <View style={tw`mt-8`}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              Your Current Plan
-            </Text>
+            <View style={tw`flex-row items-center justify-between mb-4`}>
+              <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                Your Current Plan
+              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert('Delete Plan', 'Delete your current meal plan?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await dietService.deleteActiveDietPlan();
+                          setAvailableMeals([]);
+                        } catch (e: any) {
+                          Alert.alert('Error', e?.response?.data?.message || 'Failed to delete plan');
+                        }
+                      },
+                    },
+                  ])
+                }
+                style={[tw`flex-row items-center gap-1 px-2 py-1 rounded-lg`, { backgroundColor: '#ef444418' }]}
+              >
+                <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
+                <Text style={[tw`text-xs font-bold`, { color: '#ef4444' }]}>Delete Plan</Text>
+              </TouchableOpacity>
+            </View>
             {availableMeals.map((plan) => (
               <TouchableOpacity
                 key={plan.id}

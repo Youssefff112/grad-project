@@ -9,6 +9,7 @@ router.use(authenticate, restrictTo('client'));
 
 router.post('/generate', requireAIPlan('client'), workoutController.generatePlan);
 router.get('/active', requireActiveSubscription('client'), workoutController.getActivePlan);
+router.delete('/active', requireActiveSubscription('client'), workoutController.deletePlan);
 router.post('/start', requireActiveSubscription('client'), workoutController.startSession);
 router.post('/finish/:id', requireActiveSubscription('client'), workoutController.finishSession);
 router.post('/log', requireActiveSubscription('client'), workoutController.logWorkout);

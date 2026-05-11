@@ -27,6 +27,14 @@ export const dietService = {
     return plan || null; // null = no plan yet, not an error
   },
 
+  async deleteActiveDietPlan(userId) {
+    const updated = await DietPlan.update(
+      { isActive: false },
+      { where: { userId, isActive: true } }
+    );
+    return { deleted: updated[0] > 0 };
+  },
+
   async logDietDay(userId, data) {
     const {
       date,
@@ -111,8 +119,11 @@ export const dietService = {
       throw new AppError('Please complete your profile first', 400);
     }
 
-    const { goal, currentWeight, height, age, gender } = user.profile;
-    const dietaryPreference = user.profile.dietaryPreference || user.profile.dietaryPreferences;
+    const { currentWeight, height, age, gender } = user.profile;
+    // Normalize raw goal to a valid DB enum value
+    const goal = this._normalizeGoal(user.profile.goal);
+    const rawDietPref = user.profile.dietaryPreference || user.profile.dietaryPreferences;
+    const dietaryPreference = this._normalizeDietaryPreference(rawDietPref);
 
     // Deactivate previous plans
     await DietPlan.update(
@@ -138,7 +149,7 @@ export const dietService = {
     const dietPlan = await DietPlan.create({
       userId,
       goal,
-      dietaryPreference: dietaryPreference || 'none',
+      dietaryPreference,
       dailyCalorieTarget,
       macronutrients: macros,
       weeklyMealPlan,
@@ -289,5 +300,29 @@ export const dietService = {
     const day = today.getDay();
     const diff = today.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(today.setDate(diff));
+  },
+
+  // Maps any goal string to a valid DB enum value
+  _normalizeGoal(raw) {
+    if (!raw) return 'maintenance';
+    const g = String(raw).toLowerCase().replace(/[\s-]/g, '_');
+    if (g.includes('fat') || g.includes('weight') || g === 'fatloss' || g === 'lose_weight') return 'weight_loss';
+    if (g.includes('muscle') || g.includes('bulk') || g === 'gain' || g === 'hypertrophy') return 'muscle_gain';
+    if (g.includes('endur') || g.includes('cardio') || g.includes('stamina')) return 'endurance';
+    if (['weight_loss', 'muscle_gain', 'maintenance', 'endurance'].includes(g)) return g;
+    return 'maintenance';
+  },
+
+  // Maps any dietary preference string to a valid DB enum value
+  _normalizeDietaryPreference(raw) {
+    if (!raw) return 'none';
+    const p = String(raw).toLowerCase();
+    if (p.includes('vegan')) return 'vegan';
+    if (p.includes('vegetar')) return 'vegetarian';
+    if (p.includes('gluten')) return 'gluten_free';
+    if (p.includes('keto')) return 'keto';
+    if (p.includes('paleo')) return 'paleo';
+    if (['none', 'vegetarian', 'vegan', 'gluten_free', 'keto', 'paleo'].includes(p)) return p;
+    return 'none';
   }
 };

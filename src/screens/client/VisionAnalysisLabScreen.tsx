@@ -13,12 +13,13 @@ import { hasFeatureAccess } from '../../utils/planUtils';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 
-export const VisionAnalysisLabScreen = ({ navigation }: any) => {
+export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
   const { subscriptionPlan } = useUser();
   const { totalUnread } = useNotifications();
   const { workouts } = useExerciseManagement();
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
+  const preselectedExercise: string | undefined = route?.params?.exerciseName;
   const [cachedHistory, setCachedHistory] = useState<Array<{
     date: string;
     type: string;
@@ -201,15 +202,35 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
           )}
 
           {/* Camera Viewport - Empty for CV */}
-          <View style={[tw`mx-4 mt-4 mb-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', minHeight: 280 }]}>
+          <View style={[tw`mx-4 mt-4 mb-4 rounded-2xl overflow-hidden items-center justify-center`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 2, borderStyle: 'dashed', borderColor: preselectedExercise ? accent : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'), minHeight: 280 }]}>
             <View style={tw`items-center gap-6 flex-1 justify-center py-6`}>
               <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: accent + '18' }]}>
                 <MaterialIcons name="videocam" size={40} color={accent} />
               </View>
-              <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Camera Feed</Text>
-              <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                Computer vision will render here during your workout session
-              </Text>
+
+              {preselectedExercise ? (
+                <>
+                  <View style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: accent + '20' }]}>
+                    <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-1 text-center`, { color: accent }]}>
+                      Tracking Form For
+                    </Text>
+                    <Text style={[tw`text-lg font-black text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                      {preselectedExercise}
+                    </Text>
+                  </View>
+                  <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                    AI will track your form and give real-time feedback
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Camera Feed</Text>
+                  <Text style={[tw`text-sm text-center px-8`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                    Computer vision will render here during your workout session
+                  </Text>
+                </>
+              )}
+
               <View style={tw`flex-row items-center gap-2`}>
                 <View style={tw`w-2 h-2 rounded-full bg-green-500`} />
                 <Text style={[tw`text-xs font-bold uppercase tracking-widest`, { color: '#4ade80' }]}>CV Engine Ready</Text>
@@ -217,11 +238,13 @@ export const VisionAnalysisLabScreen = ({ navigation }: any) => {
 
               {/* Start Button */}
               <TouchableOpacity
-                onPress={() => navigation.navigate('Calibration')}
+                onPress={() => navigation.navigate('Calibration', preselectedExercise ? { exerciseName: preselectedExercise } : undefined)}
                 style={[tw`flex-row items-center justify-center gap-3 py-4 px-8 rounded-2xl mt-2`, { backgroundColor: accent, minWidth: 200 }]}
               >
                 <MaterialIcons name="play-arrow" size={28} color="white" />
-                <Text style={tw`text-white text-lg font-black uppercase tracking-widest`}>Start Workout</Text>
+                <Text style={tw`text-white text-lg font-black uppercase tracking-widest`}>
+                  {preselectedExercise ? 'Start Tracking' : 'Start Workout'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

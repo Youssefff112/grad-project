@@ -8,7 +8,7 @@
  * this frontend call will automatically use the AI-generated plans.
  */
 
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiDelete } from './api';
 
 export interface WorkoutExercise {
   name: string;
@@ -102,6 +102,10 @@ export const generateWorkoutPlan = async (
 export const getActiveWorkoutPlan = async (): Promise<{ plan: WorkoutPlan }> => {
   const response: any = await apiGet('/workout/active');
   return { plan: response.data?.plan };
+};
+
+export const deleteActiveWorkoutPlan = async (): Promise<void> => {
+  await apiDelete('/workout/active');
 };
 
 /**

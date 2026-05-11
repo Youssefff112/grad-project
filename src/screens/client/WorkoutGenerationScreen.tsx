@@ -422,9 +422,34 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         {/* Active Workout Plan Days */}
         {!isLoadingPlan && availableWorkouts.length > 0 && (
           <View style={tw`mt-8`}>
-            <Text style={[tw`text-lg font-bold mb-4`, { color: textPrimary }]}>
-              Your Current Plan
-            </Text>
+            <View style={tw`flex-row items-center justify-between mb-4`}>
+              <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                Your Current Plan
+              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert('Delete Plan', 'Delete your current workout plan?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await workoutService.deleteActiveWorkoutPlan();
+                          setAvailableWorkouts([]);
+                        } catch (e: any) {
+                          Alert.alert('Error', e?.response?.data?.message || 'Failed to delete plan');
+                        }
+                      },
+                    },
+                  ])
+                }
+                style={[tw`flex-row items-center gap-1 px-2 py-1 rounded-lg`, { backgroundColor: '#ef444418' }]}
+              >
+                <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
+                <Text style={[tw`text-xs font-bold`, { color: '#ef4444' }]}>Delete Plan</Text>
+              </TouchableOpacity>
+            </View>
             {availableWorkouts.map((workout) => (
               <TouchableOpacity
                 key={workout.id}
@@ -513,6 +538,12 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                     </Text>
                   </View>
                   <View style={tw`flex-row gap-2`}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('VisionAnalysisLab', { workoutName: cw.name })}
+                      style={[tw`p-2 rounded-lg`, { backgroundColor: '#4ade8018' }]}
+                    >
+                      <MaterialIcons name="videocam" size={16} color="#4ade80" />
+                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => navigation.navigate('WorkoutBuilder', { workout: cw })}
                       style={[tw`p-2 rounded-lg`, { backgroundColor: accent + '20' }]}
@@ -822,13 +853,16 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                       Exercises
                     </Text>
                     <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                      Tap swap to substitute
+                      Tap an exercise to track form
                     </Text>
                   </View>
                   <View style={tw`gap-2`}>
                     {generatedWorkout.exercises.map((exercise, idx) => (
-                      <View
+                      <TouchableOpacity
                         key={idx}
+                        onPress={() => {
+                          navigation.navigate('VisionAnalysisLab', { exerciseName: exercise.name });
+                        }}
                         style={[
                           tw`rounded-xl p-3`,
                           { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
@@ -840,19 +874,35 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                           >
                             {idx + 1}. {exercise.name}
                           </Text>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setSwapIndex(idx);
-                              setSwapSearch('');
-                            }}
-                            style={[
-                              tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
-                              { backgroundColor: accent + '18' },
-                            ]}
-                          >
-                            <MaterialIcons name="swap-horiz" size={14} color={accent} />
-                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
-                          </TouchableOpacity>
+                          <View style={tw`flex-row gap-1`}>
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                setSwapIndex(idx);
+                                setSwapSearch('');
+                              }}
+                              style={[
+                                tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
+                                { backgroundColor: accent + '18' },
+                              ]}
+                            >
+                              <MaterialIcons name="swap-horiz" size={14} color={accent} />
+                              <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                navigation.navigate('VisionAnalysisLab', { exerciseName: exercise.name });
+                              }}
+                              style={[
+                                tw`px-2 py-1 rounded-lg flex-row items-center gap-1`,
+                                { backgroundColor: '#4ade8018' },
+                              ]}
+                            >
+                              <MaterialIcons name="videocam" size={14} color="#4ade80" />
+                              <Text style={[tw`text-xs font-bold`, { color: '#4ade80' }]}>Track</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         <View style={tw`flex-row gap-4`}>
                           <Text style={[tw`text-xs`, { color: textSecondary }]}>
@@ -865,7 +915,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                             {exercise.rest}s rest
                           </Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 </View>

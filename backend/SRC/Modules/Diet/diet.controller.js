@@ -41,5 +41,14 @@ export const dietController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async deletePlan(req, res, next) {
+    try {
+      const result = await dietService.deleteActiveDietPlan(req.user.id);
+      successResponse(res, 200, 'Diet plan deleted', result);
+    } catch (error) {
+      next(error);
+    }
   }
 };

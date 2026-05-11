@@ -60,5 +60,14 @@ export const workoutController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async deletePlan(req, res, next) {
+    try {
+      const result = await workoutService.deleteActiveWorkoutPlan(req.user.id);
+      successResponse(res, 200, 'Workout plan deleted', result);
+    } catch (error) {
+      next(error);
+    }
   }
 };

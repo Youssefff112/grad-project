@@ -28,6 +28,14 @@ export const workoutService = {
     return plan || null; // null = no plan yet, not an error
   },
 
+  async deleteActiveWorkoutPlan(userId) {
+    const updated = await WorkoutPlan.update(
+      { isActive: false },
+      { where: { userId, isActive: true } }
+    );
+    return { deleted: updated[0] > 0 };
+  },
+
   async logWorkout(userId, logData) {
     const { date, day, exercises, duration, calories, notes, rating } = logData;
 
@@ -126,8 +134,12 @@ export const workoutService = {
     }
 
     const profile = user.profile || {};
-    const goal = profile.goal || user.goal;
-    const experienceLevel = profile.experienceLevel || user.experienceLevel;
+    const rawGoal = profile.goal || user.goal;
+    const rawExperience = profile.experienceLevel || user.experienceLevel;
+
+    // Normalize to DB enum values
+    const goal = this._normalizeGoal(rawGoal);
+    const experienceLevel = this._normalizeExperienceLevel(rawExperience);
 
     // Resolve effective location: explicit arg → userType fallback → gym default
     const effectiveLocation = location || (user.userType === 'offline' ? 'home' : 'gym');
@@ -354,6 +366,26 @@ export const workoutService = {
     const day = today.getDay();
     const diff = today.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(today.setDate(diff));
+  },
+
+  // Maps any goal string the frontend/onboarding might produce to the DB enum
+  _normalizeGoal(raw) {
+    if (!raw) return 'maintenance';
+    const g = String(raw).toLowerCase().replace(/[\s-]/g, '_');
+    if (g.includes('fat') || g.includes('weight') || g === 'fatloss' || g === 'lose_weight') return 'weight_loss';
+    if (g.includes('muscle') || g.includes('bulk') || g === 'gain' || g === 'hypertrophy') return 'muscle_gain';
+    if (g.includes('endur') || g.includes('cardio') || g.includes('stamina')) return 'endurance';
+    if (['weight_loss', 'muscle_gain', 'maintenance', 'endurance'].includes(g)) return g;
+    return 'maintenance';
+  },
+
+  // Maps any experience string to the DB enum
+  _normalizeExperienceLevel(raw) {
+    if (!raw) return 'beginner';
+    const e = String(raw).toLowerCase();
+    if (e.includes('adv') || e === 'expert') return 'advanced';
+    if (e.includes('inter') || e === 'moderate') return 'intermediate';
+    return 'beginner';
   }
 };
 
