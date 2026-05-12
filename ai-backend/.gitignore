@@ -9,3 +9,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Downloaded MediaPipe model weights (auto-downloaded on first run)
+models/

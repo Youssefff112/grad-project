@@ -6,6 +6,9 @@ import math
 from typing import Dict, List, Tuple, Optional
 import cv2
 import numpy as np
+# IMPORTANT: import the compat shim BEFORE mediapipe so it installs the legacy
+# ``mp.solutions.pose`` namespace (newer MediaPipe wheels dropped it).
+from . import mp_compat  # noqa: F401  (side effect: monkey-patches mp.solutions)
 import mediapipe as mp
 
 # MediaPipe pose landmark indices

@@ -4,6 +4,8 @@ import tempfile
 from typing import Dict, List, Any, Optional
 import cv2
 import numpy as np
+# Install the legacy mp.solutions shim before importing mediapipe.
+from .. import mp_compat  # noqa: F401  (side effect)
 import mediapipe as mp
 
 from .angle_calculator import LANDMARK_INDEX

@@ -6,9 +6,12 @@ uvicorn[standard]==0.27.0
 sqlalchemy==2.0.25
 
 # Computer Vision
-mediapipe==0.10.9
-opencv-python==4.9.0.80
-numpy==1.26.3
+# NOTE: ``mp.solutions.pose`` was dropped from newer mediapipe wheels on
+# Python 3.12, so the codebase uses a small Tasks-API compat shim in
+# ``services/mp_compat.py`` and works with any mediapipe >= 0.10.13.
+mediapipe>=0.10.13
+opencv-python>=4.9.0.80
+numpy>=1.26.3
 
 # Chatbot (use OPENAI_API_KEY env var)
 openai==1.12.0
