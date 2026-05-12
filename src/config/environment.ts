@@ -14,28 +14,36 @@
  */
 import Constants from 'expo-constants';
 
+const getHostFromExpo = (): string | null => {
+  const hostUri = Constants.expoConfig?.hostUri ?? (Constants as any).manifest?.debuggerHost;
+  if (hostUri) return hostUri.split(':')[0];
+  return null;
+};
+
 const getBackendUrl = (): string => {
-  // Explicit override always wins (ngrok, production, etc.)
   const explicit = process.env.EXPO_PUBLIC_BACKEND_URL;
   if (explicit) return explicit;
-
-  // In Expo Go / dev builds, hostUri is the Metro bundler's address.
-  // The backend runs on the same machine, so we reuse the host with port 5000.
-  const hostUri = Constants.expoConfig?.hostUri ?? (Constants as any).manifest?.debuggerHost;
-  if (hostUri) {
-    const host = hostUri.split(':')[0]; // strip the Metro port
-    return `http://${host}:5000`;
-  }
-
+  const host = getHostFromExpo();
+  if (host) return `http://${host}:5000`;
   return 'http://localhost:5000';
 };
 
+const getAIBackendUrl = (): string => {
+  const explicit = process.env.EXPO_PUBLIC_AI_BACKEND_URL;
+  if (explicit) return explicit;
+  const host = getHostFromExpo();
+  if (host) return `http://${host}:8000`;
+  return 'http://localhost:8000';
+};
+
 const BACKEND_URL = getBackendUrl();
+const AI_BACKEND_URL = getAIBackendUrl();
 const API_PREFIX = process.env.EXPO_PUBLIC_API_PREFIX || '/api/v1';
 const ENV = process.env.EXPO_PUBLIC_ENV || 'development';
 
 export const environment = {
   BACKEND_URL,
+  AI_BACKEND_URL,
   API_PREFIX,
   API_BASE_URL: `${BACKEND_URL}${API_PREFIX}`,
   ENV,

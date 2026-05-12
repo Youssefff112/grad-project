@@ -1,169 +1,130 @@
 /**
  * AI Vision Service
- * Connects the React Native app to the Python AI backend for:
- *  - Real-time camera frame analysis (live joint angles)
- *  - Recorded video analysis (score, feedback, rep count)
+ * Talks to the FastAPI AI backend (default :8000) for pose/form analysis.
  *
- * Two routing strategies are supported:
- *  1. DIRECT  — app calls Python AI backend at AI_BASE_URL:8000 (low latency, recommended)
- *  2. PROXIED — app calls Node.js backend which proxies to Python AI (goes through auth)
- *
- * Set `USE_PROXY = true` to route through the Node.js backend (requires auth token).
- * Set `USE_PROXY = false` to call the Python AI directly (no auth required for CV).
+ * Endpoints used:
+ *   POST /analyze-frame       — single-frame angle analysis
+ *   POST /test-exercise-base64 — full video clip analysis (base64)
  */
 
 import axios from 'axios';
 import { environment } from '../config/environment';
-import { apiPost } from './api';
 
-const USE_PROXY = false; // Set true to route CV through Node.js backend
-
-const aiAxios = axios.create({
-  baseURL: environment.AI_BASE_URL,
-  timeout: 60000,
+const aiClient = axios.create({
+  baseURL: environment.AI_BACKEND_URL,
+  timeout: 8000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface FrameAngles {
-  [key: string]: number | Record<string, string>;
-  targets: Record<string, string>;
+  [joint: string]: number;
 }
 
-export interface VideoAnalysisResult {
-  angles_observed: Record<string, { min: number; max: number; avg: number }>;
-  targets: Record<string, string>;
-  summary: string;
-  reps_detected: number;
-  score: number;
-  mistakes_detected: string[];
-  improvement_notes: string;
-  done_well: string[];
+export interface FrameTargets {
+  [joint: string]: [number, number] | { min: number; max: number };
 }
 
-// ─── Frame Analysis ───────────────────────────────────────────────────────────
+export interface AnalyzeFrameResult {
+  angles: FrameAngles;
+  targets: FrameTargets;
+}
 
 /**
- * Analyze a single camera frame.
- * Call this repeatedly from your camera loop for live angle display.
- *
- * @param imageBase64 - base64-encoded JPEG/PNG frame (with or without data: prefix)
- * @param exerciseName - e.g. 'squat', 'push_up', 'bicep_curl', 'plank'
+ * Map UI exercise names → AI backend slugs.
+ * Backend recognises: squat, deadlift, bench, pushup, plank, lunge, row, ohp
+ */
+export const normalizeExerciseName = (name: string): string => {
+  const n = (name || '').toLowerCase().trim();
+  if (n.includes('squat')) return 'squat';
+  if (n.includes('deadlift')) return 'deadlift';
+  if (n.includes('bench')) return 'bench';
+  if (n.includes('push')) return 'pushup';
+  if (n.includes('plank')) return 'plank';
+  if (n.includes('lunge')) return 'lunge';
+  if (n.includes('row')) return 'row';
+  if (n.includes('overhead') || n.includes('press') || n.includes('ohp')) return 'ohp';
+  return 'squat';
+};
+
+/**
+ * Send a single frame (base64 JPEG/PNG, with or without data: prefix) to the
+ * AI backend and get back joint angles plus per-joint target ranges.
  */
 export const analyzeFrame = async (
   imageBase64: string,
-  exerciseName: string = 'squat'
-): Promise<FrameAngles> => {
-  if (USE_PROXY) {
-    const res: any = await apiPost('/vision/analyze-frame', {
-      image_base64: imageBase64,
-      exercise_name: exerciseName,
-    });
-    return res.data || {};
-  }
-
-  const res = await aiAxios.post('/analyze-frame', {
+  exerciseName: string,
+): Promise<AnalyzeFrameResult> => {
+  const res = await aiClient.post('/analyze-frame', {
     image_base64: imageBase64,
-    exercise_name: exerciseName,
+    exercise_name: normalizeExerciseName(exerciseName),
   });
-  return res.data;
+  return {
+    angles: (res.data?.angles ?? {}) as FrameAngles,
+    targets: (res.data?.targets ?? {}) as FrameTargets,
+  };
 };
 
-// ─── Video Analysis ───────────────────────────────────────────────────────────
-
 /**
- * Analyze a full recorded exercise video.
- * Returns score (0-100), detected mistakes, improvement notes, and rep count.
- *
- * @param videoBase64 - base64-encoded video (with or without data: prefix)
- * @param exerciseName - e.g. 'squat', 'push_up', 'bicep_curl', 'plank'
- * @param saveResult - if true, Node.js backend saves the result (only relevant when USE_PROXY=true)
+ * Health check — quick GET to see if AI backend is reachable.
  */
-export const analyzeVideo = async (
-  videoBase64: string,
-  exerciseName: string = 'squat',
-  saveResult: boolean = true
-): Promise<VideoAnalysisResult> => {
-  if (USE_PROXY) {
-    const res: any = await apiPost('/vision/analyze-video', {
-      video_base64: videoBase64,
-      exercise_name: exerciseName,
-      save: saveResult,
-    });
-    return res.data || buildEmptyResult();
+export const checkAIBackendHealth = async (): Promise<boolean> => {
+  try {
+    const res = await axios.get(`${environment.AI_BACKEND_URL}/`, { timeout: 3000 });
+    return res.status === 200;
+  } catch {
+    return false;
   }
-
-  const res = await aiAxios.post('/test-exercise-base64', {
-    video_base64: videoBase64,
-    exercise_name: exerciseName,
-  });
-  return res.data;
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Convert a camera frame (from expo-camera) to base64 string.
- * Pass the uri from CameraView's takePictureAsync or captureRef.
- */
-export const frameUriToBase64 = async (uri: string): Promise<string> => {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      // Strip the data:image/...;base64, prefix
-      resolve(result.split(',')[1] || result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 };
 
 /**
- * Format the angles dict into human-readable display lines.
+ * Compute an overall "form score" 0–100 from joint angles vs target ranges.
+ * Each joint inside its target range scores 100; outside drops linearly with the
+ * distance from the nearest bound (clamped at 0).
  */
-export const formatAnglesForDisplay = (angles: FrameAngles): string[] => {
-  const lines: string[] = [];
-  const targets = (angles.targets as Record<string, string>) || {};
+export const computeFormScore = (
+  angles: FrameAngles,
+  targets: FrameTargets,
+): number => {
+  const entries = Object.entries(targets);
+  if (entries.length === 0) return 0;
 
-  for (const [key, value] of Object.entries(angles)) {
-    if (key === 'targets') continue;
-    if (typeof value === 'number') {
-      lines.push(`${key.replace(/_/g, ' ')}: ${value}°`);
+  let total = 0;
+  let count = 0;
+
+  for (const [joint, target] of entries) {
+    const angle = angles[joint];
+    if (typeof angle !== 'number') continue;
+
+    let min: number;
+    let max: number;
+    if (Array.isArray(target)) {
+      [min, max] = target;
+    } else if (target && typeof target === 'object' && 'min' in target && 'max' in target) {
+      min = (target as { min: number; max: number }).min;
+      max = (target as { min: number; max: number }).max;
+    } else {
+      continue;
     }
-  }
 
-  if (Object.keys(targets).length > 0) {
-    lines.push('─── Targets ───');
-    for (const [k, v] of Object.entries(targets)) {
-      lines.push(`${k.replace(/_/g, ' ')}: ${v}`);
+    let score: number;
+    if (angle >= min && angle <= max) {
+      score = 100;
+    } else {
+      const distance = angle < min ? min - angle : angle - max;
+      // Lose 2 points per degree out of range, floor at 0
+      score = Math.max(0, 100 - distance * 2);
     }
+
+    total += score;
+    count += 1;
   }
 
-  return lines.length > 0 ? lines : ['No pose detected'];
+  return count === 0 ? 0 : Math.round(total / count);
 };
-
-/**
- * Build an empty VideoAnalysisResult (used as fallback on error).
- */
-export const buildEmptyResult = (): VideoAnalysisResult => ({
-  angles_observed: {},
-  targets: {},
-  summary: 'Analysis unavailable',
-  reps_detected: 0,
-  score: 0,
-  mistakes_detected: [],
-  improvement_notes: '',
-  done_well: [],
-});
 
 export default {
   analyzeFrame,
-  analyzeVideo,
-  frameUriToBase64,
-  formatAnglesForDisplay,
-  buildEmptyResult,
+  checkAIBackendHealth,
+  computeFormScore,
+  normalizeExerciseName,
 };
