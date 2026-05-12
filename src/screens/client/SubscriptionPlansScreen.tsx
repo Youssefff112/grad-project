@@ -17,6 +17,7 @@ import { Button } from '../../components/Button';
 import type { SubscriptionPlan } from '../../context/UserContext';
 import * as subscriptionService from '../../services/subscriptionService';
 import type { Subscription } from '../../services/subscriptionService';
+import { PLAN_FEATURES } from '../../constants/plans';
 
 interface Plan {
   id: SubscriptionPlan;
@@ -29,91 +30,67 @@ interface Plan {
   recommended?: boolean;
 }
 
+// NOTE: This marketing copy is the source-of-truth-for-display only. The
+// actual feature gating lives in ``src/constants/plans.ts`` (PLAN_FEATURES).
+// Keep the bullets here in sync with that file — bullets must reflect what
+// the gating code actually unlocks, otherwise users hit "feature locked"
+// modals on things they paid for.
 const plans: Plan[] = [
   {
     id: 'Free',
     name: 'Free',
     price: 0,
     billing: '/month',
-    description: 'Start your journey',
+    description: 'Get started — basic tracking',
     features: [
       'Browse exercise library',
-      'Basic activity tracking',
-      'Water intake logging',
-      'Calorie counter',
-      'Progress charts',
+      'Log workouts manually',
+      'Track water & calories',
+      'View progress charts',
     ],
     limitations: [
-      'No AI-generated workouts',
-      'No meal planning',
-      'No coach access',
-      'No computer vision',
-      'Limited to basic features',
+      'No AI workouts or meal plans',
+      'No human coach',
+      'No computer vision form check',
     ],
   },
   {
     id: 'Standard',
-    name: 'Standard',
+    name: 'AI Plan',
     price: 9.99,
     billing: '/month',
-    description: 'Enhanced tracking',
+    description: 'Let AI run your training & nutrition',
     features: [
-      'All Free features',
-      'Custom workout tracking',
-      'Detailed nutrition tracking',
-      'Weekly progress reports',
-      'Goal management',
-      'Workout history',
-    ],
-    limitations: [
-      'No AI-generated workouts',
-      'No meal planning',
-      'No coach access',
-      'No computer vision',
-    ],
-  },
-  {
-    id: 'Premium',
-    name: 'Premium',
-    price: 19.99,
-    billing: '/month',
-    description: 'AI-Powered experience',
-    features: [
-      'All Standard features',
-      'AI-generated workouts',
-      'AI meal planning',
+      'Everything in Free',
+      'AI-generated workout plans',
+      'AI-generated meal plans',
       'AI chatbot for recommendations',
-      'Computer vision support',
-      'Swap exercises/meals dynamically',
-      'Workout adjustments',
-      'Priority support',
+      'Computer vision form check',
+      'Swap exercises & meals dynamically',
     ],
     limitations: [
-      'No dedicated coach',
-      'Limited personalization',
+      'No dedicated human coach',
     ],
     recommended: true,
   },
   {
-    id: 'ProCoach',
-    name: 'Pro Coach',
-    price: 49.99,
+    id: 'Premium',
+    name: 'Coach Plan',
+    price: 19.99,
     billing: '/month',
-    description: 'Work with a coach',
+    description: 'Work with a real human coach',
     features: [
-      'All Standard features',
+      'Everything in Free',
       'Dedicated coach assignment',
-      'Coach-created workouts',
-      'Coach-designed meal plans',
+      'Coach-built workouts & meal plans',
       'Coach messaging (24h response)',
-      'In-app communication',
-      'Computer vision support',
+      'Shared progress dashboard with your coach',
+      'Computer vision form check',
       'Weekly check-ins',
-      'Custom training programs',
     ],
     limitations: [
-      'All payments processed through platform',
-      'Coach reviews all generated content',
+      'No AI-generated workouts or meals',
+      'Coach reviews & approves your program',
     ],
   },
   {
@@ -121,17 +98,15 @@ const plans: Plan[] = [
     name: 'Elite',
     price: 99.99,
     billing: '/month',
-    description: 'Premium coach experience',
+    description: 'AI + dedicated coach, everything unlocked',
     features: [
-      'All Pro Coach features',
-      'AI + Coach combined',
-      'Priority coach assignment',
-      'Unlimited messaging',
-      'Weekly 1-on-1 calls',
+      'Everything in AI Plan and Coach Plan',
+      'AI workouts, meals & chatbot',
+      'Dedicated coach + messaging',
+      'Shared progress dashboard',
       'Advanced computer vision',
+      'Priority support',
       'Custom nutrition plans',
-      'Progress analytics',
-      'Dedicated success manager',
     ],
     limitations: [],
   },
@@ -198,7 +173,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
       setSubscriptionPlan(selectedPlan);
       updateLastPlanReview();
 
-      Alert.alert('Success', `You're now on the ${selectedPlan} plan!`, [
+      Alert.alert('Success', `You're now on the ${PLAN_FEATURES[selectedPlan].name}!`, [
         {
           text: 'Continue',
           onPress: () => {
@@ -245,7 +220,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
 
         {/* Plans Grid */}
         <View style={tw`flex-col gap-4`}>
-          {plans.filter((p) => p.id !== 'ProCoach').map((plan) => (
+          {plans.map((plan) => (
             <TouchableOpacity
               key={plan.id}
               onPress={() => handleSelectPlan(plan.id)}
@@ -313,96 +288,119 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
             Feature Comparison
           </Text>
           
-          {/* Comparison Rows */}
+          {/* Comparison Rows — booleans MUST mirror PLAN_FEATURES in
+              ``src/constants/plans.ts`` so the marketing matches the gates. */}
           <View style={tw`gap-3`}>
             {[
-              { 
-                label: 'Browse Exercises', 
+              {
+                label: 'Browse Exercises',
                 icon: 'fitness-center',
                 rows: [
                   { plan: 'Free', included: true },
                   { plan: 'Standard', included: true },
                   { plan: 'Premium', included: true },
-                  { plan: 'ProCoach', included: true },
                   { plan: 'Elite', included: true },
-                ]
+                ],
               },
-              { 
-                label: 'Activity Tracking', 
+              {
+                label: 'Activity Tracking',
                 icon: 'trending-up',
                 rows: [
                   { plan: 'Free', included: true },
                   { plan: 'Standard', included: true },
                   { plan: 'Premium', included: true },
-                  { plan: 'ProCoach', included: true },
                   { plan: 'Elite', included: true },
-                ]
+                ],
               },
-              { 
-                label: 'AI Workouts', 
+              {
+                label: 'AI Workouts',
                 icon: 'auto-awesome',
                 rows: [
                   { plan: 'Free', included: false },
-                  { plan: 'Standard', included: false },
-                  { plan: 'Premium', included: true },
-                  { plan: 'ProCoach', included: false },
+                  { plan: 'Standard', included: true },
+                  { plan: 'Premium', included: false },
                   { plan: 'Elite', included: true },
-                ]
+                ],
               },
-              { 
-                label: 'AI Meal Planning', 
+              {
+                label: 'AI Meal Planning',
                 icon: 'restaurant',
                 rows: [
                   { plan: 'Free', included: false },
-                  { plan: 'Standard', included: false },
-                  { plan: 'Premium', included: true },
-                  { plan: 'ProCoach', included: false },
+                  { plan: 'Standard', included: true },
+                  { plan: 'Premium', included: false },
                   { plan: 'Elite', included: true },
-                ]
+                ],
               },
-              { 
-                label: 'Dedicated Coach', 
+              {
+                label: 'AI Chatbot',
+                icon: 'smart-toy',
+                rows: [
+                  { plan: 'Free', included: false },
+                  { plan: 'Standard', included: true },
+                  { plan: 'Premium', included: false },
+                  { plan: 'Elite', included: true },
+                ],
+              },
+              {
+                label: 'Dedicated Coach',
                 icon: 'school',
                 rows: [
                   { plan: 'Free', included: false },
                   { plan: 'Standard', included: false },
-                  { plan: 'Premium', included: false },
-                  { plan: 'ProCoach', included: true },
-                  { plan: 'Elite', included: true },
-                ]
-              },
-              { 
-                label: 'Computer Vision', 
-                icon: 'videocam',
-                rows: [
-                  { plan: 'Free', included: false },
-                  { plan: 'Standard', included: false },
                   { plan: 'Premium', included: true },
-                  { plan: 'ProCoach', included: true },
                   { plan: 'Elite', included: true },
-                ]
+                ],
               },
-              { 
-                label: 'Messaging Support', 
+              {
+                label: 'Coach Messaging',
                 icon: 'chat-bubble',
                 rows: [
                   { plan: 'Free', included: false },
                   { plan: 'Standard', included: false },
-                  { plan: 'Premium', included: false },
-                  { plan: 'ProCoach', included: true },
+                  { plan: 'Premium', included: true },
                   { plan: 'Elite', included: true },
-                ]
+                ],
               },
-              { 
-                label: 'Priority Support', 
-                icon: 'support-agent',
+              {
+                label: 'Shared Coach Dashboard',
+                icon: 'dashboard',
                 rows: [
                   { plan: 'Free', included: false },
                   { plan: 'Standard', included: false },
                   { plan: 'Premium', included: true },
-                  { plan: 'ProCoach', included: true },
                   { plan: 'Elite', included: true },
-                ]
+                ],
+              },
+              {
+                label: 'Computer Vision',
+                icon: 'videocam',
+                rows: [
+                  { plan: 'Free', included: false },
+                  { plan: 'Standard', included: true },
+                  { plan: 'Premium', included: true },
+                  { plan: 'Elite', included: true },
+                ],
+              },
+              {
+                label: 'Progress Tracking',
+                icon: 'insights',
+                rows: [
+                  { plan: 'Free', included: false },
+                  { plan: 'Standard', included: false },
+                  { plan: 'Premium', included: true },
+                  { plan: 'Elite', included: true },
+                ],
+              },
+              {
+                label: 'Priority Support',
+                icon: 'support-agent',
+                rows: [
+                  { plan: 'Free', included: false },
+                  { plan: 'Standard', included: false },
+                  { plan: 'Premium', included: false },
+                  { plan: 'Elite', included: true },
+                ],
               },
             ].map((row, idx) => (
               <View 
@@ -433,7 +431,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                 
                 {/* Plan Indicators */}
                 <View style={tw`flex-row gap-1`}>
-                  {row.rows.filter((item) => item.plan !== 'ProCoach').map((item, i) => (
+                  {row.rows.map((item, i) => (
                     <View 
                       key={i}
                       style={[
@@ -498,7 +496,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                   Current Plan
                 </Text>
                 <Text style={[tw`text-2xl font-bold mt-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                  {subscriptionPlan}
+                  {PLAN_FEATURES[subscriptionPlan]?.name ?? subscriptionPlan}
                 </Text>
               </View>
               <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent + '20' }]}>
@@ -587,7 +585,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
 
             {subscriptionPlan !== 'Free' && (
               <TouchableOpacity
-                onPress={() => Alert.alert('Cancel Subscription', `Are you sure you want to cancel your ${subscriptionPlan} plan?`, [{ text: 'Keep Plan' }, { text: 'Cancel Plan', onPress: () => { setSubscriptionPlan('Free'); Alert.alert('Cancelled', 'Your subscription has been cancelled. You now have access to the Free plan.'); }, style: 'destructive' }])}
+                onPress={() => Alert.alert('Cancel Subscription', `Are you sure you want to cancel your ${PLAN_FEATURES[subscriptionPlan]?.name ?? subscriptionPlan}?`, [{ text: 'Keep Plan' }, { text: 'Cancel Plan', onPress: () => { setSubscriptionPlan('Free'); Alert.alert('Cancelled', 'Your subscription has been cancelled. You now have access to the Free plan.'); }, style: 'destructive' }])}
                 style={[tw`rounded-xl p-4 flex-row items-center gap-3`, { backgroundColor: '#ef4444' + '15', borderWidth: 1, borderColor: '#ef4444' + '40' }]}
               >
                 <View style={[tw`p-3 rounded-lg`, { backgroundColor: '#ef4444' + '25' }]}>
