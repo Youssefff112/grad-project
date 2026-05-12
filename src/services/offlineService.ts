@@ -164,6 +164,40 @@ export const getCachedResponse = async (endpoint: string): Promise<any | null> =
   }
 };
 
+/**
+ * Invalidate cached GET responses by endpoint prefix.
+ *
+ * Use this after any write (POST/PATCH/DELETE) that mutates server state we
+ * also cache (e.g. workout/diet plan delete & regenerate). Otherwise the
+ * offline interceptor in api.ts will happily resurrect the deleted plan from
+ * the cache the next time the device is briefly offline.
+ *
+ * Accepts a single endpoint or an array. Matches by `startsWith` so passing
+ * "/workout" clears /workout/active, /workout/history, etc.
+ */
+export const invalidateCachedResponse = async (endpoints: string | string[]) => {
+  try {
+    const list = Array.isArray(endpoints) ? endpoints : [endpoints];
+    const keys = await AsyncStorage.getAllKeys().catch(() => []);
+    if (!keys || keys.length === 0) return;
+    const targets = keys.filter((key) => {
+      if (!key.startsWith('api_cache_')) return false;
+      const ep = key.slice('api_cache_'.length);
+      return list.some((p) => ep.startsWith(p));
+    });
+    if (targets.length === 0) return;
+    await Promise.all(
+      targets.map((key) =>
+        AsyncStorage.removeItem(key).catch((error) => {
+          console.warn('[OfflineService] Error invalidating cache key:', error);
+        }),
+      ),
+    );
+  } catch (error) {
+    console.warn('[OfflineService] Error invalidating cached response:', error);
+  }
+};
+
 // Clear all offline cache
 export const clearAllCache = async () => {
   try {

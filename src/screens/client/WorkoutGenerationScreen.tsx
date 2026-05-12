@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -114,11 +115,31 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
   const inputBg = isDark ? '#1e293b' : '#f1f5f9';
   const inputBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
 
-  useEffect(() => {
-    if (hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration')) {
-      loadActivePlan();
+  const loadActivePlan = useCallback(async () => {
+    setIsLoadingPlan(true);
+    try {
+      const { plan } = await workoutService.getActiveWorkoutPlan();
+      // CRITICAL: if the user just deleted the plan elsewhere or never had
+      // one, we MUST clear local state. Otherwise the previously-loaded plan
+      // would persist visually after deletion or regeneration.
+      setAvailableWorkouts(plan ? planToWorkout(plan) : []);
+    } catch {
+      // Treat fetch failure as "no plan" so the UI doesn't show stale data.
+      setAvailableWorkouts([]);
+    } finally {
+      setIsLoadingPlan(false);
     }
-  }, [subscriptionPlan]);
+  }, []);
+
+  // Re-fetch every time this screen regains focus so deletes/generates done
+  // from other screens (or this one) always reflect immediately.
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration')) {
+        loadActivePlan();
+      }
+    }, [subscriptionPlan, loadActivePlan]),
+  );
 
   if (!hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration')) {
     return (
@@ -132,20 +153,6 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
       />
     );
   }
-
-  const loadActivePlan = async () => {
-    setIsLoadingPlan(true);
-    try {
-      const { plan } = await workoutService.getActiveWorkoutPlan();
-      if (plan) {
-        setAvailableWorkouts(planToWorkout(plan));
-      }
-    } catch {
-      // no active plan yet
-    } finally {
-      setIsLoadingPlan(false);
-    }
-  };
 
   // ── Step 1: open questionnaire ───────────────────────────────────────────────
   const handleOpenQuestionnaire = () => {

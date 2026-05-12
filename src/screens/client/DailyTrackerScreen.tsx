@@ -75,9 +75,15 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
             water: DEFAULT_TARGETS.water,
             workoutMinutes: DEFAULT_TARGETS.workoutMinutes,
           });
+        } else {
+          // No active diet plan — drop stale state and revert to defaults so
+          // the tracker doesn't keep using last week's deleted targets.
+          setActiveDietPlan(null);
+          setDailyTargets(DEFAULT_TARGETS);
         }
       } catch {
-        // use default targets
+        setActiveDietPlan(null);
+        setDailyTargets(DEFAULT_TARGETS);
       }
     };
     loadData();

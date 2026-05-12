@@ -68,18 +68,17 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   // Calculate readiness score based on various factors
   const readinessScore = Math.floor(Math.random() * 40 + 60); // 60-100%
 
-  useEffect(() => {
-    loadActivePlan();
-  }, []);
-
-  const loadActivePlan = async () => {
+  const loadActivePlan = useCallback(async () => {
     try {
       const { plan } = await workoutService.getActiveWorkoutPlan();
-      if (plan) setActivePlan(plan);
+      // Always reflect the server-side truth, including null (no plan).
+      // Without this, deleting / regenerating the plan elsewhere would leave
+      // the stale plan stuck on the home page.
+      setActivePlan(plan ?? null);
     } catch {
-      // no active plan
+      setActivePlan(null);
     }
-  };
+  }, []);
 
   const loadDailyProgress = useCallback(async () => {
     try {
@@ -92,12 +91,14 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         planResult.status === 'fulfilled' ? planResult.value : { plan: null },
       ]);
 
-      if ((cachedLog as offlineService.DailyMealLog | null)?.waterGlasses !== undefined) {
-        setWaterGlasses((cachedLog as offlineService.DailyMealLog).waterGlasses);
-      }
-      if ((plan as dietService.DietPlan | null)?.dailyCalorieTarget) {
-        setCalorieTarget((plan as dietService.DietPlan).dailyCalorieTarget);
-      }
+      const log = cachedLog as offlineService.DailyMealLog | null;
+      setWaterGlasses(log?.waterGlasses ?? 0);
+
+      const dietPlan = plan as dietService.DietPlan | null;
+      // Reset to default when there's no active diet plan, otherwise the
+      // home page keeps showing the deleted plan's calorie target.
+      setCalorieTarget(dietPlan?.dailyCalorieTarget ?? 2000);
+      if (!dietPlan) setCaloriesConsumed(0);
 
       // Try to get today's consumed calories from diet history
       try {
@@ -117,7 +118,8 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   useFocusEffect(
     useCallback(() => {
       loadDailyProgress();
-    }, [loadDailyProgress]),
+      loadActivePlan();
+    }, [loadDailyProgress, loadActivePlan]),
   );
 
   // Get today's workout day from the active plan

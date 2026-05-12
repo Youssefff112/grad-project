@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -71,10 +72,47 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   const textSecondary = isDark ? '#94a3b8' : '#64748b';
   const inputBg = isDark ? '#1e293b' : '#f1f5f9';
 
-  // Load active plan exercises on mount
-  useEffect(() => {
-    loadActivePlanExercises();
+  const loadActivePlanExercises = useCallback(async () => {
+    setPlanLoading(true);
+    try {
+      const { plan } = await workoutService.getActiveWorkoutPlan();
+      const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const todaySchedule = plan?.weeklySchedule?.find(
+        (d: any) => d.day?.toLowerCase() === today && !d.isRestDay,
+      ) || plan?.weeklySchedule?.find((d: any) => !d.isRestDay);
+
+      if (todaySchedule?.exercises?.length) {
+        setPlanName(`${prettyLabel(todaySchedule.day)}: ${prettyLabel(todaySchedule.focus) || 'Workout'}`);
+        setPlanExercises(
+          todaySchedule.exercises.map((e: any) => ({
+            name: e.name,
+            sets: e.sets,
+            reps: e.reps,
+            rest: e.restTime ?? e.rest ?? 60,
+            source: 'plan' as const,
+          })),
+        );
+      } else {
+        // No active plan (or plan has no exercises) — wipe stale state so the
+        // UI doesn't keep showing the previously-deleted plan.
+        setPlanName(null);
+        setPlanExercises([]);
+      }
+    } catch {
+      setPlanName(null);
+      setPlanExercises([]);
+    } finally {
+      setPlanLoading(false);
+    }
   }, []);
+
+  // Refresh on every focus so deletes / regenerates done from other screens
+  // are reflected here immediately.
+  useFocusEffect(
+    useCallback(() => {
+      loadActivePlanExercises();
+    }, [loadActivePlanExercises]),
+  );
 
   useEffect(() => {
     if (activeTab === 'history') loadWorkoutHistory();
@@ -89,33 +127,6 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
       const cached = await offlineService.getCachedWorkoutHistory();
       if (cached?.length) setCachedHistory(cached);
     } catch { /* ignore */ }
-  };
-
-  const loadActivePlanExercises = async () => {
-    setPlanLoading(true);
-    try {
-      const { plan } = await workoutService.getActiveWorkoutPlan();
-      if (plan?.weeklySchedule) {
-        const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        const todaySchedule = plan.weeklySchedule.find(
-          (d: any) => d.day?.toLowerCase() === today && !d.isRestDay
-        ) || plan.weeklySchedule.find((d: any) => !d.isRestDay);
-
-        if (todaySchedule?.exercises?.length) {
-          setPlanName(`${prettyLabel(todaySchedule.day)}: ${prettyLabel(todaySchedule.focus) || 'Workout'}`);
-          setPlanExercises(
-            todaySchedule.exercises.map((e: any) => ({
-              name: e.name,
-              sets: e.sets,
-              reps: e.reps,
-              rest: e.restTime ?? e.rest ?? 60,
-              source: 'plan' as const,
-            }))
-          );
-        }
-      }
-    } catch { /* no plan yet */ }
-    finally { setPlanLoading(false); }
   };
 
   const loadWorkoutHistory = async () => {

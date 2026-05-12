@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -133,11 +134,32 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
   const textSecondary = isDark ? '#cbd5e1' : '#475569';
 
-  useEffect(() => {
-    if (hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
-      loadActivePlan();
+  const loadActivePlan = useCallback(async () => {
+    setIsLoadingPlan(true);
+    try {
+      const { plan } = await dietService.getActiveDietPlan();
+      // Always mirror server truth. Without the else-branch the previously
+      // deleted plan would stick on screen forever.
+      if (plan && plan.weeklyMealPlan?.length > 0) {
+        setAvailableMeals([dietPlanToDisplay(plan, 'approved')]);
+      } else {
+        setAvailableMeals([]);
+      }
+    } catch {
+      setAvailableMeals([]);
+    } finally {
+      setIsLoadingPlan(false);
     }
-  }, [subscriptionPlan]);
+  }, []);
+
+  // Re-fetch on focus so deletes / regenerates from anywhere update this screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
+        loadActivePlan();
+      }
+    }, [subscriptionPlan, loadActivePlan]),
+  );
 
   if (!hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) {
     return (
@@ -151,20 +173,6 @@ export const MealGenerationScreen = ({ navigation }: any) => {
       />
     );
   }
-
-  const loadActivePlan = async () => {
-    setIsLoadingPlan(true);
-    try {
-      const { plan } = await dietService.getActiveDietPlan();
-      if (plan && plan.weeklyMealPlan?.length > 0) {
-        setAvailableMeals([dietPlanToDisplay(plan, 'approved')]);
-      }
-    } catch {
-      // no active plan yet
-    } finally {
-      setIsLoadingPlan(false);
-    }
-  };
 
   const handleGenerateMealPlan = async () => {
     setIsGenerating(true);
