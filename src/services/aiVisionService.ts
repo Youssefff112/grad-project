@@ -283,27 +283,69 @@ export const computeFormScore = (
   return count === 0 ? 0 : Math.round(total / count);
 };
 
+// ── Angle smoothing (EMA, per joint) ────────────────────────────────────────
+/**
+ * Exponential moving average over each joint angle. Pose Landmarker Lite has
+ * ~±5–10° of noise frame-to-frame, which makes both the form score and the
+ * rep detector jitter. Pass every fresh `analyze-frame` response through
+ * `smooth.update()` and use the returned smoothed angles instead.
+ */
+export class AngleSmoother {
+  private values: FrameAngles = {};
+  private alpha: number;
+
+  /** `alpha` is the new-sample weight. 0.4 = balanced; lower = smoother but laggier. */
+  constructor(alpha: number = 0.45) {
+    this.alpha = alpha;
+  }
+
+  update(angles: FrameAngles): FrameAngles {
+    const out: FrameAngles = {};
+    for (const key of Object.keys(angles)) {
+      const v = angles[key];
+      if (typeof v !== 'number') continue;
+      const prev = this.values[key];
+      out[key] = typeof prev === 'number' ? prev * (1 - this.alpha) + v * this.alpha : v;
+      this.values[key] = out[key];
+    }
+    return out;
+  }
+
+  reset() {
+    this.values = {};
+  }
+}
+
 // ── Rep detector (live, frontend-side) ──────────────────────────────────────
 /**
- * Cycle-based rep counter. Feed it joint angles over time; it tracks state
- * (top ↔ bottom) and emits one rep per full cycle.
+ * Cycle-based rep counter with hysteresis + cooldown to ignore MediaPipe noise.
+ *
+ * State machine:
+ *   - The angle must clearly cross BOTH the bottom and top thresholds (with a
+ *     dead-band of ~10–15°) before counting one rep.
+ *   - After a rep is counted, a short cooldown prevents double-counts caused
+ *     by jitter sitting on the threshold.
  *
  * For "normal" exercises (squat, push-up):
- *   bottom = angle ≤ down threshold
- *   top    = angle ≥ up threshold
+ *   bottom = angle ≤ rep.down   (deep)
+ *   top    = angle ≥ rep.up     (lockout)
  *   1 rep  = bottom → top
  *
  * For "inverted" exercises (bicep curl, row):
- *   bottom (extended) = angle ≥ up threshold
- *   top (contracted)  = angle ≤ down threshold
- *   1 rep             = bottom → top
+ *   bottom (extended) = angle ≥ rep.up    (arm straight / arm out)
+ *   top    (contracted) = angle ≤ rep.down (arm curled / row tucked)
+ *   1 rep  = bottom → top
  */
 export class RepDetector {
   private profile: ExerciseProfile;
   private phase: 'top' | 'bottom' | 'unknown' = 'unknown';
+  private lastRepAt: number = 0;
+  /** Min ms between two counted reps — guards against jitter double-counts. */
+  private cooldownMs: number;
 
-  constructor(profile: ExerciseProfile) {
+  constructor(profile: ExerciseProfile, cooldownMs: number = 500) {
     this.profile = profile;
+    this.cooldownMs = cooldownMs;
   }
 
   /** Returns 1 when a new rep is detected, 0 otherwise. */
@@ -314,23 +356,30 @@ export class RepDetector {
     if (typeof value !== 'number') return 0;
 
     const inverted = !!rep.inverted;
-    const bottomCondition = inverted ? value >= rep.up : value <= rep.down;
-    const topCondition = inverted ? value <= rep.down : value >= rep.up;
+    const isBottom = inverted ? value >= rep.up : value <= rep.down;
+    const isTop = inverted ? value <= rep.down : value >= rep.up;
 
     let counted = 0;
-    if (bottomCondition) {
-      this.phase = 'bottom';
-    } else if (topCondition) {
-      if (this.phase === 'bottom') {
+    const now = Date.now();
+
+    if (isBottom) {
+      // Entering bottom resets the rep cycle.
+      if (this.phase !== 'bottom') this.phase = 'bottom';
+    } else if (isTop) {
+      if (this.phase === 'bottom' && now - this.lastRepAt > this.cooldownMs) {
         counted = 1;
+        this.lastRepAt = now;
       }
       this.phase = 'top';
     }
+    // Mid-range angles don't change phase — they're the "dead-band" that
+    // gives us hysteresis.
     return counted;
   }
 
   reset() {
     this.phase = 'unknown';
+    this.lastRepAt = 0;
   }
 }
 
@@ -357,5 +406,6 @@ export default {
   getExerciseProfile,
   parseTarget,
   RepDetector,
+  AngleSmoother,
   isHoldingForm,
 };

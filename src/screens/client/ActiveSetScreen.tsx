@@ -7,10 +7,13 @@ import tw from '../../tw';
 import * as aiVisionService from '../../services/aiVisionService';
 import * as workoutService from '../../services/workoutService';
 
-const ANALYSIS_INTERVAL_MS = 800;
-const SCAN_LOST_GRACE_MS = 2500;
+// Aim for ~2.5 fps of analysis. Faster than the previous 800ms loop so the
+// rep detector actually sees both ends of a movement.
+const ANALYSIS_INTERVAL_MS = 450;
+const SCAN_LOST_GRACE_MS = 1500;
 
 type SessionState = 'running' | 'paused' | 'stopped';
+type CameraFacing = 'front' | 'back';
 
 interface RouteParams {
   exerciseName?: string;
@@ -37,14 +40,16 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const inFlightRef = useRef(false);
   const lastPoseAtRef = useRef<number>(0);
   const repDetectorRef = useRef<aiVisionService.RepDetector>(new aiVisionService.RepDetector(profile));
+  const smootherRef = useRef<aiVisionService.AngleSmoother>(new aiVisionService.AngleSmoother(0.45));
 
-  // Reset detector when exercise changes
   useEffect(() => {
     repDetectorRef.current = new aiVisionService.RepDetector(profile);
+    smootherRef.current = new aiVisionService.AngleSmoother(0.45);
   }, [profile]);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<CameraFacing>('front');
   const [aiBackendOk, setAiBackendOk] = useState<boolean | null>(null);
 
   // Session state
@@ -60,14 +65,11 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const [angles, setAngles] = useState<aiVisionService.FrameAngles>({});
   const [poseDetected, setPoseDetected] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
 
-  // Camera permission auto-prompt
   useEffect(() => {
     if (!permission?.granted) requestPermission();
   }, [permission]);
 
-  // AI backend health
   useEffect(() => {
     let mounted = true;
     aiVisionService.checkAIBackendHealth().then((ok) => {
@@ -83,35 +85,33 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     return () => clearInterval(t);
   }, [sessionState]);
 
-  // Periodic frame analysis
   const analyzeOneFrame = useCallback(async () => {
     if (sessionState !== 'running' || !cameraReady || !cameraRef.current) return;
     if (inFlightRef.current) return;
 
     inFlightRef.current = true;
-    setAnalyzing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.35,
+        quality: 0.5,
         base64: true,
-        skipProcessing: true,
         shutterSound: false,
+        exif: false,
       });
       if (!photo?.base64) return;
 
       const result = await aiVisionService.analyzeFrame(photo.base64, rawExerciseName);
-      setAngles(result.angles);
-      setPoseDetected(result.poseDetected);
       if (result.poseDetected) {
+        const smoothed = smootherRef.current.update(result.angles);
+        setAngles(smoothed);
+        setPoseDetected(true);
         lastPoseAtRef.current = Date.now();
-        setFormScore(aiVisionService.computeFormScore(result.angles, result.targets));
+        setFormScore(aiVisionService.computeFormScore(smoothed, result.targets));
         setAnalysisError(null);
 
         if (isHold) {
-          setHolding(aiVisionService.isHoldingForm(profile, result.angles));
+          setHolding(aiVisionService.isHoldingForm(profile, smoothed));
         } else {
-          // Rep detection
-          const counted = repDetectorRef.current.update(result.angles);
+          const counted = repDetectorRef.current.update(smoothed);
           if (counted > 0) {
             setReps((r) => {
               const next = r + counted;
@@ -124,10 +124,12 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
           }
         }
       } else {
+        // Pose lost — clear holding and decay score after a short grace.
         setHolding(false);
-        // Keep last score for a moment; clear after grace period
         if (Date.now() - lastPoseAtRef.current > SCAN_LOST_GRACE_MS) {
+          setPoseDetected(false);
           setFormScore(null);
+          smootherRef.current.reset();
         }
       }
     } catch (err: any) {
@@ -135,7 +137,6 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
       setAnalysisError(msg);
     } finally {
       inFlightRef.current = false;
-      setAnalyzing(false);
     }
   }, [sessionState, cameraReady, rawExerciseName, profile, isHold, targetReps, targetSets, currentSet]);
 
@@ -153,7 +154,7 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     };
   }, [sessionState, cameraReady, analyzeOneFrame]);
 
-  // Hold timer — only ticks while user is in form
+  // Hold timer — ticks only while in form
   useEffect(() => {
     if (!isHold || sessionState !== 'running' || !holding) return;
     const t = setInterval(() => {
@@ -170,10 +171,8 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   }, [isHold, sessionState, holding, targetHoldSeconds, currentSet, targetSets]);
 
   const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
+    const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
@@ -202,7 +201,7 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
                 rating: formScore ? Math.min(5, Math.max(1, Math.round(formScore / 20))) : 3,
               });
             } catch {
-              // Silent — keep UX smooth even if API fails
+              // ignore — keep UX smooth even if logging fails
             }
             navigation.goBack();
           },
@@ -223,18 +222,10 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     return '#ef4444';
   };
 
-  const formLabel = (score: number | null) => {
-    if (score === null) return '—';
-    if (score >= 85) return 'Excellent';
-    if (score >= 65) return 'Good';
-    if (score >= 40) return 'Adjust';
-    return 'Poor';
-  };
-
   const prettyJoint = (k: string) =>
     k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-  // ── Permission gating ───────────────────────────────────────────────────────
+  // ── Permission gating ────────────────────────────────────────────────────
   if (!permission) {
     return (
       <SafeAreaView style={tw`flex-1 bg-black items-center justify-center`}>
@@ -267,48 +258,91 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
 
   return (
     <View style={tw`flex-1 bg-black`}>
-      {/* Camera feed */}
+      {/* Camera fills the entire screen */}
       <CameraView
         ref={cameraRef}
         style={tw`absolute inset-0`}
-        facing="front"
+        facing={cameraFacing}
         onCameraReady={() => setCameraReady(true)}
       />
 
-      {/* Scrims for legibility */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 130, backgroundColor: 'rgba(0,0,0,0.45)' }} />
-      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 310, backgroundColor: 'rgba(0,0,0,0.65)' }} />
+      {/* Subtle gradient scrims for legibility (much thinner than before) */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 60, backgroundColor: 'rgba(0,0,0,0.35)' }} />
+      <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 170, backgroundColor: 'rgba(0,0,0,0.55)' }} />
 
-      {/* ───── Top bar ───── */}
+      {/* ───── Top bar — close · status pill · flip / AI ───── */}
       <SafeAreaView style={tw`absolute inset-0`} edges={['top']} pointerEvents="box-none">
-        <View style={tw`flex-row items-center justify-between px-5 pt-2`}>
-          <TouchableOpacity onPress={handleStop} style={tw`w-11 h-11 rounded-full bg-white/15 items-center justify-center`}>
-            <MaterialIcons name="close" size={22} color="white" />
+        <View style={tw`flex-row items-center justify-between px-4`}>
+          <TouchableOpacity onPress={handleStop} style={tw`w-10 h-10 rounded-full bg-black/45 items-center justify-center border border-white/15`}>
+            <MaterialIcons name="close" size={20} color="white" />
           </TouchableOpacity>
 
-          <View style={tw`flex-row items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/10`}>
+          <View style={tw`flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-black/45 border border-white/15`}>
             <View
               style={[
                 tw`w-2 h-2 rounded-full`,
                 { backgroundColor: sessionState === 'running' ? (poseDetected ? '#22c55e' : '#ef4444') : '#94a3b8' },
               ]}
             />
-            <Text style={tw`text-white text-xs font-bold tracking-wider uppercase`}>
-              {sessionState === 'paused' ? 'Paused' : poseDetected ? 'Detected' : 'Scanning…'}
+            <Text style={tw`text-white text-[11px] font-bold uppercase tracking-wider`}>
+              {sessionState === 'paused' ? 'Paused' : poseDetected ? 'Tracking' : 'Scanning…'}
             </Text>
           </View>
 
-          <View
-            style={[
-              tw`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full`,
-              {
-                backgroundColor:
-                  aiBackendOk === true ? 'rgba(34,197,94,0.18)' :
-                  aiBackendOk === false ? 'rgba(239,68,68,0.18)' :
-                  'rgba(255,255,255,0.1)',
-              },
-            ]}
-          >
+          <View style={tw`flex-row gap-2`}>
+            <TouchableOpacity
+              onPress={() => setCameraFacing((f) => (f === 'front' ? 'back' : 'front'))}
+              style={tw`w-10 h-10 rounded-full bg-black/45 items-center justify-center border border-white/15`}
+            >
+              <MaterialIcons name="flip-camera-ios" size={18} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {/* ───── Floating chips: timer + form score + AI status ───── */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: insets.top + 56,
+          left: 12,
+          right: 12,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+        }}
+      >
+        {/* Timer */}
+        <View style={tw`bg-black/55 px-3 py-2 rounded-2xl border border-white/15 items-center min-w-[88px]`}>
+          <Text style={tw`text-white/60 text-[9px] font-bold uppercase tracking-widest`}>Time</Text>
+          <Text style={[tw`text-white font-black`, { fontSize: 22, lineHeight: 26, fontVariant: ['tabular-nums'] }]}>
+            {formatTime(elapsedSeconds)}
+          </Text>
+        </View>
+
+        {/* Form score */}
+        <View style={tw`bg-black/55 px-3 py-2 rounded-2xl border border-white/15 items-center min-w-[88px]`}>
+          <Text style={tw`text-white/60 text-[9px] font-bold uppercase tracking-widest`}>Form</Text>
+          <Text style={[tw`font-black`, { color: formColor(formScore), fontSize: 22, lineHeight: 26 }]}>
+            {formScore !== null ? `${formScore}` : '--'}
+          </Text>
+        </View>
+
+        {/* AI status */}
+        <View
+          style={[
+            tw`px-3 py-2 rounded-2xl items-center min-w-[88px] border`,
+            {
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              borderColor:
+                aiBackendOk === true ? 'rgba(34,197,94,0.5)' :
+                aiBackendOk === false ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.15)',
+            },
+          ]}
+        >
+          <Text style={tw`text-white/60 text-[9px] font-bold uppercase tracking-widest`}>AI</Text>
+          <View style={tw`flex-row items-center gap-1`}>
             <MaterialIcons
               name={aiBackendOk === false ? 'cloud-off' : 'cloud-done'}
               size={14}
@@ -316,43 +350,20 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
             />
             <Text
               style={[
-                tw`text-[10px] font-bold uppercase`,
+                tw`text-[11px] font-black uppercase`,
                 { color: aiBackendOk === true ? '#22c55e' : aiBackendOk === false ? '#ef4444' : '#94a3b8' },
               ]}
             >
-              {aiBackendOk === true ? 'AI On' : aiBackendOk === false ? 'AI Off' : '...'}
+              {aiBackendOk === true ? 'On' : aiBackendOk === false ? 'Off' : '…'}
             </Text>
           </View>
         </View>
+      </View>
 
-        {/* Big timer + exercise name */}
-        <View style={tw`items-center mt-5`}>
-          <Text style={tw`text-white/70 text-xs font-bold uppercase tracking-widest`}>Session</Text>
-          <Text
-            style={[
-              tw`text-white font-black tracking-tight`,
-              { fontSize: 56, lineHeight: 60, fontVariant: ['tabular-nums'] },
-            ]}
-          >
-            {formatTime(elapsedSeconds)}
-          </Text>
-          <View style={tw`mt-1 px-3 py-1 rounded-full bg-white/10`}>
-            <Text style={tw`text-white text-sm font-bold capitalize`}>{exerciseDisplay}</Text>
-          </View>
-        </View>
-      </SafeAreaView>
-
-      {/* ───── Side panel: live form score ───── */}
-      <View style={[tw`absolute right-4`, { top: insets.top + 200 }]}>
-        <View style={tw`items-center gap-1.5 bg-black/55 px-3 py-3 rounded-2xl border border-white/10`}>
-          <Text style={tw`text-white/60 text-[10px] font-bold uppercase tracking-widest`}>Form</Text>
-          <Text style={[tw`font-black`, { color: formColor(formScore), fontSize: 32, lineHeight: 36 }]}>
-            {formScore !== null ? `${formScore}` : '--'}
-          </Text>
-          <Text style={[tw`text-[10px] font-bold uppercase tracking-wider`, { color: formColor(formScore) }]}>
-            {formLabel(formScore)}
-          </Text>
-          {analyzing && <ActivityIndicator size="small" color="#94a3b8" style={tw`mt-0.5`} />}
+      {/* Exercise name floating pill (centered above bottom panel) */}
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 190, alignItems: 'center' }}>
+        <View style={tw`bg-black/55 px-3 py-1 rounded-full border border-white/15`}>
+          <Text style={tw`text-white text-xs font-bold uppercase tracking-wider`}>{exerciseDisplay}</Text>
         </View>
       </View>
 
@@ -362,119 +373,117 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
-            top: insets.top + 200,
-            bottom: 320,
+            left: 24,
+            right: 24,
+            top: '40%',
             alignItems: 'center',
-            justifyContent: 'center',
           }}
         >
-          <View style={tw`px-6 py-4 rounded-2xl bg-black/60 border border-white/15 items-center gap-2 mx-8`}>
+          <View style={tw`px-5 py-3 rounded-2xl bg-black/65 border border-white/15 items-center gap-1.5`}>
             <ActivityIndicator color="#22c55e" />
-            <Text style={tw`text-white text-base font-bold`}>Looking for you…</Text>
-            <Text style={tw`text-white/70 text-xs text-center`}>
-              Step back so your whole body fits inside the frame
+            <Text style={tw`text-white text-sm font-bold`}>Looking for you…</Text>
+            <Text style={tw`text-white/70 text-[11px] text-center`}>
+              Step back so your whole body fits in frame
             </Text>
           </View>
         </View>
       )}
 
-      {/* ───── Bottom panel ───── */}
+      {/* ───── Bottom panel (compact: ~170px tall) ───── */}
       <View
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          paddingHorizontal: 16,
-          paddingTop: 16,
-          paddingBottom: Math.max(insets.bottom + 12, 24),
+          paddingHorizontal: 14,
+          paddingTop: 10,
+          paddingBottom: Math.max(insets.bottom + 8, 16),
         }}
       >
-        {/* Joint angle chips (live data) */}
+        {/* Single-row joint chips (max 3) */}
         {Object.keys(angles).length > 0 && (
-          <View style={tw`flex-row flex-wrap gap-2 mb-3`}>
+          <View style={tw`flex-row gap-1.5 mb-2`}>
             {Object.entries(angles)
-              .filter(([k, v]) => typeof v === 'number' && k !== 'targets')
-              .slice(0, 4)
+              .filter(([k, v]) => typeof v === 'number' && k.endsWith('_avg'))
+              .slice(0, 3)
               .map(([k, v]) => (
-                <View key={k} style={tw`px-2.5 py-1 rounded-full bg-white/10 border border-white/10 flex-row gap-1.5`}>
-                  <Text style={tw`text-white/70 text-[10px] font-bold uppercase`}>{prettyJoint(k)}</Text>
+                <View key={k} style={tw`px-2 py-0.5 rounded-full bg-white/15 flex-row gap-1`}>
+                  <Text style={tw`text-white/70 text-[10px] font-bold uppercase`}>{prettyJoint(k.replace('_avg', ''))}</Text>
                   <Text style={tw`text-white text-[10px] font-black`}>{Math.round(v as number)}°</Text>
                 </View>
               ))}
           </View>
         )}
 
-        {/* Primary stat cards (reps or hold) + set counter */}
-        <View style={tw`flex-row gap-3 mb-4`}>
+        {/* Reps/hold + sets — compact single row */}
+        <View style={tw`flex-row gap-2 mb-2`}>
           {isHold ? (
             <View
               style={[
-                tw`flex-1 rounded-2xl px-4 py-3`,
+                tw`flex-1 rounded-xl px-3 py-2`,
                 {
-                  backgroundColor: holding ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.1)',
+                  backgroundColor: holding ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.1)',
                   borderWidth: 1,
-                  borderColor: holding ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.15)',
+                  borderColor: holding ? 'rgba(34,197,94,0.55)' : 'rgba(255,255,255,0.15)',
                 },
               ]}
             >
               <View style={tw`flex-row items-center justify-between`}>
-                <Text style={tw`text-white/70 text-[10px] font-bold uppercase tracking-widest`}>
+                <Text style={tw`text-white/70 text-[9px] font-bold uppercase tracking-widest`}>
                   Hold {holding ? '· Holding' : '· Off form'}
                 </Text>
                 <TouchableOpacity onPress={resetCurrent} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <MaterialIcons name="refresh" size={14} color="rgba(255,255,255,0.6)" />
+                  <MaterialIcons name="refresh" size={12} color="rgba(255,255,255,0.6)" />
                 </TouchableOpacity>
               </View>
-              <View style={tw`flex-row items-baseline gap-1.5 mt-1`}>
-                <Text style={tw`text-white text-3xl font-black`}>{holdSeconds}s</Text>
-                <Text style={tw`text-white/50 text-sm font-bold`}>/ {targetHoldSeconds}s</Text>
+              <View style={tw`flex-row items-baseline gap-1`}>
+                <Text style={tw`text-white text-2xl font-black`}>{holdSeconds}s</Text>
+                <Text style={tw`text-white/50 text-xs font-bold`}>/ {targetHoldSeconds}s</Text>
               </View>
             </View>
           ) : (
-            <View style={tw`flex-1 bg-white/10 border border-white/15 rounded-2xl px-4 py-3`}>
+            <View style={tw`flex-1 bg-white/10 border border-white/15 rounded-xl px-3 py-2`}>
               <View style={tw`flex-row items-center justify-between`}>
-                <Text style={tw`text-white/70 text-[10px] font-bold uppercase tracking-widest`}>
+                <Text style={tw`text-white/70 text-[9px] font-bold uppercase tracking-widest`}>
                   Reps · auto
                 </Text>
                 <TouchableOpacity onPress={resetCurrent} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <MaterialIcons name="refresh" size={14} color="rgba(255,255,255,0.6)" />
+                  <MaterialIcons name="refresh" size={12} color="rgba(255,255,255,0.6)" />
                 </TouchableOpacity>
               </View>
-              <View style={tw`flex-row items-baseline gap-1.5 mt-1`}>
-                <Text style={tw`text-white text-3xl font-black`}>{reps}</Text>
-                <Text style={tw`text-white/50 text-sm font-bold`}>/ {targetReps}</Text>
+              <View style={tw`flex-row items-baseline gap-1`}>
+                <Text style={tw`text-white text-2xl font-black`}>{reps}</Text>
+                <Text style={tw`text-white/50 text-xs font-bold`}>/ {targetReps}</Text>
               </View>
             </View>
           )}
 
-          <View style={tw`flex-1 bg-white/10 border border-white/15 rounded-2xl px-4 py-3`}>
-            <Text style={tw`text-white/70 text-[10px] font-bold uppercase tracking-widest`}>Set</Text>
-            <View style={tw`flex-row items-baseline gap-1.5 mt-1`}>
-              <Text style={tw`text-white text-3xl font-black`}>{currentSet}</Text>
-              <Text style={tw`text-white/50 text-sm font-bold`}>/ {targetSets}</Text>
+          <View style={tw`flex-1 bg-white/10 border border-white/15 rounded-xl px-3 py-2`}>
+            <Text style={tw`text-white/70 text-[9px] font-bold uppercase tracking-widest`}>Set</Text>
+            <View style={tw`flex-row items-baseline gap-1`}>
+              <Text style={tw`text-white text-2xl font-black`}>{currentSet}</Text>
+              <Text style={tw`text-white/50 text-xs font-bold`}>/ {targetSets}</Text>
             </View>
           </View>
         </View>
 
         {/* AI offline banner */}
         {analysisError && aiBackendOk === false && (
-          <View style={tw`bg-red-500/15 border border-red-500/30 rounded-xl px-3 py-2 mb-3 flex-row items-center gap-2`}>
-            <MaterialIcons name="error-outline" size={16} color="#ef4444" />
-            <Text style={tw`text-red-300 text-xs flex-1`}>
-              AI server unreachable — your timer still works.
+          <View style={tw`bg-red-500/15 border border-red-500/30 rounded-lg px-2.5 py-1.5 mb-2 flex-row items-center gap-1.5`}>
+            <MaterialIcons name="error-outline" size={14} color="#ef4444" />
+            <Text style={tw`text-red-300 text-[11px] flex-1`}>
+              AI server unreachable — timer still works.
             </Text>
           </View>
         )}
 
         {/* Pause + Stop */}
-        <View style={tw`flex-row gap-3`}>
+        <View style={tw`flex-row gap-2`}>
           <TouchableOpacity
             onPress={togglePause}
             style={[
-              tw`flex-1 flex-row items-center justify-center gap-2 py-4 rounded-2xl`,
+              tw`flex-1 flex-row items-center justify-center gap-1.5 py-3 rounded-xl`,
               {
                 backgroundColor: sessionState === 'paused' ? '#22c55e' : 'rgba(255,255,255,0.15)',
                 borderWidth: 1,
@@ -482,18 +491,18 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
               },
             ]}
           >
-            <MaterialIcons name={sessionState === 'paused' ? 'play-arrow' : 'pause'} size={22} color="white" />
-            <Text style={tw`text-white text-base font-black uppercase tracking-wider`}>
+            <MaterialIcons name={sessionState === 'paused' ? 'play-arrow' : 'pause'} size={18} color="white" />
+            <Text style={tw`text-white text-sm font-black uppercase tracking-wider`}>
               {sessionState === 'paused' ? 'Resume' : 'Pause'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleStop}
-            style={tw`flex-1 flex-row items-center justify-center gap-2 py-4 rounded-2xl bg-red-500`}
+            style={tw`flex-1 flex-row items-center justify-center gap-1.5 py-3 rounded-xl bg-red-500`}
           >
-            <MaterialIcons name="stop" size={22} color="white" />
-            <Text style={tw`text-white text-base font-black uppercase tracking-wider`}>Stop</Text>
+            <MaterialIcons name="stop" size={18} color="white" />
+            <Text style={tw`text-white text-sm font-black uppercase tracking-wider`}>Stop</Text>
           </TouchableOpacity>
         </View>
       </View>
