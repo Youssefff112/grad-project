@@ -18,8 +18,8 @@ export const dietService = {
     return this._generateDietPlanForUser(userId);
   },
 
-  async generateDietPlanForUser(targetUserId, coachId) {
-    return this._generateDietPlanForUser(targetUserId, coachId);
+  async generateDietPlanForUser(targetUserId, coachId, planName = null) {
+    return this._generateDietPlanForUser(targetUserId, coachId, planName);
   },
 
   async getActiveDietPlan(userId) {
@@ -113,7 +113,7 @@ export const dietService = {
     };
   },
 
-  async _generateDietPlanForUser(userId, coachId = null) {
+  async _generateDietPlanForUser(userId, coachId = null, planName = null) {
     const user = await User.findByPk(userId);
     if (!user || !user.profile || !user.profile.goal) {
       throw new AppError('Please complete your profile first', 400);
@@ -153,6 +153,7 @@ export const dietService = {
 
     const dietPlan = await DietPlan.create({
       userId,
+      planName: planName || null,
       goal,
       dietaryPreference,
       dailyCalorieTarget,

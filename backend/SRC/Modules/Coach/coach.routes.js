@@ -32,6 +32,14 @@ router.get('/analytics', authenticate, restrictTo('coach'), requireActiveSubscri
 router.post('/assign/workout', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.assignWorkoutPlan);
 router.post('/assign/diet', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.assignDietPlan);
 
+// Per-client plan management (view, generate, edit)
+router.get('/clients/:clientId/workout-plan', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientWorkoutPlan);
+router.get('/clients/:clientId/diet-plan', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientDietPlan);
+router.post('/clients/:clientId/generate-workout', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.generateWorkoutForClient);
+router.post('/clients/:clientId/generate-diet', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.generateDietForClient);
+router.patch('/plans/workout/:planId', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.updateClientWorkoutPlan);
+router.patch('/plans/diet/:planId', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.updateClientDietPlan);
+
 // Parameterized client-facing routes (after specific routes)
 router.get('/:coachId/detail', coachController.getCoachDetail);
 router.get('/:coachId/reviews', coachController.getCoachReviews);

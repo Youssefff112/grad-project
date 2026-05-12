@@ -246,3 +246,41 @@ export const assignDietToClient = async (
 ): Promise<void> => {
   await apiPost('/coach/assign/diet', { clientId, ...planData });
 };
+
+// ─── Per-client plan management ───────────────────────────────────────────────
+
+export const getClientWorkoutPlan = async (clientId: number): Promise<{ plan: any | null }> => {
+  const response = await apiGet(`/coach/clients/${clientId}/workout-plan`);
+  return { plan: response.data?.plan ?? null };
+};
+
+export const getClientDietPlan = async (clientId: number): Promise<{ plan: any | null }> => {
+  const response = await apiGet(`/coach/clients/${clientId}/diet-plan`);
+  return { plan: response.data?.plan ?? null };
+};
+
+export const generateWorkoutForClient = async (clientId: number): Promise<{ plan: any }> => {
+  const response = await apiPost(`/coach/clients/${clientId}/generate-workout`, {});
+  return { plan: response.data?.plan };
+};
+
+export const generateDietForClient = async (clientId: number): Promise<{ plan: any }> => {
+  const response = await apiPost(`/coach/clients/${clientId}/generate-diet`, {});
+  return { plan: response.data?.plan };
+};
+
+export const updateClientWorkoutPlan = async (
+  planId: number,
+  updates: { weeklySchedule?: any; planName?: string }
+): Promise<{ plan: any }> => {
+  const response = await apiPatch(`/coach/plans/workout/${planId}`, updates);
+  return { plan: response.data?.plan };
+};
+
+export const updateClientDietPlan = async (
+  planId: number,
+  updates: { weeklyMealPlan?: any; dailyCalorieTarget?: number; macronutrients?: any; planName?: string }
+): Promise<{ plan: any }> => {
+  const response = await apiPatch(`/coach/plans/diet/${planId}`, updates);
+  return { plan: response.data?.plan };
+};

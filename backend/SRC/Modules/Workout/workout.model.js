@@ -1,6 +1,7 @@
 // src/Modules/Workout/workout.model.js
 import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '../../../DB/connection.js';
+import { User } from '../User/user.model.js';
 
 export class WorkoutPlan extends Model {}
 export class WorkoutLog extends Model {}
@@ -9,6 +10,10 @@ WorkoutPlan.init({
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false
+  },
+  planName: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   goal: {
     type: DataTypes.ENUM('weight_loss', 'muscle_gain', 'maintenance', 'endurance'),
@@ -103,4 +108,14 @@ WorkoutLog.init({
     { fields: ['workoutPlanId'] }
   ]
 });
+
+// Associations
+User.hasMany(WorkoutPlan, { foreignKey: 'userId', as: 'workoutPlans' });
+WorkoutPlan.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+WorkoutPlan.hasMany(WorkoutLog, { foreignKey: 'workoutPlanId', as: 'logs' });
+WorkoutLog.belongsTo(WorkoutPlan, { foreignKey: 'workoutPlanId', as: 'plan' });
+
+User.hasMany(WorkoutLog, { foreignKey: 'userId', as: 'workoutLogs' });
+WorkoutLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 

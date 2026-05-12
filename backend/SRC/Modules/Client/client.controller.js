@@ -30,6 +30,15 @@ export const clientController = {
     }
   },
 
+  async removeCoach(req, res, next) {
+    try {
+      const profile = await clientService.removeCoach(req.user.id);
+      successResponse(res, 200, 'Coach removed', { profile });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getSubscriptionStatus(req, res, next) {
     try {
       const subscription = await clientService.getSubscriptionStatus(req.user.id);

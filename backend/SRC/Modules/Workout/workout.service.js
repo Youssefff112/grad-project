@@ -19,8 +19,8 @@ export const workoutService = {
     return this._generateWorkoutPlanForUser(userId, null, location, equipment);
   },
 
-  async generateWorkoutPlanForUser(targetUserId, coachId) {
-    return this._generateWorkoutPlanForUser(targetUserId, coachId, null, null);
+  async generateWorkoutPlanForUser(targetUserId, coachId, planName = null) {
+    return this._generateWorkoutPlanForUser(targetUserId, coachId, null, null, planName);
   },
 
   async getActiveWorkoutPlan(userId) {
@@ -127,7 +127,7 @@ export const workoutService = {
     };
   },
 
-  async _generateWorkoutPlanForUser(userId, coachId = null, location = null, equipment = null) {
+  async _generateWorkoutPlanForUser(userId, coachId = null, location = null, equipment = null, planName = null) {
     const user = await User.findByPk(userId);
     if (!user || !user.profile || !user.profile.goal || !user.profile.experienceLevel) {
       throw new AppError('Please complete your profile first', 400);
@@ -161,6 +161,7 @@ export const workoutService = {
 
     const workoutPlan = await WorkoutPlan.create({
       userId,
+      planName: planName || null,
       goal,
       experienceLevel,
       weeklySchedule,

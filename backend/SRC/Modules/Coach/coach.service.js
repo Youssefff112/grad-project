@@ -16,7 +16,7 @@ export const coachService = {
     const { specialty, minRating, page = 1, limit = 20 } = filters;
     const offset = (page - 1) * limit;
 
-    const where = {};
+    const where = { isApproved: true };
     if (minRating) {
       where.rating = { [Op.gte]: minRating };
     }
@@ -24,6 +24,7 @@ export const coachService = {
     // Filter by specialty if provided
     let query = {
       where,
+      include: [{ model: User, as: 'User', attributes: ['id', 'firstName', 'lastName', 'email'] }],
       order: [['rating', 'DESC']],
       limit,
       offset
@@ -102,10 +103,19 @@ export const coachService = {
       : [];
 
     const userMap = new Map(users.map(user => [user.id, user]));
-    const clients = rows.map(row => ({
-      profile: row,
-      user: userMap.get(row.userId) || null
-    }));
+
+    // Return flat objects that match the CoachClient interface on the frontend
+    const clients = rows.map(row => {
+      const user = userMap.get(row.userId);
+      return {
+        ...row.toJSON(),
+        User: user
+          ? { firstName: user.firstName, lastName: user.lastName, email: user.email }
+          : null,
+        status: 'active',
+        lastActivity: row.updatedAt ? row.updatedAt.toISOString() : null,
+      };
+    });
 
     return {
       clients,

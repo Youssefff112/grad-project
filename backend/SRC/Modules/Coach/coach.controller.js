@@ -3,9 +3,23 @@ import { coachService } from './coach.service.js';
 import { coachReviewService } from './coach.review.service.js';
 import { successResponse } from '../../Utils/successResponse.utils.js';
 import { workoutService } from '../Workout/workout.service.js';
+import { WorkoutPlan } from '../Workout/workout.model.js';
 import { dietService } from '../Diet/diet.service.js';
+import { DietPlan } from '../Diet/diet.model.js';
 import { User } from '../User/user.model.js';
+import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+
+// Resolve the User.id from what might be a ClientProfile.id or a raw User.id.
+// The frontend sends ClientProfile.id (from /coach/clients), so we look it up first.
+async function resolveUserId(clientProfileId) {
+  const profile = await ClientProfile.findByPk(clientProfileId);
+  if (profile) return profile.userId;
+  // Fallback: treat the id as a direct userId
+  const user = await User.findByPk(clientProfileId);
+  if (user && user.role === 'client') return user.id;
+  throw new AppError('Client not found', 404);
+}
 
 export const coachController = {
   async createCoach(req, res, next) {
@@ -87,7 +101,7 @@ export const coachController = {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 20;
       const result = await coachService.getClients(req.user.id, page, limit);
-      successResponse(res, 200, 'Coach clients retrieved', result.clients, result.pagination);
+      successResponse(res, 200, 'Coach clients retrieved', { clients: result.clients }, result.pagination);
     } catch (error) {
       next(error);
     }
@@ -105,17 +119,13 @@ export const coachController = {
   async assignWorkoutPlan(req, res, next) {
     try {
       await coachService.requireApprovedCoach(req.user.id);
-      const { userId } = req.body;
-      if (!userId) {
-        throw new AppError('userId is required', 400);
+      const { clientId, userId: rawUserId } = req.body;
+      const rawId = clientId || rawUserId;
+      if (!rawId) {
+        throw new AppError('clientId is required', 400);
       }
-
-      const client = await User.findByPk(userId);
-      if (!client || client.role !== 'client') {
-        throw new AppError('Client not found', 404);
-      }
-
-      const plan = await workoutService.generateWorkoutPlanForUser(userId, req.user.id);
+      const resolvedUserId = await resolveUserId(parseInt(rawId));
+      const plan = await workoutService.generateWorkoutPlanForUser(resolvedUserId, req.user.id);
       successResponse(res, 201, 'Workout plan assigned', { plan });
     } catch (error) {
       next(error);
@@ -125,18 +135,112 @@ export const coachController = {
   async assignDietPlan(req, res, next) {
     try {
       await coachService.requireApprovedCoach(req.user.id);
-      const { userId } = req.body;
-      if (!userId) {
-        throw new AppError('userId is required', 400);
+      const { clientId, userId: rawUserId } = req.body;
+      const rawId = clientId || rawUserId;
+      if (!rawId) {
+        throw new AppError('clientId is required', 400);
       }
-
-      const client = await User.findByPk(userId);
-      if (!client || client.role !== 'client') {
-        throw new AppError('Client not found', 404);
-      }
-
-      const plan = await dietService.generateDietPlanForUser(userId, req.user.id);
+      const resolvedUserId = await resolveUserId(parseInt(rawId));
+      const plan = await dietService.generateDietPlanForUser(resolvedUserId, req.user.id);
       successResponse(res, 201, 'Diet plan assigned', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ─── Per-client plan management ───────────────────────────────────────────
+
+  async getClientWorkoutPlan(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(parseInt(req.params.clientId));
+      const plan = await workoutService.getActiveWorkoutPlan(userId);
+      successResponse(res, 200, 'Client workout plan retrieved', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getClientDietPlan(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(parseInt(req.params.clientId));
+      const plan = await dietService.getActiveDietPlan(userId);
+      successResponse(res, 200, 'Client diet plan retrieved', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async generateWorkoutForClient(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(parseInt(req.params.clientId));
+      const plan = await workoutService.generateWorkoutPlanForUser(userId, req.user.id);
+      successResponse(res, 201, 'Workout plan generated for client', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async generateDietForClient(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(parseInt(req.params.clientId));
+      const plan = await dietService.generateDietPlanForUser(userId, req.user.id);
+      successResponse(res, 201, 'Diet plan generated for client', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updateClientWorkoutPlan(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const { planId } = req.params;
+      const { weeklySchedule, planName } = req.body;
+
+      const plan = await WorkoutPlan.findByPk(parseInt(planId));
+      if (!plan) {
+        throw new AppError('Workout plan not found', 404);
+      }
+      if (plan.assignedByCoachId !== req.user.id) {
+        throw new AppError('You can only edit plans you assigned', 403);
+      }
+
+      if (weeklySchedule !== undefined) plan.weeklySchedule = weeklySchedule;
+      if (planName !== undefined) plan.planName = planName;
+      plan.assignedAt = new Date();
+      await plan.save();
+
+      successResponse(res, 200, 'Workout plan updated', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updateClientDietPlan(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const { planId } = req.params;
+      const { weeklyMealPlan, dailyCalorieTarget, macronutrients, planName } = req.body;
+
+      const plan = await DietPlan.findByPk(parseInt(planId));
+      if (!plan) {
+        throw new AppError('Diet plan not found', 404);
+      }
+      if (plan.assignedByCoachId !== req.user.id) {
+        throw new AppError('You can only edit plans you assigned', 403);
+      }
+
+      if (weeklyMealPlan !== undefined) plan.weeklyMealPlan = weeklyMealPlan;
+      if (dailyCalorieTarget !== undefined) plan.dailyCalorieTarget = dailyCalorieTarget;
+      if (macronutrients !== undefined) plan.macronutrients = macronutrients;
+      if (planName !== undefined) plan.planName = planName;
+      plan.assignedAt = new Date();
+      await plan.save();
+
+      successResponse(res, 200, 'Diet plan updated', { plan });
     } catch (error) {
       next(error);
     }

@@ -10,6 +10,7 @@ router.use(authenticate, restrictTo('client'));
 router.get('/profile', clientController.getProfile);
 router.patch('/profile', clientController.updateProfile);
 router.post('/coach', clientController.selectCoach);
+router.delete('/coach', clientController.removeCoach);
 router.get('/subscription', clientController.getSubscriptionStatus);
 
 export default router;

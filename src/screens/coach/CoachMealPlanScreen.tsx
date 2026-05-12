@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -15,11 +15,6 @@ interface Meal {
   fat: number;
 }
 
-interface DayPlan {
-  day: string;
-  meals: { type: string; items: Meal[] }[];
-}
-
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
 const MOCK_FOOD_SUGGESTIONS = [
@@ -29,14 +24,51 @@ const MOCK_FOOD_SUGGESTIONS = [
   { id: '4', name: 'Sweet Potato (200g)', calories: 172, protein: 3, carbs: 40, fat: 0 },
   { id: '5', name: 'Greek Yogurt (200g)', calories: 130, protein: 17, carbs: 10, fat: 2 },
   { id: '6', name: 'Oats (80g)', calories: 300, protein: 10, carbs: 54, fat: 5 },
+  { id: '7', name: 'Salmon (150g)', calories: 312, protein: 30, carbs: 0, fat: 20 },
+  { id: '8', name: 'Avocado (100g)', calories: 160, protein: 2, carbs: 9, fat: 15 },
 ];
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+function mealTypeLabel(type: string): string {
+  const t = (type || '').toLowerCase();
+  if (t.includes('breakfast')) return 'Breakfast';
+  if (t.includes('lunch')) return 'Lunch';
+  if (t.includes('dinner')) return 'Dinner';
+  return 'Snack';
+}
+
+// Map backend weeklyMealPlan → UI dayPlans format
+function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; items: Meal[] }[]> {
+  const result: Record<string, { type: string; items: Meal[] }[]> = {};
+  weeklyMealPlan.forEach((dayEntry: any) => {
+    const idx = DAY_FULL_NAMES.indexOf((dayEntry.day || '').toLowerCase());
+    if (idx === -1) return;
+    const label = DAY_LABELS[idx];
+    const groupMap: Record<string, Meal[]> = {};
+    (dayEntry.meals || []).forEach((meal: any, i: number) => {
+      const typeKey = mealTypeLabel(meal.type || meal.mealType || '');
+      const nutrition = meal.nutrition || meal.macros || {};
+      const item: Meal = {
+        id: `${label}-${typeKey}-${i}`,
+        name: meal.name || meal.description || 'Meal',
+        calories: nutrition.calories || meal.calories || 0,
+        protein: nutrition.protein || meal.protein || 0,
+        carbs: nutrition.carbs || nutrition.carbohydrates || meal.carbs || 0,
+        fat: nutrition.fats || nutrition.fat || meal.fat || 0,
+      };
+      if (!groupMap[typeKey]) groupMap[typeKey] = [];
+      groupMap[typeKey].push(item);
+    });
+    result[label] = Object.entries(groupMap).map(([type, items]) => ({ type, items }));
+  });
+  return result;
+}
 
 export const CoachMealPlanScreen = ({ navigation, route }: any) => {
-  const { clientId, clientName } = route?.params ?? {};
+  const { clientId, clientName, existingPlan } = route?.params ?? {};
   const { isDark, accent } = useTheme();
-  const [isSaving, setIsSaving] = useState(false);
 
   const [planName, setPlanName] = useState('');
   const [calorieTarget, setCalorieTarget] = useState('2000');
@@ -44,6 +76,21 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   const [selectedMealType, setSelectedMealType] = useState('Breakfast');
   const [dayPlans, setDayPlans] = useState<Record<string, { type: string; items: Meal[] }[]>>({});
   const [showFoodPicker, setShowFoodPicker] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const editingPlanId: number | null = existingPlan?.id ?? null;
+
+  useEffect(() => {
+    if (existingPlan) {
+      setPlanName(existingPlan.planName || `${existingPlan.goal || 'Diet'} Plan`);
+      if (existingPlan.dailyCalorieTarget) {
+        setCalorieTarget(String(existingPlan.dailyCalorieTarget));
+      }
+      const mapped = mapMealPlanToUI(existingPlan.weeklyMealPlan || []);
+      setDayPlans(mapped);
+    }
+  }, []);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -52,26 +99,47 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
   const getDayMeals = (day: string) => dayPlans[day] || [];
 
-  const getDayCalories = (day: string) => {
-    return getDayMeals(day).reduce((total, mealGroup) =>
-      total + mealGroup.items.reduce((t, item) => t + item.calories, 0), 0);
-  };
+  const getDayCalories = (day: string) =>
+    getDayMeals(day).reduce((total, group) =>
+      total + group.items.reduce((t, item) => t + item.calories, 0), 0);
 
-  const addFoodToDay = (food: Meal) => {
+  const addFoodToDay = (food: typeof MOCK_FOOD_SUGGESTIONS[0]) => {
+    const mealItem: Meal = { ...food };
     setDayPlans(prev => {
       const dayData = prev[selectedDay] || [];
-      const mealGroup = dayData.find(g => g.type === selectedMealType);
-      if (mealGroup) {
+      const existing = dayData.find(g => g.type === selectedMealType);
+      if (existing) {
         return {
           ...prev,
           [selectedDay]: dayData.map(g =>
-            g.type === selectedMealType ? { ...g, items: [...g.items, food] } : g
+            g.type === selectedMealType ? { ...g, items: [...g.items, mealItem] } : g
           ),
         };
       }
-      return { ...prev, [selectedDay]: [...dayData, { type: selectedMealType, items: [food] }] };
+      return { ...prev, [selectedDay]: [...dayData, { type: selectedMealType, items: [mealItem] }] };
     });
     setShowFoodPicker(false);
+  };
+
+  const handleGenerateWithAI = async () => {
+    if (!clientId) {
+      Alert.alert('No Client', 'Select a client first to generate a plan.');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { plan } = await coachService.generateDietForClient(Number(clientId));
+      if (plan) {
+        setPlanName(plan.planName || `${plan.goal || 'Diet'} Plan`);
+        if (plan.dailyCalorieTarget) setCalorieTarget(String(plan.dailyCalorieTarget));
+        setDayPlans(mapMealPlanToUI(plan.weeklyMealPlan || []));
+        Alert.alert('Plan Generated', 'The AI diet plan has been loaded. Review and edit it before saving.');
+      }
+    } catch (err: any) {
+      Alert.alert('Generation Failed', err?.message || 'Could not generate a plan. Make sure the client has completed their profile.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSave = async () => {
@@ -81,9 +149,9 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     }
     setIsSaving(true);
     try {
-      const weeklyMealPlan = DAYS.map(day => ({
-        day,
-        meals: (dayPlans[day] || []).flatMap(group =>
+      const weeklyMealPlan = DAY_LABELS.map((label, i) => ({
+        day: DAY_FULL_NAMES[i],
+        meals: (dayPlans[label] || []).flatMap(group =>
           group.items.map(item => ({
             type: group.type.toLowerCase() as any,
             name: item.name,
@@ -94,13 +162,24 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           }))
         ),
       }));
-      const planData = {
-        planName,
-        dailyCalorieTarget: parseInt(calorieTarget, 10) || 2000,
-        weeklyMealPlan,
-      };
-      if (clientId) {
-        await coachService.assignDietToClient(Number(clientId), planData);
+
+      const caloriesNum = parseInt(calorieTarget, 10) || 2000;
+
+      if (editingPlanId) {
+        await coachService.updateClientDietPlan(editingPlanId, {
+          weeklyMealPlan,
+          dailyCalorieTarget: caloriesNum,
+          planName,
+        });
+        Alert.alert('Plan Updated', `Diet plan "${planName}" has been updated.`, [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      } else if (clientId) {
+        await coachService.assignDietToClient(Number(clientId), {
+          planName,
+          dailyCalorieTarget: caloriesNum,
+          weeklyMealPlan,
+        });
         Alert.alert('Plan Assigned', `Meal plan "${planName}" has been assigned to ${clientName}.`, [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -118,12 +197,14 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      <View style={[tw`flex-row items-center justify-between px-4 py-3`, { borderBottomWidth: 1, borderColor: borderColor, backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
+      <View style={[tw`flex-row items-center justify-between px-4 py-3`, { borderBottomWidth: 1, borderColor, backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={tw`p-1`}>
           <MaterialIcons name="arrow-back" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
         </TouchableOpacity>
         <View style={tw`items-center`}>
-          <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>Meal Plan Builder</Text>
+          <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>
+            {editingPlanId ? 'Edit Meal Plan' : 'Meal Plan Builder'}
+          </Text>
           {clientName && <Text style={[tw`text-xs`, { color: subtextColor }]}>for {clientName}</Text>}
         </View>
         <TouchableOpacity onPress={handleSave} disabled={isSaving} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: isSaving ? accent + '80' : accent }]}>
@@ -132,8 +213,30 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
       </View>
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
+        {/* AI Generate banner */}
+        {clientId && (
+          <TouchableOpacity
+            onPress={handleGenerateWithAI}
+            disabled={isGenerating}
+            style={[tw`flex-row items-center justify-center gap-2 p-3.5 rounded-2xl mb-4`, {
+              backgroundColor: isDark ? '#1e1b4b' : '#ede9fe',
+              borderWidth: 1,
+              borderColor: isDark ? '#4f46e5' : '#a5b4fc',
+            }]}
+          >
+            {isGenerating ? (
+              <ActivityIndicator size="small" color="#6366f1" />
+            ) : (
+              <MaterialIcons name="auto-awesome" size={18} color="#6366f1" />
+            )}
+            <Text style={[tw`text-sm font-bold`, { color: '#6366f1' }]}>
+              {isGenerating ? 'Generating plan…' : editingPlanId ? 'Regenerate with AI' : 'Generate with AI'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Plan Details */}
-        <View style={[tw`p-4 rounded-2xl mb-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
+        <View style={[tw`p-4 rounded-2xl mb-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
           <TextInput
             style={[tw`text-lg font-bold mb-1`, { color: textPrimary }]}
             placeholder="Plan name..."
@@ -157,7 +260,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
         {/* Day selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-4`} contentContainerStyle={tw`px-4 gap-2`}>
-          {DAYS.map(day => {
+          {DAY_LABELS.map(day => {
             const cals = getDayCalories(day);
             const isActive = selectedDay === day;
             return (
@@ -208,16 +311,18 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           return (
             <View style={tw`gap-2 mb-4`}>
               {meals.length === 0 && (
-                <View style={[tw`p-6 rounded-xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
+                <View style={[tw`p-6 rounded-xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
                   <MaterialIcons name="add-circle-outline" size={32} color={subtextColor} />
                   <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No items for {selectedMealType} yet</Text>
                 </View>
               )}
               {meals.map((item, i) => (
-                <View key={i} style={[tw`flex-row items-center p-3 rounded-xl`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
+                <View key={i} style={[tw`flex-row items-center p-3 rounded-xl`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
                   <View style={tw`flex-1`}>
                     <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{item.name}</Text>
-                    <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{item.calories} kcal · P:{item.protein}g · C:{item.carbs}g · F:{item.fat}g</Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
+                      {item.calories} kcal · P:{item.protein}g · C:{item.carbs}g · F:{item.fat}g
+                    </Text>
                   </View>
                   <TouchableOpacity onPress={() => {
                     setDayPlans(prev => ({
@@ -244,16 +349,18 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
 
         {showFoodPicker && (
-          <View style={[tw`mt-3 rounded-2xl overflow-hidden`, { borderWidth: 1, borderColor: borderColor }]}>
+          <View style={[tw`mt-3 rounded-2xl overflow-hidden`, { borderWidth: 1, borderColor }]}>
             {MOCK_FOOD_SUGGESTIONS.map(food => (
               <TouchableOpacity
                 key={food.id}
                 onPress={() => addFoodToDay(food)}
-                style={[tw`flex-row items-center p-4`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor: borderColor }]}
+                style={[tw`flex-row items-center p-4`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor }]}
               >
                 <View style={tw`flex-1`}>
                   <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{food.name}</Text>
-                  <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{food.calories} kcal · P:{food.protein}g · C:{food.carbs}g · F:{food.fat}g</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
+                    {food.calories} kcal · P:{food.protein}g · C:{food.carbs}g · F:{food.fat}g
+                  </Text>
                 </View>
                 <MaterialIcons name="add-circle" size={22} color={accent} />
               </TouchableOpacity>
