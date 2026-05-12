@@ -4,7 +4,12 @@
  *
  * Endpoints used:
  *   POST /analyze-frame       — single-frame angle analysis
- *   POST /test-exercise-base64 — full video clip analysis (base64)
+ *
+ * This module also provides:
+ *  - target-string parsing (the backend sends "70-90°", "170°+", "180° straight")
+ *  - a live `RepDetector` that counts reps from angle cycles
+ *  - exercise type metadata (rep-based vs isometric hold)
+ *  - form score computation given parsed targets
  */
 
 import axios from 'axios';
@@ -16,51 +21,156 @@ const aiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// ── Types ────────────────────────────────────────────────────────────────────
 export interface FrameAngles {
   [joint: string]: number;
 }
 
-export interface FrameTargets {
-  [joint: string]: [number, number] | { min: number; max: number };
+export interface FrameTargetsRaw {
+  [joint: string]: string;
 }
 
 export interface AnalyzeFrameResult {
   angles: FrameAngles;
-  targets: FrameTargets;
+  targets: FrameTargetsRaw;
+  /** True when MediaPipe successfully detected a person in the frame. */
+  poseDetected: boolean;
 }
 
+export interface ParsedTarget {
+  min: number;
+  max: number;
+}
+
+export type ExerciseType = 'reps' | 'hold';
+
+export interface ExerciseProfile {
+  /** Slug recognised by the AI backend. */
+  slug: string;
+  /** UI label. */
+  display: string;
+  /** Whether this is rep-counted or hold-timed. */
+  type: ExerciseType;
+  /** For rep-counted exercises: the joint angle key (e.g. 'knee_avg') and the
+   * angle thresholds that define the "bottom" and "top" of one rep. */
+  rep?: {
+    angleKey: string;
+    /** Going below `down` is the bottom of a rep. */
+    down: number;
+    /** Going above `up` is the top of a rep. */
+    up: number;
+    /** Some exercises (like curls) are inverted — "down" is the high-angle
+     * extended position, "up" is the low-angle contracted position. */
+    inverted?: boolean;
+  };
+  /** For hold exercises: the joint angle key and the range that counts as "in form". */
+  hold?: {
+    angleKey: string;
+    minAngle: number;
+    maxAngle: number;
+  };
+}
+
+// ── Exercise profiles ────────────────────────────────────────────────────────
+const EXERCISE_PROFILES: ExerciseProfile[] = [
+  {
+    slug: 'squat',
+    display: 'Squat',
+    type: 'reps',
+    rep: { angleKey: 'knee_avg', down: 110, up: 160 },
+  },
+  {
+    slug: 'deadlift',
+    display: 'Deadlift',
+    type: 'reps',
+    rep: { angleKey: 'knee_avg', down: 130, up: 165 },
+  },
+  {
+    slug: 'pushup',
+    display: 'Push-Up',
+    type: 'reps',
+    rep: { angleKey: 'elbow_avg', down: 110, up: 160 },
+  },
+  {
+    slug: 'bench',
+    display: 'Bench Press',
+    type: 'reps',
+    rep: { angleKey: 'elbow_avg', down: 100, up: 160 },
+  },
+  {
+    slug: 'bicep_curl',
+    display: 'Bicep Curl',
+    type: 'reps',
+    rep: { angleKey: 'elbow_avg', down: 60, up: 150, inverted: true },
+  },
+  {
+    slug: 'ohp',
+    display: 'Overhead Press',
+    type: 'reps',
+    rep: { angleKey: 'elbow_avg', down: 90, up: 160 },
+  },
+  {
+    slug: 'row',
+    display: 'Row',
+    type: 'reps',
+    rep: { angleKey: 'elbow_avg', down: 80, up: 160, inverted: true },
+  },
+  {
+    slug: 'lunge',
+    display: 'Lunge',
+    type: 'reps',
+    rep: { angleKey: 'knee_avg', down: 110, up: 165 },
+  },
+  {
+    slug: 'plank',
+    display: 'Plank',
+    type: 'hold',
+    hold: { angleKey: 'body_avg', minAngle: 160, maxAngle: 195 },
+  },
+];
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
 /**
- * Map UI exercise names → AI backend slugs.
- * Backend recognises: squat, deadlift, bench, pushup, plank, lunge, row, ohp
+ * Resolve a UI exercise name to a profile (slug, type, thresholds).
+ * Falls back to "Squat" for unknown names.
  */
-export const normalizeExerciseName = (name: string): string => {
+export const getExerciseProfile = (name: string): ExerciseProfile => {
   const n = (name || '').toLowerCase().trim();
-  if (n.includes('squat')) return 'squat';
-  if (n.includes('deadlift')) return 'deadlift';
-  if (n.includes('bench')) return 'bench';
-  if (n.includes('push')) return 'pushup';
-  if (n.includes('plank')) return 'plank';
-  if (n.includes('lunge')) return 'lunge';
-  if (n.includes('row')) return 'row';
-  if (n.includes('overhead') || n.includes('press') || n.includes('ohp')) return 'ohp';
-  return 'squat';
+  if (n.includes('plank')) return EXERCISE_PROFILES.find((p) => p.slug === 'plank')!;
+  if (n.includes('curl') || n.includes('bicep')) return EXERCISE_PROFILES.find((p) => p.slug === 'bicep_curl')!;
+  if (n.includes('overhead') || n.includes('ohp') || n.includes('shoulder press')) return EXERCISE_PROFILES.find((p) => p.slug === 'ohp')!;
+  if (n.includes('bench')) return EXERCISE_PROFILES.find((p) => p.slug === 'bench')!;
+  if (n.includes('push')) return EXERCISE_PROFILES.find((p) => p.slug === 'pushup')!;
+  if (n.includes('deadlift')) return EXERCISE_PROFILES.find((p) => p.slug === 'deadlift')!;
+  if (n.includes('row')) return EXERCISE_PROFILES.find((p) => p.slug === 'row')!;
+  if (n.includes('lunge')) return EXERCISE_PROFILES.find((p) => p.slug === 'lunge')!;
+  if (n.includes('squat')) return EXERCISE_PROFILES.find((p) => p.slug === 'squat')!;
+  return EXERCISE_PROFILES[0];
 };
+
+/** Backwards-compat helper used by older code. */
+export const normalizeExerciseName = (name: string): string => getExerciseProfile(name).slug;
 
 /**
  * Send a single frame (base64 JPEG/PNG, with or without data: prefix) to the
- * AI backend and get back joint angles plus per-joint target ranges.
+ * AI backend and get back joint angles plus per-joint target strings.
  */
 export const analyzeFrame = async (
   imageBase64: string,
   exerciseName: string,
 ): Promise<AnalyzeFrameResult> => {
+  const profile = getExerciseProfile(exerciseName);
   const res = await aiClient.post('/analyze-frame', {
     image_base64: imageBase64,
-    exercise_name: normalizeExerciseName(exerciseName),
+    exercise_name: profile.slug,
   });
+  const angles = (res.data?.angles ?? {}) as FrameAngles;
+  const targets = (res.data?.targets ?? {}) as FrameTargetsRaw;
   return {
-    angles: (res.data?.angles ?? {}) as FrameAngles,
-    targets: (res.data?.targets ?? {}) as FrameTargets,
+    angles,
+    targets,
+    poseDetected: Object.keys(angles).length > 0,
   };
 };
 
@@ -77,49 +187,166 @@ export const checkAIBackendHealth = async (): Promise<boolean> => {
 };
 
 /**
- * Compute an overall "form score" 0–100 from joint angles vs target ranges.
- * Each joint inside its target range scores 100; outside drops linearly with the
- * distance from the nearest bound (clamped at 0).
+ * Parse a target string from the backend into a {min, max} numeric range.
+ * Examples handled:
+ *   "70-90°"          → { min: 70, max: 90 }
+ *   "170°+"           → { min: 170, max: 195 }
+ *   "180° straight"   → { min: 175, max: 195 }
+ *   "30-45°"          → { min: 30, max: 45 }
+ *   "165-180°"        → { min: 165, max: 195 }
+ */
+export const parseTarget = (raw: string): ParsedTarget | null => {
+  if (!raw || typeof raw !== 'string') return null;
+
+  // "min-max"
+  const range = raw.match(/(\d+)\s*-\s*(\d+)/);
+  if (range) {
+    const min = parseInt(range[1], 10);
+    let max = parseInt(range[2], 10);
+    // Treat "165-180°" as "165 and above" — straight extension.
+    if (max >= 165 && max <= 180) max = 195;
+    return { min, max };
+  }
+
+  // "N+"
+  const plus = raw.match(/(\d+)\s*°?\s*\+/);
+  if (plus) {
+    const n = parseInt(plus[1], 10);
+    return { min: n, max: 195 };
+  }
+
+  // "180° straight" / "180°" → a tight band around N
+  const single = raw.match(/(\d+)\s*°/);
+  if (single) {
+    const n = parseInt(single[1], 10);
+    return { min: Math.max(0, n - 10), max: Math.min(195, n + 15) };
+  }
+
+  return null;
+};
+
+/**
+ * Compute an overall form score (0–100) from joint angles and target strings.
+ * Each joint inside its target range scores 100; outside drops linearly with
+ * the distance from the nearest bound.
+ *
+ * The backend keys for *targets* don't always match the *angle* keys exactly
+ * (e.g. target key "knee_bottom" but angle keys "knee_left/knee_right/knee_avg").
+ * For each target, we pick the closest matching angle.
  */
 export const computeFormScore = (
   angles: FrameAngles,
-  targets: FrameTargets,
+  targets: FrameTargetsRaw,
 ): number => {
-  const entries = Object.entries(targets);
-  if (entries.length === 0) return 0;
+  const angleKeys = Object.keys(angles);
+  if (angleKeys.length === 0) return 0;
+
+  const targetEntries = Object.entries(targets || {});
+  if (targetEntries.length === 0) return 0;
 
   let total = 0;
   let count = 0;
 
-  for (const [joint, target] of entries) {
-    const angle = angles[joint];
+  for (const [targetKey, rawTarget] of targetEntries) {
+    const parsed = parseTarget(rawTarget);
+    if (!parsed) continue;
+
+    // Find an angle whose name shares the joint prefix with the target key.
+    const tk = targetKey.toLowerCase();
+    const joint =
+      tk.startsWith('knee') ? 'knee' :
+      tk.startsWith('elbow') ? 'elbow' :
+      tk.startsWith('hip') ? 'hip' :
+      tk.startsWith('body') ? 'body' :
+      tk.startsWith('shoulder') ? 'shoulder' :
+      null;
+    if (!joint) continue;
+
+    const matchKey = angleKeys.find((k) => k.startsWith(`${joint}_avg`))
+                  ?? angleKeys.find((k) => k.startsWith(joint));
+    if (!matchKey) continue;
+
+    const angle = angles[matchKey];
     if (typeof angle !== 'number') continue;
 
-    let min: number;
-    let max: number;
-    if (Array.isArray(target)) {
-      [min, max] = target;
-    } else if (target && typeof target === 'object' && 'min' in target && 'max' in target) {
-      min = (target as { min: number; max: number }).min;
-      max = (target as { min: number; max: number }).max;
+    let s: number;
+    if (angle >= parsed.min && angle <= parsed.max) {
+      s = 100;
     } else {
-      continue;
+      const distance = angle < parsed.min ? parsed.min - angle : angle - parsed.max;
+      s = Math.max(0, 100 - distance * 2);
     }
-
-    let score: number;
-    if (angle >= min && angle <= max) {
-      score = 100;
-    } else {
-      const distance = angle < min ? min - angle : angle - max;
-      // Lose 2 points per degree out of range, floor at 0
-      score = Math.max(0, 100 - distance * 2);
-    }
-
-    total += score;
+    total += s;
     count += 1;
   }
 
   return count === 0 ? 0 : Math.round(total / count);
+};
+
+// ── Rep detector (live, frontend-side) ──────────────────────────────────────
+/**
+ * Cycle-based rep counter. Feed it joint angles over time; it tracks state
+ * (top ↔ bottom) and emits one rep per full cycle.
+ *
+ * For "normal" exercises (squat, push-up):
+ *   bottom = angle ≤ down threshold
+ *   top    = angle ≥ up threshold
+ *   1 rep  = bottom → top
+ *
+ * For "inverted" exercises (bicep curl, row):
+ *   bottom (extended) = angle ≥ up threshold
+ *   top (contracted)  = angle ≤ down threshold
+ *   1 rep             = bottom → top
+ */
+export class RepDetector {
+  private profile: ExerciseProfile;
+  private phase: 'top' | 'bottom' | 'unknown' = 'unknown';
+
+  constructor(profile: ExerciseProfile) {
+    this.profile = profile;
+  }
+
+  /** Returns 1 when a new rep is detected, 0 otherwise. */
+  update(angles: FrameAngles): number {
+    const rep = this.profile.rep;
+    if (!rep) return 0;
+    const value = angles[rep.angleKey];
+    if (typeof value !== 'number') return 0;
+
+    const inverted = !!rep.inverted;
+    const bottomCondition = inverted ? value >= rep.up : value <= rep.down;
+    const topCondition = inverted ? value <= rep.down : value >= rep.up;
+
+    let counted = 0;
+    if (bottomCondition) {
+      this.phase = 'bottom';
+    } else if (topCondition) {
+      if (this.phase === 'bottom') {
+        counted = 1;
+      }
+      this.phase = 'top';
+    }
+    return counted;
+  }
+
+  reset() {
+    this.phase = 'unknown';
+  }
+}
+
+/**
+ * Returns true when the current angle indicates the user is holding good form
+ * for an isometric exercise (used by plank-style hold timers).
+ */
+export const isHoldingForm = (
+  profile: ExerciseProfile,
+  angles: FrameAngles,
+): boolean => {
+  const hold = profile.hold;
+  if (!hold) return false;
+  const value = angles[hold.angleKey];
+  if (typeof value !== 'number') return false;
+  return value >= hold.minAngle && value <= hold.maxAngle;
 };
 
 export default {
@@ -127,4 +354,8 @@ export default {
   checkAIBackendHealth,
   computeFormScore,
   normalizeExerciseName,
+  getExerciseProfile,
+  parseTarget,
+  RepDetector,
+  isHoldingForm,
 };
