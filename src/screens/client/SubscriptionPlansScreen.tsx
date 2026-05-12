@@ -245,7 +245,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
 
         {/* Plans Grid */}
         <View style={tw`flex-col gap-4`}>
-          {plans.map((plan) => (
+          {plans.filter((p) => p.id !== 'ProCoach').map((plan) => (
             <TouchableOpacity
               key={plan.id}
               onPress={() => handleSelectPlan(plan.id)}
@@ -433,7 +433,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                 
                 {/* Plan Indicators */}
                 <View style={tw`flex-row gap-1`}>
-                  {row.rows.map((item, i) => (
+                  {row.rows.filter((item) => item.plan !== 'ProCoach').map((item, i) => (
                     <View 
                       key={i}
                       style={[
@@ -474,10 +474,10 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
           {/* Plan Header */}
           <View style={tw`mt-6 flex-row gap-1 px-0`}>
             <View style={tw`flex-1`} />
-            {['Free', 'Standard', 'Premium', 'ProCoach', 'Elite'].map((plan) => (
+            {['Free', 'Standard', 'Premium', 'Elite'].map((plan) => (
               <View key={plan} style={tw`w-9 items-center`}>
                 <Text style={[tw`text-xs font-bold text-center`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  {plan === 'ProCoach' ? 'Coach' : plan === 'Premium' ? 'AI' : plan}
+                  {plan}
                 </Text>
               </View>
             ))}

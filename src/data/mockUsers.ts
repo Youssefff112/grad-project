@@ -13,13 +13,14 @@ export interface MockUser {
 }
 
 export const MOCK_USERS: MockUser[] = [
+  // ── Clients ────────────────────────────────────────────────────────────
   {
     id: '1',
     fullName: 'Alex Free',
     email: 'alex@free.com',
     password: 'password123',
     subscriptionPlan: 'Free',
-    description: 'Free plan - Basic tracking only',
+    description: 'Client · Free — basic tracking only',
     role: 'client',
   },
   {
@@ -28,7 +29,7 @@ export const MOCK_USERS: MockUser[] = [
     email: 'sam@standard.com',
     password: 'password123',
     subscriptionPlan: 'Standard',
-    description: 'Standard plan - Enhanced tracking',
+    description: 'Client · AI Plan — enhanced tracking',
     role: 'client',
   },
   {
@@ -37,17 +38,8 @@ export const MOCK_USERS: MockUser[] = [
     email: 'petra@premium.com',
     password: 'password123',
     subscriptionPlan: 'Premium',
-    description: 'Premium (AI) plan - AI workouts & meals',
+    description: 'Client · Coach Plan — dedicated coach access',
     role: 'client',
-  },
-  {
-    id: '4',
-    fullName: 'Coach Charlie',
-    email: 'charlie@coach.com',
-    password: 'password123',
-    subscriptionPlan: 'ProCoach',
-    description: 'Pro Coach plan - Dedicated coach support',
-    role: 'coach',
   },
   {
     id: '5',
@@ -55,8 +47,18 @@ export const MOCK_USERS: MockUser[] = [
     email: 'emma@elite.com',
     password: 'password123',
     subscriptionPlan: 'Elite',
-    description: 'Elite plan - Everything included',
+    description: 'Client · Elite — everything included',
     role: 'client',
+  },
+  // ── Staff (separate role, not a client tier) ──────────────────────────
+  {
+    id: '4',
+    fullName: 'Coach Charlie',
+    email: 'charlie@coach.com',
+    password: 'password123',
+    subscriptionPlan: 'ProCoach',
+    description: 'Coach account — manages real clients',
+    role: 'coach',
   },
   {
     id: '6',
@@ -64,7 +66,7 @@ export const MOCK_USERS: MockUser[] = [
     email: 'admin@vertex.com',
     password: 'admin123',
     subscriptionPlan: 'Free',
-    description: 'Admin - Full platform control',
+    description: 'Admin — full platform control',
     role: 'admin',
   },
 ];

@@ -179,101 +179,145 @@ export const SignInScreen = ({ navigation }: any) => {
             <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
               Demo: Quick Login
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
-              <View style={tw`flex-row gap-2`}>
-                {MOCK_USERS.map((user) => (
+
+            {(() => {
+              // Colors per role so it's instantly obvious which chip logs you
+              // into which kind of account.
+              const colorFor = (role: MockUser['role']) => {
+                if (role === 'admin') return '#ef4444';
+                if (role === 'coach') return '#f59e0b';
+                return accent;
+              };
+              const iconFor = (role: MockUser['role']) => {
+                if (role === 'admin') return 'admin-panel-settings';
+                if (role === 'coach') return 'sports';
+                return 'person';
+              };
+
+              const handleQuickLogin = async (user: MockUser) => {
+                setEmail(user.email);
+                setPassword(user.password);
+                setIsLoading(true);
+                try {
+                  // Try real login first so the device gets a JWT for all protected endpoints
+                  const loginResp = await authService.login({ email: user.email, password: user.password }).catch(async (err: any) => {
+                    // User doesn't exist in DB yet — auto-register them
+                    if (err?.response?.status === 401) {
+                      const [first, ...rest] = user.fullName.split(' ');
+                      await authService.register({
+                        firstName: first,
+                        lastName: rest.join(' ') || 'Demo',
+                        email: user.email,
+                        password: user.password,
+                        confirmPassword: user.password,
+                        userType: 'onsite',
+                        role: user.role === 'coach' ? 'coach' : 'client',
+                      });
+                      return authService.login({ email: user.email, password: user.password });
+                    }
+                    throw err;
+                  });
+
+                  if (loginResp?.success && loginResp.data?.user && loginResp.data?.token) {
+                    const u = loginResp.data.user;
+                    const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
+                    await setAuthTokens(loginResp.data.token, loginResp.data.refreshToken);
+                    setFullName(fullName);
+                    saveEmail(u.email);
+                    setRole(u.role as any);
+
+                    if (u.role === 'client' || u.role === 'coach') {
+                      await _ensureMockSubscription(user).catch(() => { /* may already exist */ });
+                    }
+
+                    if (u.role === 'admin') {
+                      navigation.navigate('AdminDashboard');
+                    } else if (u.role === 'coach') {
+                      setSubscriptionPlan('ProCoach');
+                      navigation.navigate('CoachCommandCenter');
+                    } else {
+                      setSubscriptionPlan(user.subscriptionPlan);
+                      navigation.navigate('TraineeCommandCenter');
+                    }
+                  }
+                } catch {
+                  // Backend unavailable — fall back to local navigation without a token
+                  setFullName(user.fullName);
+                  saveEmail(user.email);
+                  setRole(user.role as any);
+                  if (user.role === 'admin') {
+                    navigation.navigate('AdminDashboard');
+                  } else if (user.role === 'coach') {
+                    setSubscriptionPlan('ProCoach');
+                    navigation.navigate('CoachCommandCenter');
+                  } else {
+                    setSubscriptionPlan(user.subscriptionPlan);
+                    navigation.navigate('TraineeCommandCenter');
+                  }
+                } finally {
+                  setIsLoading(false);
+                }
+              };
+
+              const renderChip = (user: MockUser) => {
+                const color = colorFor(user.role);
+                // Client chips show the *plan display name* (e.g. "AI Plan").
+                // Staff chips show the role itself ("Coach" / "Admin") to
+                // make it obvious they're not a client tier.
+                const label =
+                  user.role === 'admin'
+                    ? 'Admin'
+                    : user.role === 'coach'
+                      ? 'Coach'
+                      : PLAN_FEATURES[user.subscriptionPlan].name;
+
+                return (
                   <TouchableOpacity
                     key={user.id}
-                    onPress={async () => {
-                      setEmail(user.email);
-                      setPassword(user.password);
-                      setIsLoading(true);
-                      try {
-                        // Try real login first so the device gets a JWT for all protected endpoints
-                        let loginResp = await authService.login({ email: user.email, password: user.password }).catch(async (err: any) => {
-                          // User doesn't exist in DB yet — auto-register them
-                          if (err?.response?.status === 401) {
-                            const [first, ...rest] = user.fullName.split(' ');
-                            await authService.register({
-                              firstName: first,
-                              lastName: rest.join(' ') || 'Demo',
-                              email: user.email,
-                              password: user.password,
-                              confirmPassword: user.password,
-                              userType: 'onsite',
-                              role: user.role === 'coach' ? 'coach' : 'client',
-                            });
-                            // Retry login after registration
-                            return authService.login({ email: user.email, password: user.password });
-                          }
-                          throw err;
-                        });
-
-                        if (loginResp?.success && loginResp.data?.user && loginResp.data?.token) {
-                          const u = loginResp.data.user;
-                          const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
-                          await setAuthTokens(loginResp.data.token, loginResp.data.refreshToken);
-                          setFullName(fullName);
-                          saveEmail(u.email);
-                          setRole(u.role as any);
-
-                          // Ensure the mock user has an active subscription for their plan
-                          if (u.role === 'client' || u.role === 'coach') {
-                            await _ensureMockSubscription(user).catch(() => {/* silent — subscription may already exist */});
-                          }
-
-                          if (u.role === 'admin') {
-                            navigation.navigate('AdminDashboard');
-                          } else if (u.role === 'coach') {
-                            setSubscriptionPlan('ProCoach');
-                            navigation.navigate('CoachCommandCenter');
-                          } else {
-                            setSubscriptionPlan(user.subscriptionPlan);
-                            navigation.navigate('TraineeCommandCenter');
-                          }
-                        }
-                      } catch {
-                        // Backend unavailable — fall back to local navigation without token
-                        setFullName(user.fullName);
-                        saveEmail(user.email);
-                        setRole(user.role as any);
-                        if (user.role === 'admin') {
-                          navigation.navigate('AdminDashboard');
-                        } else if (user.role === 'coach') {
-                          setSubscriptionPlan('ProCoach');
-                          navigation.navigate('CoachCommandCenter');
-                        } else {
-                          setSubscriptionPlan(user.subscriptionPlan);
-                          navigation.navigate('TraineeCommandCenter');
-                        }
-                      } finally {
-                        setIsLoading(false);
-                      }
-                    }}
-                    style={[tw`px-4 py-2 rounded-lg border`, {
-                      backgroundColor: user.role === 'admin' ? '#ef444420' : accent + '0a',
-                      borderColor: user.role === 'admin' ? '#ef444460' : accent + '40',
-                    }]}
+                    onPress={() => handleQuickLogin(user)}
+                    style={[
+                      tw`px-4 py-2 rounded-lg border`,
+                      { backgroundColor: color + '14', borderColor: color + '55' },
+                    ]}
                   >
-                    <View style={tw`flex-row items-center gap-1`}>
-                      <MaterialIcons
-                        name={user.role === 'admin' ? 'admin-panel-settings' : user.role === 'coach' ? 'fitness-center' : 'person'}
-                        size={14}
-                        color={user.role === 'admin' ? '#ef4444' : accent}
-                      />
+                    <View style={tw`flex-row items-center gap-2`}>
+                      <MaterialIcons name={iconFor(user.role) as any} size={14} color={color} />
                       <View>
-                        <Text style={[tw`text-xs font-bold`, { color: user.role === 'admin' ? '#ef4444' : accent }]}>
-                          {user.role === 'admin' ? 'Admin' : user.subscriptionPlan}
-                        </Text>
+                        <Text style={[tw`text-xs font-bold`, { color }]}>{label}</Text>
                         <Text style={[tw`text-xs`, { color: '#94a3b8' }]} numberOfLines={1}>
                           {user.fullName.split(' ')[0]}
                         </Text>
                       </View>
                     </View>
                   </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+                );
+              };
+
+              const clientUsers = MOCK_USERS.filter((u) => u.role === 'client');
+              const staffUsers = MOCK_USERS.filter((u) => u.role !== 'client');
+
+              return (
+                <View style={tw`gap-3`}>
+                  <View>
+                    <Text style={[tw`text-[10px] font-semibold uppercase tracking-wider mb-2`, { color: subtextColor }]}>
+                      Clients
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
+                      <View style={tw`flex-row gap-2`}>{clientUsers.map(renderChip)}</View>
+                    </ScrollView>
+                  </View>
+
+                  <View>
+                    <Text style={[tw`text-[10px] font-semibold uppercase tracking-wider mb-2`, { color: subtextColor }]}>
+                      Staff (Coach & Admin)
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
+                      <View style={tw`flex-row gap-2`}>{staffUsers.map(renderChip)}</View>
+                    </ScrollView>
+                  </View>
+                </View>
+              );
+            })()}
           </View>
 
           <FormInput

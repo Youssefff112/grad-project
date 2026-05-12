@@ -13,7 +13,7 @@ import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
-import { PLAN_FEATURES, SubscriptionPlan } from '../../constants/plans';
+import { PLAN_FEATURES, SubscriptionPlan, CLIENT_SUBSCRIPTION_PLANS } from '../../constants/plans';
 import * as subscriptionService from '../../services/subscriptionService';
 
 export const SubscriptionSelectionScreen = ({ navigation }: any) => {
@@ -22,7 +22,9 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
 
-  const plans: SubscriptionPlan[] = ['Free', 'Standard', 'Premium', 'ProCoach', 'Elite'];
+  // Only client-facing tiers. ``ProCoach`` is a coach account, not a client
+  // subscription, so we deliberately exclude it from this list.
+  const plans: SubscriptionPlan[] = CLIENT_SUBSCRIPTION_PLANS;
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
     if (!selectedPlan) {
@@ -122,7 +124,7 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
                 <View style={tw`flex-row items-center justify-between mb-4`}>
                   <View style={tw`flex-1`}>
                     <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                      {plan}
+                      {planData.name}
                     </Text>
                     <Text style={[tw`text-sm mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
                       ${planData.price.toFixed(2)}/month
@@ -181,7 +183,13 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
       {/* Footer */}
       <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
         <Button
-          title={isConfirming ? 'Activating...' : (selectedPlan ? `Continue with ${selectedPlan}` : 'Select a Plan to Continue')}
+          title={
+            isConfirming
+              ? 'Activating...'
+              : selectedPlan
+                ? `Continue with ${PLAN_FEATURES[selectedPlan].name}`
+                : 'Select a Plan to Continue'
+          }
           size="lg"
           disabled={isConfirming}
           onPress={handleConfirmPlan}
