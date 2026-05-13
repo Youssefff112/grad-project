@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface Conversation {
-  id: string;
-  unread: number;
-}
-
 interface NotificationContextType {
   conversations: Map<string, number>;
   totalUnread: number;

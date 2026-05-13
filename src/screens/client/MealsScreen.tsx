@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -86,29 +87,38 @@ export const MealsScreen = ({ navigation }: any) => {
     return DEFAULT_MEALS;
   })();
 
-  // Load active diet plan on mount
-  useEffect(() => {
-    const load = async () => {
-      setPlanLoading(true);
-      try {
-        const { plan } = await dietService.getActiveDietPlan();
-        if (plan) {
-          setActivePlan(plan);
-          setDailyTarget({
-            calories: plan.dailyCalorieTarget,
-            protein: plan.macronutrients.protein,
-            carbs: plan.macronutrients.carbs,
-            fats: plan.macronutrients.fats,
-          });
-        }
-      } catch {
-        // fall through to defaults
-      } finally {
-        setPlanLoading(false);
+  // Load active diet plan; re-runs on every focus so deletes/regenerations
+  // anywhere in the app are reflected here immediately.
+  const loadDietPlan = useCallback(async () => {
+    setPlanLoading(true);
+    try {
+      const { plan } = await dietService.getActiveDietPlan();
+      if (plan) {
+        setActivePlan(plan);
+        setDailyTarget({
+          calories: plan.dailyCalorieTarget,
+          protein: plan.macronutrients.protein,
+          carbs: plan.macronutrients.carbs,
+          fats: plan.macronutrients.fats,
+        });
+      } else {
+        // No active plan — drop stale state and revert to defaults.
+        setActivePlan(null);
+        setDailyTarget(DEFAULT_DAILY_TARGET);
       }
-    };
-    load();
+    } catch {
+      setActivePlan(null);
+      setDailyTarget(DEFAULT_DAILY_TARGET);
+    } finally {
+      setPlanLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDietPlan();
+    }, [loadDietPlan]),
+  );
 
   // Initialize checkedMeals when meals list changes
   useEffect(() => {

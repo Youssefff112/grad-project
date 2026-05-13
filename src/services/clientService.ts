@@ -3,7 +3,7 @@
  * Handles client-specific profile and coach selection API calls.
  */
 
-import { apiGet, apiPatch, apiPost } from './api';
+import { apiGet, apiPatch, apiPost, apiDelete } from './api';
 
 export interface ClientProfile {
   id: number;
@@ -51,6 +51,14 @@ export const selectCoach = async (coachId: number): Promise<{ profile: ClientPro
 };
 
 /**
+ * Remove (unassign) the current client's coach.
+ */
+export const removeCoach = async (): Promise<{ profile: ClientProfile }> => {
+  const response: any = await apiDelete('/client/coach');
+  return { profile: response.data?.profile };
+};
+
+/**
  * Get the current client's subscription status.
  */
 export const getClientSubscriptionStatus = async (): Promise<{
@@ -64,5 +72,6 @@ export default {
   getClientProfile,
   updateClientProfile,
   selectCoach,
+  removeCoach,
   getClientSubscriptionStatus,
 };

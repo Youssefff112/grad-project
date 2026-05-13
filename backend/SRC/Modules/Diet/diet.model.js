@@ -1,6 +1,7 @@
 // src/Modules/Diet/diet.model.js
 import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '../../../DB/connection.js';
+import { User } from '../User/user.model.js';
 
 export class DietPlan extends Model {}
 export class DietLog extends Model {}
@@ -9,6 +10,10 @@ DietPlan.init({
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false
+  },
+  planName: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   goal: {
     type: DataTypes.ENUM('weight_loss', 'muscle_gain', 'maintenance', 'endurance'),
@@ -108,3 +113,13 @@ DietLog.init({
     { fields: ['dietPlanId'] }
   ]
 });
+
+// Associations
+User.hasMany(DietPlan, { foreignKey: 'userId', as: 'dietPlans' });
+DietPlan.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+DietPlan.hasMany(DietLog, { foreignKey: 'dietPlanId', as: 'logs' });
+DietLog.belongsTo(DietPlan, { foreignKey: 'dietPlanId', as: 'plan' });
+
+User.hasMany(DietLog, { foreignKey: 'userId', as: 'dietLogs' });
+DietLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });

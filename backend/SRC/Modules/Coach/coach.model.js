@@ -68,6 +68,12 @@ CoachProfile.init({
   timestamps: true
 });
 
+// Lazy import to avoid circular dependencies
+import('../User/user.model.js').then(({ User }) => {
+  CoachProfile.belongsTo(User, { foreignKey: 'userId', as: 'User' });
+  User.hasOne(CoachProfile, { foreignKey: 'userId', as: 'CoachProfile' });
+}).catch(() => {});
+
 export class Coach extends Model {}
 
 Coach.init({

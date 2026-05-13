@@ -53,6 +53,16 @@ export const clientService = {
     return profile;
   },
 
+  async removeCoach(userId) {
+    let profile = await ClientProfile.findOne({ where: { userId } });
+    if (!profile) {
+      throw new AppError('Client profile not found', 404);
+    }
+    profile.selectedCoachId = null;
+    await profile.save();
+    return profile;
+  },
+
   async getSubscriptionStatus(userId) {
     const subscription = await subscriptionService.getActiveSubscription(userId, 'client');
     return subscription;

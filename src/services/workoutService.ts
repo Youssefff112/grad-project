@@ -8,7 +8,8 @@
  * this frontend call will automatically use the AI-generated plans.
  */
 
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiDelete } from './api';
+import { invalidateCachedResponse } from './offlineService';
 
 export interface WorkoutExercise {
   name: string;
@@ -82,18 +83,35 @@ export interface LogWorkoutRequest {
 /**
  * Trigger AI/rule-based workout plan generation for the current user.
  * Requires: active subscription + complete user profile with goal & experienceLevel.
+ * @param location   'home' | 'gym' — where the user will work out
+ * @param equipment  list of available equipment IDs (e.g. ['dumbbells', 'resistance_bands'])
  */
-export const generateWorkoutPlan = async (): Promise<{ plan: WorkoutPlan }> => {
-  const response: any = await apiPost('/workout/generate', {});
+export const generateWorkoutPlan = async (
+  location?: 'home' | 'gym' | null,
+  equipment?: string[],
+): Promise<{ plan: WorkoutPlan }> => {
+  const response: any = await apiPost('/workout/generate', {
+    location: location ?? undefined,
+    equipment: equipment && equipment.length > 0 ? equipment : undefined,
+  });
+  // The server just deactivated the old plan; drop any cached GET so the
+  // offline interceptor can't resurrect it.
+  await invalidateCachedResponse(['/workout/active', '/workout/history']);
   return { plan: response.data?.plan };
 };
 
 /**
  * Get the currently active workout plan for the current user.
+ * Returns ``{ plan: null }`` if the user has no active plan.
  */
-export const getActiveWorkoutPlan = async (): Promise<{ plan: WorkoutPlan }> => {
+export const getActiveWorkoutPlan = async (): Promise<{ plan: WorkoutPlan | null }> => {
   const response: any = await apiGet('/workout/active');
-  return { plan: response.data?.plan };
+  return { plan: response.data?.plan ?? null };
+};
+
+export const deleteActiveWorkoutPlan = async (): Promise<void> => {
+  await apiDelete('/workout/active');
+  await invalidateCachedResponse(['/workout/active', '/workout/history']);
 };
 
 /**

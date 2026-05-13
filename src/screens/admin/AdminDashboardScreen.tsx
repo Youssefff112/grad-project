@@ -227,7 +227,12 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
             {/* Sign out */}
             <View style={tw`px-5 mt-6`}>
               <TouchableOpacity
-                onPress={async () => { await logout(); navigation.navigate('Splash'); }}
+                onPress={async () => {
+                  try { await logout(); } catch { /* still reset stack */ }
+                  // reset() wipes the navigator stack so admin/coach/client
+                  // screens are fully unmounted before Splash appears.
+                  navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+                }}
                 style={[tw`flex-row items-center justify-center gap-2 py-4 rounded-2xl`, { backgroundColor: '#ef444420', borderWidth: 1, borderColor: '#ef444430' }]}
               >
                 <MaterialIcons name="logout" size={18} color="#ef4444" />

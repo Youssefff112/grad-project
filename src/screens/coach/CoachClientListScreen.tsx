@@ -11,6 +11,7 @@ type ClientStatus = 'active' | 'pending' | 'inactive';
 
 interface Client {
   id: string;
+  userId: string;
   name: string;
   email: string;
   plan: string;
@@ -40,6 +41,7 @@ export const CoachClientListScreen = ({ navigation }: any) => {
       const { clients: raw } = await coachService.getMyClients();
       const mapped: Client[] = raw.map((c) => ({
         id: String(c.id),
+        userId: String(c.userId || c.id),
         name: c.User
           ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}`
           : `Client #${c.id}`,
@@ -151,7 +153,7 @@ export const CoachClientListScreen = ({ navigation }: any) => {
           return (
             <TouchableOpacity
               key={client.id}
-              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, clientName: client.name })}
+              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name })}
               style={[tw`p-4 rounded-2xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
             >
               <View style={tw`flex-row items-start gap-3`}>

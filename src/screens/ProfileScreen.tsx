@@ -204,7 +204,28 @@ export const ProfileScreen = ({ navigation }: any) => {
         {/* Sign Out */}
         <View style={tw`px-4 mb-8`}>
           <TouchableOpacity
-            onPress={() => Alert.alert('Sign Out', 'Are you sure you want to sign out?', [{ text: 'Cancel' }, { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); navigation.navigate('Splash'); } }])}
+            onPress={() =>
+              Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+                { text: 'Cancel' },
+                {
+                  text: 'Sign Out',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await logout();
+                    } catch {
+                      // Even if logout API call fails, still reset the navigator
+                      // so the user isn't stuck on an authed screen with empty state.
+                    }
+                    // IMPORTANT: ``reset`` wipes the navigation stack. Using
+                    // ``navigate`` here leaves the Trainee / Coach screens
+                    // mounted behind Splash, where they keep firing data
+                    // fetches against the now-cleared auth state and crash.
+                    navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+                  },
+                },
+              ])
+            }
             style={[tw`flex-row items-center justify-center gap-2 py-4 rounded-2xl`, { backgroundColor: '#ef444420', borderWidth: 1, borderColor: '#ef444430' }]}
           >
             <MaterialIcons name="logout" size={20} color="#ef4444" />

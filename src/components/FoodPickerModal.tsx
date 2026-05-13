@@ -257,9 +257,12 @@ export const FoodPickerModal: React.FC<FoodPickerModalProps> = ({
               <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-4`}>
                 {filteredFoods.length > 0 ? (
                   filteredFoods.map((food) => (
-                    <TouchableOpacity key={food.id} onPress={() => handleSelectFood(food)}>
-                      <FoodCard food={food} showActions={false} />
-                    </TouchableOpacity>
+                    <FoodCard
+                      key={food.id}
+                      food={food}
+                      showActions={false}
+                      onPress={() => handleSelectFood(food)}
+                    />
                   ))
                 ) : (
                   <View style={tw`flex-1 items-center justify-center py-8 gap-2`}>

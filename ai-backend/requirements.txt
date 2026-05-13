@@ -1,0 +1,22 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Database
+sqlalchemy==2.0.25
+
+# Computer Vision
+# NOTE: ``mp.solutions.pose`` was dropped from newer mediapipe wheels on
+# Python 3.12, so the codebase uses a small Tasks-API compat shim in
+# ``services/mp_compat.py`` and works with any mediapipe >= 0.10.13.
+mediapipe>=0.10.13
+opencv-python>=4.9.0.80
+numpy>=1.26.3
+
+# Chatbot (use OPENAI_API_KEY env var)
+openai==1.12.0
+
+# Utils
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0

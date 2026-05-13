@@ -8,7 +8,8 @@
  * this frontend call will automatically use the AI-generated plans.
  */
 
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiDelete } from './api';
+import { invalidateCachedResponse } from './offlineService';
 
 export interface MacroNutrients {
   protein: number;
@@ -78,15 +79,23 @@ export interface DietLogRequest {
  */
 export const generateDietPlan = async (): Promise<{ plan: DietPlan }> => {
   const response: any = await apiPost('/diet/generate', {});
+  // Old plan is now deactivated server-side; drop any cached GET.
+  await invalidateCachedResponse(['/diet/active', '/diet/history']);
   return { plan: response.data?.plan };
 };
 
 /**
  * Get the currently active diet plan for the current user.
+ * Returns ``{ plan: null }`` if the user has no active plan.
  */
-export const getActiveDietPlan = async (): Promise<{ plan: DietPlan }> => {
+export const getActiveDietPlan = async (): Promise<{ plan: DietPlan | null }> => {
   const response: any = await apiGet('/diet/active');
-  return { plan: response.data?.plan };
+  return { plan: response.data?.plan ?? null };
+};
+
+export const deleteActiveDietPlan = async (): Promise<void> => {
+  await apiDelete('/diet/active');
+  await invalidateCachedResponse(['/diet/active', '/diet/history']);
 };
 
 /**

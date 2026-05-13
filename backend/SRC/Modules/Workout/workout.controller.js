@@ -4,7 +4,8 @@ import { successResponse } from '../../Utils/successResponse.utils.js';
 export const workoutController = {
   async generatePlan(req, res, next) {
     try {
-      const plan = await workoutService.generateWorkoutPlan(req.user.id);
+      const { location, equipment } = req.body || {};
+      const plan = await workoutService.generateWorkoutPlan(req.user.id, location, equipment);
       successResponse(res, 201, 'Workout plan generated successfully', { plan });
     } catch (error) {
       next(error);
@@ -56,6 +57,15 @@ export const workoutController = {
         parseInt(limit) || 10
       );
       successResponse(res, 200, 'Workout history retrieved', result.logs, result.pagination);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async deletePlan(req, res, next) {
+    try {
+      const result = await workoutService.deleteActiveWorkoutPlan(req.user.id);
+      successResponse(res, 200, 'Workout plan deleted', result);
     } catch (error) {
       next(error);
     }

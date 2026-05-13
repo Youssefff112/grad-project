@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exercise Test - App Records & Feedback</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; background: #1a1a2e; color: #eee; }
+    h1 { color: #00d9ff; }
+    video { width: 100%; border-radius: 8px; background: #000; }
+    .panel { background: #16213e; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+    button { padding: 0.75rem 1.5rem; font-size: 1rem; border: none; border-radius: 6px; cursor: pointer; margin: 4px; }
+    #recordBtn { background: #e63946; color: white; }
+    #stopBtn { background: #457b9d; color: white; display: none; }
+    #stopBtn.recording { display: inline-block; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 50% { opacity: 0.7; } }
+    #feedback { display: none; }
+    #feedback.visible { display: block; }
+    .score { font-size: 2rem; font-weight: bold; color: #00d9ff; margin: 0.5rem 0; }
+    .issues { color: #ff6b6b; margin: 0.5rem 0; }
+    .tips { color: #69db7c; margin: 0.5rem 0; }
+    .summary { margin: 1rem 0; line-height: 1.5; }
+    ul { margin: 0.25rem 0; padding-left: 1.5rem; }
+    select { padding: 0.5rem; font-size: 1rem; border-radius: 4px; margin: 0.5rem 0; }
+    .status { margin: 0.5rem 0; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Exercise Test</h1>
+  <p>The app records you, calculates your angles, and shows you the numbers. Use these to fix your form in live mode.</p>
+
+  <div class="panel">
+    <label>Exercise: </label>
+    <select id="exercise">
+      <option value="squat">Squat</option>
+      <option value="push-up">Push-up</option>
+      <option value="bicep curl">Bicep Curl</option>
+      <option value="plank">Plank</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <video id="preview" autoplay muted playsinline></video>
+    <p class="status" id="status">Click Record to start. Do your exercise, then click Stop.</p>
+    <button id="recordBtn">Start Recording</button>
+    <button id="stopBtn">Stop & Get Feedback</button>
+  </div>
+
+  <div id="feedback" class="panel">
+    <h2>Form Analysis</h2>
+    <div class="score" id="scoreEl"></div>
+    <div class="tips" id="doneWell">
+      <strong>What you did well:</strong>
+      <ul id="doneWellList"></ul>
+    </div>
+    <div class="issues" id="toFix">
+      <strong>What to fix:</strong>
+      <ul id="toFixList"></ul>
+    </div>
+    <div id="improvementNotes"></div>
+    <hr style="border-color:#333; margin:1rem 0;">
+    <p>Angles observed:</p>
+    <div class="summary" id="summary"></div>
+    <ul id="angles"></ul>
+    <p><strong>Target angles:</strong></p>
+    <ul id="targets"></ul>
+    <div id="reps"></div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    let mediaRecorder;
+    let chunks = [];
+
+    const preview = document.getElementById('preview');
+    const recordBtn = document.getElementById('recordBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const feedback = document.getElementById('feedback');
+    const summaryEl = document.getElementById('summary');
+    const anglesEl = document.getElementById('angles');
+    const targetsEl = document.getElementById('targets');
+    const repsEl = document.getElementById('reps');
+
+    recordBtn.onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        preview.srcObject = stream;
+        chunks = [];
+        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+        mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          preview.srcObject = null;
+          sendAndAnalyze();
+        };
+        mediaRecorder.start(100);
+        recordBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        stopBtn.classList.add('recording');
+        status.textContent = 'RECORDING - Do your exercise now. Click Stop when done.';
+        feedback.classList.remove('visible');
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message + ' (Allow camera access)';
+      }
+    };
+
+    stopBtn.onclick = () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        stopBtn.classList.remove('recording');
+        stopBtn.style.display = 'none';
+        recordBtn.style.display = 'inline-block';
+        status.textContent = 'Analyzing your exercise...';
+      }
+    };
+
+    async function sendAndAnalyze() {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const exercise = document.getElementById('exercise').value;
+
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64 = reader.result;
+        try {
+          const res = await fetch(API_BASE + '/test-exercise-base64', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_base64: base64.split(',')[1] || base64, exercise_name: exercise })
+          });
+          const report = await res.json();
+          showFeedback(report);
+        } catch (e) {
+          status.textContent = 'Error: ' + e.message + '. Is the API running on port 8000?';
+          recordBtn.style.display = 'inline-block';
+        }
+      };
+    }
+
+    function showFeedback(report) {
+      const score = report.score != null ? report.score : null;
+      document.getElementById('scoreEl').textContent = score != null ? 'Form Score: ' + Math.round(score) + '%' : '';
+      const doneWell = report.done_well || [];
+      document.getElementById('doneWellList').innerHTML = doneWell.length ? doneWell.map(x => '<li>' + x + '</li>').join('') : '<li>Keep practicing!</li>';
+      const toFix = report.to_fix || report.mistakes_detected || [];
+      document.getElementById('toFixList').innerHTML = toFix.length ? toFix.map(x => '<li>' + x + '</li>').join('') : '<li>None detected</li>';
+      document.getElementById('improvementNotes').innerHTML = report.improvement_notes ? '<p><strong>Next reps:</strong> ' + report.improvement_notes + '</p>' : '';
+      summaryEl.textContent = report.summary || '';
+      const ang = report.angles_observed || {};
+      anglesEl.innerHTML = Object.entries(ang).map(([k, v]) =>
+        '<li>' + k + ': min=' + (v.min ?? '-') + '° max=' + (v.max ?? '-') + '° avg=' + (v.avg ?? '-') + '°</li>'
+      ).join('') || '<li>No pose detected</li>';
+      const tgt = report.targets || {};
+      targetsEl.innerHTML = Object.entries(tgt).map(([k, v]) => '<li>' + k + ': ' + v + '</li>').join('') || '';
+      repsEl.innerHTML = report.reps_detected ? 'Reps detected: ' + report.reps_detected : '';
+      feedback.classList.add('visible');
+      status.textContent = 'Done! Review your score and feedback above.';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyc.*
+*.py.2*
+*.db
+*.sqlite
+.env
+.env.*
+!.env.example
+
+# Downloaded MediaPipe model weights (auto-downloaded on first run)
+models/

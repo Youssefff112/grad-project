@@ -29,9 +29,12 @@ export interface PlanFeatures {
 }
 
 export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
+  // ────────────────────────────────────────────────────────────────────────
+  // CLIENT TIERS (consumer plans, role = 'client')
+  // ────────────────────────────────────────────────────────────────────────
   Free: {
     plan: 'Free',
-    name: 'Free Plan',
+    name: 'Free',
     price: 0,
     isCoachAccount: false,
     hasFoodTracking: true,
@@ -56,7 +59,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
   },
   Standard: {
     plan: 'Standard',
-    name: 'Standard (AI Plan)',
+    name: 'AI Plan',
     price: 9.99,
     isCoachAccount: false,
     hasFoodTracking: true,
@@ -81,7 +84,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
   },
   Premium: {
     plan: 'Premium',
-    name: 'Premium (Coach Plan)',
+    name: 'Coach Plan',
     price: 19.99,
     isCoachAccount: false,
     hasFoodTracking: true,
@@ -104,9 +107,14 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasClientProgressTracking: false,
     hasReviewManagement: false,
   },
+  // ────────────────────────────────────────────────────────────────────────
+  // COACH TIER (separate from the client tiers above — role = 'coach')
+  // This is what someone pays to BE a coach on the platform; clients should
+  // never see this in the subscription selection list.
+  // ────────────────────────────────────────────────────────────────────────
   ProCoach: {
     plan: 'ProCoach',
-    name: 'Pro Coach Account',
+    name: 'Coach Account',
     price: 49.99,
     isCoachAccount: true,
     hasFoodTracking: false,
@@ -129,9 +137,10 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasClientProgressTracking: true,
     hasReviewManagement: true,
   },
+  // Back to CLIENT TIERS
   Elite: {
     plan: 'Elite',
-    name: 'Elite Plan',
+    name: 'Elite',
     price: 99.99,
     isCoachAccount: false,
     hasFoodTracking: true,
@@ -155,3 +164,24 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, PlanFeatures> = {
     hasReviewManagement: false,
   },
 };
+
+/**
+ * The plans a client can subscribe to in onboarding / upgrade screens.
+ * ``ProCoach`` is intentionally excluded — it's a coach-only account type,
+ * not a tier a client should ever pick. Use this list everywhere a "choose
+ * your subscription" UI is rendered.
+ */
+export const CLIENT_SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  'Free',
+  'Standard',
+  'Premium',
+  'Elite',
+];
+
+/** True if the given plan key belongs to a client (consumer) tier. */
+export const isClientPlan = (plan: SubscriptionPlan): boolean =>
+  !PLAN_FEATURES[plan].isCoachAccount;
+
+/** True if the given plan key is the coach-account tier. */
+export const isCoachPlan = (plan: SubscriptionPlan): boolean =>
+  PLAN_FEATURES[plan].isCoachAccount;
