@@ -58,7 +58,7 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center rounded-full`}>
           <MaterialIcons name="arrow-back" size={24} color={accent} />
         </TouchableOpacity>
-        <Text style={[tw`font-bold text-xl tracking-tighter`, { color: accent }]}>VERTEX Pro</Text>
+        <Text style={[tw`font-bold text-xl tracking-tighter`, { color: accent }]}>Vertex</Text>
         <View style={tw`w-10`} />
       </View>
 

@@ -76,12 +76,25 @@ export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigati
   const handleSaveProfile = async () => {
     try {
       setSaving(true);
-      await coachService.updateCoachProfile({
+      const years = parseInt(experienceYears, 10);
+      const { profile: updated } = await coachService.updateCoachProfile({
         bio,
         specialties,
-        experienceYears: parseInt(experienceYears)
+        experienceYears: Number.isFinite(years) ? years : 0,
       });
-      Alert.alert('Success', 'Profile updated');
+      setProfile(updated);
+      setBio(updated.bio || '');
+      setSpecialties(updated.specialties || []);
+      setExperienceYears(String(updated.experienceYears ?? 0));
+
+      // Always land on coach home — do not goBack() (trial/subscription sits under this screen).
+      try {
+        navigation.reset({ index: 0, routes: [{ name: 'CoachCommandCenter' }] });
+      } catch {
+        navigation.navigate('CoachCommandCenter');
+      }
+
+      Alert.alert('Success', 'Profile updated successfully!');
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to update profile');
     } finally {

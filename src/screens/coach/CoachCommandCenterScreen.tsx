@@ -119,7 +119,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
             </View>
           )}
         </TouchableOpacity>
-        <Text style={[tw`text-lg font-bold tracking-tighter`, { color: accent }]}>VERTEX Pro</Text>
+        <Text style={[tw`text-lg font-bold tracking-tighter`, { color: accent }]}>Vertex</Text>
         <TouchableOpacity onPress={() => navigation.navigate('CoachProfileEdit')} style={tw`flex size-10 items-center justify-center`}>
           <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
         </TouchableOpacity>
