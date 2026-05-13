@@ -4,6 +4,7 @@ import * as tokenManager from '../utils/tokenManager';
 import authService from '../services/auth.service';
 import { getClientSubscriptionStatus, getClientProfile } from '../services/clientService';
 import { isClientPlan } from '../constants/plans';
+import type { CoachApplicationStatus } from '../utils/coachGate';
 
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
 export type SubscriptionPlan = 'Free' | 'Standard' | 'Premium' | 'ProCoach' | 'Elite';
@@ -47,6 +48,9 @@ interface UserContextType {
   refreshToken: string | null;
   userId: string | null;
   isAuthenticated: boolean;
+
+  coachApplicationStatus: CoachApplicationStatus | null;
+  setCoachApplicationStatus: (status: CoachApplicationStatus | null) => Promise<void>;
 
   setFullName: (name: string) => void;
   setEmail: (email: string) => void;
@@ -106,6 +110,9 @@ const UserContext = createContext<UserContextType>({
   userId: null,
   isAuthenticated: false,
 
+  coachApplicationStatus: null,
+  setCoachApplicationStatus: async () => {},
+
   setFullName: () => {},
   setEmail: () => {},
   setWeight: () => {},
@@ -162,12 +169,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userId, setUserIdState] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticatedState] = useState(false);
 
+  const [coachApplicationStatus, setCoachApplicationStatusState] = useState<CoachApplicationStatus | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
 
   // Load saved user data on mount
   useEffect(() => {
     const loadUserData = async () => {
       try {
+        const savedCoachAppStatus = await AsyncStorage.getItem('user_coach_application_status').catch(() => null);
         // Load user profile data with defensive error handling
         const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId, savedNotifs, savedRole] =
           await Promise.all([
@@ -266,6 +276,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Token expired, clear it
           await tokenManager.clearTokens();
         }
+
+        if (savedRole !== 'coach') {
+          setCoachApplicationStatusState(null);
+          await AsyncStorage.removeItem('user_coach_application_status').catch(() => {});
+        } else if (tokens.accessToken && isTokenValid) {
+          try {
+            const coachSvc = await import('../services/coachService');
+            const { resolveCoachGate } = await import('../utils/coachGate');
+            const { profile } = await coachSvc.getMyCoachProfile();
+            const gate = resolveCoachGate({
+              isApproved: profile?.isApproved,
+              applicationStatus: profile?.applicationStatus as CoachApplicationStatus,
+            });
+            setCoachApplicationStatusState(gate);
+            await AsyncStorage.setItem('user_coach_application_status', gate);
+          } catch {
+            const g = savedCoachAppStatus;
+            if (g === 'pending' || g === 'approved' || g === 'rejected') {
+              setCoachApplicationStatusState(g as CoachApplicationStatus);
+            } else {
+              setCoachApplicationStatusState('pending');
+            }
+          }
+        } else if (savedRole === 'coach') {
+          const g = savedCoachAppStatus;
+          if (g === 'pending' || g === 'approved' || g === 'rejected') {
+            setCoachApplicationStatusState(g as CoachApplicationStatus);
+          }
+        }
       } catch (error) {
         console.log('Failed to load user data:', error);
       } finally {
@@ -330,6 +369,23 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_role', r).catch((error) =>
       console.log('Failed to save user role:', error)
     );
+    if (r !== 'coach') {
+      setCoachApplicationStatusState(null);
+      AsyncStorage.removeItem('user_coach_application_status').catch(() => {});
+    }
+  }, []);
+
+  const setCoachApplicationStatus = useCallback(async (status: CoachApplicationStatus | null) => {
+    setCoachApplicationStatusState(status);
+    if (status) {
+      await AsyncStorage.setItem('user_coach_application_status', status).catch((error) =>
+        console.log('Failed to save coach application status:', error)
+      );
+    } else {
+      await AsyncStorage.removeItem('user_coach_application_status').catch((error) =>
+        console.log('Failed to clear coach application status:', error)
+      );
+    }
   }, []);
 
   const setFullName = useCallback((name: string) => {
@@ -565,8 +621,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         AsyncStorage.removeItem('user_last_plan_review'),
         AsyncStorage.removeItem('user_id'),
         AsyncStorage.removeItem('user_role'),
+        AsyncStorage.removeItem('user_coach_application_status'),
       ]);
       setRoleState('client');
+      setCoachApplicationStatusState(null);
     } catch (error) {
       console.error('Failed to logout:', error);
       throw error;
@@ -598,6 +656,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       refreshToken,
       userId,
       isAuthenticated,
+      coachApplicationStatus,
 
       setFullName,
       setEmail,
@@ -614,6 +673,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateLastPlanReview,
       setNotificationSettings,
       setRole,
+      setCoachApplicationStatus,
 
       // Authentication methods
       setAuthTokens,

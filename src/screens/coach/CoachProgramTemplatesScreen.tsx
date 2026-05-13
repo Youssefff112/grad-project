@@ -18,19 +18,10 @@ interface Template {
   createdAt: string;
 }
 
-const MOCK_TEMPLATES: Template[] = [
-  { id: '1', type: 'workout', name: 'Hypertrophy Phase 1', description: '4-day upper/lower split focused on muscle growth', duration: '8 weeks', goal: 'Muscle Gain', timesUsed: 7, createdAt: 'Mar 2026' },
-  { id: '2', type: 'workout', name: 'Foundation Strength', description: 'Full-body compound movements for beginners', duration: '6 weeks', goal: 'Strength', timesUsed: 12, createdAt: 'Jan 2026' },
-  { id: '3', type: 'workout', name: 'Cardio Fat Burn', description: 'HIIT and steady-state cardio combination', duration: '4 weeks', goal: 'Weight Loss', timesUsed: 5, createdAt: 'Feb 2026' },
-  { id: '4', type: 'meal', name: 'High Protein Cut', description: 'High-protein, caloric deficit plan for fat loss', duration: '8 weeks', goal: 'Weight Loss', timesUsed: 9, createdAt: 'Feb 2026' },
-  { id: '5', type: 'meal', name: 'Clean Bulk Nutrition', description: 'Caloric surplus with clean whole foods', duration: '12 weeks', goal: 'Muscle Gain', timesUsed: 4, createdAt: 'Mar 2026' },
-  { id: '6', type: 'meal', name: 'Balanced Maintenance', description: 'Balanced macros for weight maintenance and health', duration: 'Ongoing', goal: 'General Health', timesUsed: 6, createdAt: 'Jan 2026' },
-];
-
 export const CoachProgramTemplatesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const [activeTab, setActiveTab] = useState<TemplateType>('workout');
-  const [templates, setTemplates] = useState(MOCK_TEMPLATES);
+  const [templates, setTemplates] = useState<Template[]>([]);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';

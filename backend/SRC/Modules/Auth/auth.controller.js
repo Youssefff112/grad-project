@@ -16,6 +16,11 @@ export const authController = {
 
       const activeSubscription = await subscriptionService.getActiveSubscription(user.id, user.role).catch(() => null);
 
+      let coachProfile = null;
+      if (user.role === 'coach') {
+        coachProfile = await authService.getCoachAuthSnapshot(user.id);
+      }
+
       successResponse(res, 201, 'User registered successfully', {
         user: {
           id: user.id,
@@ -25,7 +30,8 @@ export const authController = {
           userType: user.userType,
           role: user.role,
           isActive: user.isActive,
-          subscriptionPlan: activeSubscription?.planName || null
+          subscriptionPlan: activeSubscription?.planName || null,
+          coachProfile
         },
         token,
         refreshToken,
@@ -43,6 +49,11 @@ export const authController = {
 
       const activeSubscription = await subscriptionService.getActiveSubscription(user.id, user.role).catch(() => null);
 
+      let coachProfile = null;
+      if (user.role === 'coach') {
+        coachProfile = await authService.getCoachAuthSnapshot(user.id);
+      }
+
       successResponse(res, 200, 'Login successful', {
         user: {
           id: user.id,
@@ -52,7 +63,8 @@ export const authController = {
           userType: user.userType,
           role: user.role,
           isActive: user.isActive,
-          subscriptionPlan: activeSubscription?.planName || null
+          subscriptionPlan: activeSubscription?.planName || null,
+          coachProfile
         },
         token,
         refreshToken,

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -21,13 +22,27 @@ const COACH_FEATURES = [
 ];
 
 export const CoachSubscriptionScreen = ({ navigation }: any) => {
+  const route = useRoute<any>();
   const { isDark, accent } = useTheme();
   const { setSubscriptionPlan, fullName } = useUser();
   const [isLoading, setIsLoading] = useState(false);
+  const [congratsShown, setCongratsShown] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+
+  useEffect(() => {
+    if (congratsShown) return;
+    if (route.params?.justApproved) {
+      setCongratsShown(true);
+      Alert.alert(
+        'You are approved',
+        `Congratulations${fullName ? `, ${fullName.split(' ')[0]}` : ''}! Your coach account is verified. Activate your Pro Coach plan below to unlock the full dashboard.`,
+        [{ text: 'Great!', style: 'default' }]
+      );
+    }
+  }, [route.params, fullName, congratsShown]);
 
   const handleActivate = async () => {
     setIsLoading(true);
@@ -55,9 +70,13 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       <View style={[tw`flex-row items-center p-4 pb-2 justify-between`, { borderBottomWidth: 1, borderColor: borderColor, backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center rounded-full`}>
-          <MaterialIcons name="arrow-back" size={24} color={accent} />
-        </TouchableOpacity>
+        {route.params?.justApproved ? (
+          <View style={tw`w-10`} />
+        ) : (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={tw`flex size-10 items-center justify-center rounded-full`}>
+            <MaterialIcons name="arrow-back" size={24} color={accent} />
+          </TouchableOpacity>
+        )}
         <Text style={[tw`font-bold text-xl tracking-tighter`, { color: accent }]}>Vertex</Text>
         <View style={tw`w-10`} />
       </View>

@@ -181,6 +181,7 @@ async function ensureProfile(user, userData) {
     const coachDefaults = {
       userId: user.id,
       isApproved: true,
+      applicationStatus: 'approved',
       bio: 'Experienced personal trainer specialising in strength and conditioning.',
       specialties: ['Strength Training', 'Muscle Gain', 'Fat Loss'],
       experienceYears: 5,
@@ -192,12 +193,14 @@ async function ensureProfile(user, userData) {
       where: { userId: user.id },
       defaults: coachDefaults,
     });
-    if (userData.coachProfile) {
-      await CoachProfile.update(
-        { ...userData.coachProfile },
-        { where: { userId: user.id } }
-      );
-    }
+    await CoachProfile.update(
+      {
+        ...(userData.coachProfile || {}),
+        isApproved: true,
+        applicationStatus: 'approved',
+      },
+      { where: { userId: user.id } }
+    );
   } else if (user.role === 'client') {
     await ClientProfile.findOrCreate({
       where: { userId: user.id },
@@ -217,6 +220,7 @@ async function syncUserFromSeed(existing, userData) {
   await existing.update({
     firstName: userData.firstName,
     lastName: userData.lastName,
+    role: userData.role,
     userType: userData.userType,
     profile: mergedProfile,
   });

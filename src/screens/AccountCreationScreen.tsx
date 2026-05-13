@@ -18,10 +18,11 @@ import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
 import * as authService from '../services/auth.service';
+import { resolveCoachGate } from '../utils/coachGate';
 
 export const AccountCreationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setAuthTokens, setSubscriptionPlan, setRole, setUserId } = useUser();
+  const { setFullName, setEmail: saveEmail, setAuthTokens, setSubscriptionPlan, setRole, setUserId, setCoachApplicationStatus } = useUser();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,6 +38,13 @@ export const AccountCreationScreen = ({ navigation }: any) => {
 
     if (!name.trim()) {
       newErrors.name = 'Please enter your full name';
+    } else {
+      const parts = name.trim().split(/\s+/);
+      const first = parts[0];
+      const last = parts.slice(1).join(' ') || first;
+      if (first.length < 2 || last.length < 2) {
+        newErrors.name = 'Use at least 2 characters for first and last name (e.g. Jane Doe).';
+      }
     }
     if (!email.trim()) {
       newErrors.email = 'Please enter your email address';
@@ -95,8 +103,10 @@ export const AccountCreationScreen = ({ navigation }: any) => {
         // Persist role so the app routes correctly after re-launch
         setRole(isCoachSignup ? 'coach' : 'client');
         if (isCoachSignup) {
-          setSubscriptionPlan('ProCoach');
-          navigation.navigate('CoachSubscription');
+          const gate = resolveCoachGate((response.data.user as any)?.coachProfile);
+          await setCoachApplicationStatus(gate);
+          setSubscriptionPlan('Free');
+          navigation.navigate('CoachPendingApproval');
         } else {
           navigation.navigate('SubscriptionSelection');
         }
@@ -105,8 +115,15 @@ export const AccountCreationScreen = ({ navigation }: any) => {
       let errorMessage = 'Failed to create account. Please try again.';
 
       if (error.response?.status === 400) {
-        const msg = error.response?.data?.message;
-        errorMessage = msg || 'Invalid registration data. Please check your inputs.';
+        const data = error.response?.data;
+        const details = data?.details;
+        const msg = data?.message;
+        if (Array.isArray(details) && details.length > 0) {
+          errorMessage = details.map((d: { message?: string }) => d.message).filter(Boolean).join(' ');
+        }
+        if (!errorMessage || errorMessage === 'Failed to create account. Please try again.') {
+          errorMessage = msg || 'Invalid registration data. Please check your inputs.';
+        }
       } else if (error.message === 'Network Error' || !error.response) {
         errorMessage = 'Cannot reach the server. Please check your internet connection and try again.';
       }

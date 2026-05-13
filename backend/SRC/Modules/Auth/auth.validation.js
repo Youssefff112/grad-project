@@ -15,7 +15,8 @@ export const registerSchema = Joi.object({
         'any.only': 'Passwords do not match'
       }),
     userType: Joi.string().valid('onsite', 'offline').required(),
-    role: Joi.string().valid('client', 'coach').default('client')
+    // Admin is only accepted for the seeded demo account (enforced again in auth.service).
+    role: Joi.string().valid('client', 'coach', 'admin').default('client')
   })
 });
 

@@ -10,17 +10,14 @@ import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const TIME_SLOTS = ['7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM'];
 
-const MOCK_UPCOMING = [
-  { id: '1', clientName: 'Alex Johnson', day: 'Today', time: '10:00 AM', type: 'Check-in Call', status: 'confirmed' },
-  { id: '2', clientName: 'Maria Garcia', day: 'Today', time: '2:30 PM', type: 'Plan Review', status: 'confirmed' },
-  { id: '3', clientName: 'James Wilson', day: 'Tomorrow', time: '9:00 AM', type: 'Assessment', status: 'pending' },
-  { id: '4', clientName: 'Sarah Chen', day: 'Wed', time: '4:00 PM', type: 'Intro Session', status: 'pending' },
-];
-
 export const CoachScheduleScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { totalUnread } = useNotifications();
   const [selectedDay, setSelectedDay] = useState('Mon');
+  /** Upcoming sessions — populate from API when scheduling is wired; empty until then */
+  const [upcomingSessions] = useState<
+    { id: string; clientName: string; day: string; time: string; type: string; status: string }[]
+  >([]);
   const [availability, setAvailability] = useState<Record<string, string[]>>({
     Mon: ['9:00 AM', '10:00 AM', '11:00 AM', '4:00 PM', '5:00 PM'],
     Tue: ['9:00 AM', '10:00 AM', '4:00 PM'],
@@ -64,7 +61,16 @@ export const CoachScheduleScreen = ({ navigation }: any) => {
         {/* Upcoming Sessions */}
         <View style={tw`px-4 pt-4`}>
           <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: textPrimary }]}>Upcoming Sessions</Text>
-          {MOCK_UPCOMING.map(session => (
+          {upcomingSessions.length === 0 ? (
+            <View style={[tw`p-6 rounded-xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
+              <MaterialIcons name="event-available" size={36} color={subtextColor} />
+              <Text style={[tw`text-sm font-bold mt-3 text-center`, { color: textPrimary }]}>No upcoming sessions</Text>
+              <Text style={[tw`text-xs mt-1 text-center`, { color: subtextColor }]}>
+                Sessions booked by clients will show here once scheduling is connected.
+              </Text>
+            </View>
+          ) : (
+            upcomingSessions.map(session => (
             <View
               key={session.id}
               style={[tw`flex-row items-center gap-4 p-4 rounded-xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
@@ -90,7 +96,8 @@ export const CoachScheduleScreen = ({ navigation }: any) => {
                 </View>
               </View>
             </View>
-          ))}
+            ))
+          )}
         </View>
 
         {/* Availability */}

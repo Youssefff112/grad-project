@@ -59,6 +59,12 @@ CoachProfile.init({
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+  /** Admin gate: pending → approved or rejected (revoke also sets rejected). */
+  applicationStatus: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending',
+    allowNull: false
+  },
   approvedBy: {
     type: DataTypes.INTEGER
   },

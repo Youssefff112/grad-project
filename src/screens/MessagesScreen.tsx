@@ -59,7 +59,6 @@ export const MessagesScreen = ({ navigation }: any) => {
       const fetchConversations = async () => {
         setIsLoading(true);
         try {
-          // If using mock mode or not authenticated, just return some mock data
           const apiConvs = await getConversations().catch(e => {
              console.log('Conversations API not available or 401, using empty state');
              return [];

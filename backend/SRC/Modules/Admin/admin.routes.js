@@ -33,6 +33,7 @@ router.delete('/clients/:id', adminController.deleteClient);
 // Coach Approval
 router.get('/coach-applications', adminController.getCoachApplications);
 router.patch('/coaches/:id/approve', adminController.approveCoach);
+router.patch('/coaches/:id/reject', adminController.rejectCoach);
 router.patch('/coaches/:id/revoke', adminController.revokeCoachApproval);
 
 export default router;

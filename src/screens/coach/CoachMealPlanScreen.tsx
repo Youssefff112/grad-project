@@ -18,17 +18,6 @@ interface Meal {
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
-const MOCK_FOOD_SUGGESTIONS = [
-  { id: '1', name: 'Chicken Breast (200g)', calories: 330, protein: 62, carbs: 0, fat: 7 },
-  { id: '2', name: 'Brown Rice (150g)', calories: 195, protein: 4, carbs: 42, fat: 1 },
-  { id: '3', name: 'Eggs (2 large)', calories: 140, protein: 12, carbs: 1, fat: 10 },
-  { id: '4', name: 'Sweet Potato (200g)', calories: 172, protein: 3, carbs: 40, fat: 0 },
-  { id: '5', name: 'Greek Yogurt (200g)', calories: 130, protein: 17, carbs: 10, fat: 2 },
-  { id: '6', name: 'Oats (80g)', calories: 300, protein: 10, carbs: 54, fat: 5 },
-  { id: '7', name: 'Salmon (150g)', calories: 312, protein: 30, carbs: 0, fat: 20 },
-  { id: '8', name: 'Avocado (100g)', calories: 160, protein: 2, carbs: 9, fat: 15 },
-];
-
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -85,6 +74,11 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   const [selectedMealType, setSelectedMealType] = useState('Breakfast');
   const [dayPlans, setDayPlans] = useState<Record<string, { type: string; items: Meal[] }[]>>({});
   const [showFoodPicker, setShowFoodPicker] = useState(false);
+  const [customFoodName, setCustomFoodName] = useState('');
+  const [customCalories, setCustomCalories] = useState('');
+  const [customProtein, setCustomProtein] = useState('');
+  const [customCarbs, setCustomCarbs] = useState('');
+  const [customFat, setCustomFat] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [ingredientModal, setIngredientModal] = useState<{
@@ -118,8 +112,16 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     getDayMeals(day).reduce((total, group) =>
       total + group.items.reduce((t, item) => t + item.calories, 0), 0);
 
-  const addFoodToDay = (food: typeof MOCK_FOOD_SUGGESTIONS[0]) => {
-    const mealItem: Meal = { ...food, ingredients: [food.name] };
+  const addFoodToDay = (food: Pick<Meal, 'name' | 'calories' | 'protein' | 'carbs' | 'fat'>) => {
+    const mealItem: Meal = {
+      id: `food-${Date.now()}`,
+      name: food.name,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fat: food.fat,
+      ingredients: [food.name],
+    };
     setDayPlans(prev => {
       const dayData = prev[selectedDay] || [];
       const existing = dayData.find(g => g.type === selectedMealType);
@@ -134,6 +136,30 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
       return { ...prev, [selectedDay]: [...dayData, { type: selectedMealType, items: [mealItem] }] };
     });
     setShowFoodPicker(false);
+    setCustomFoodName('');
+    setCustomCalories('');
+    setCustomProtein('');
+    setCustomCarbs('');
+    setCustomFat('');
+  };
+
+  const handleAddCustomFood = () => {
+    const name = customFoodName.trim();
+    if (!name) {
+      Alert.alert('Missing name', 'Enter a food name to add.');
+      return;
+    }
+    const parseN = (s: string) => {
+      const n = parseFloat(s.replace(/,/g, '.'));
+      return Number.isFinite(n) ? Math.max(0, n) : 0;
+    };
+    addFoodToDay({
+      name,
+      calories: parseN(customCalories),
+      protein: parseN(customProtein),
+      carbs: parseN(customCarbs),
+      fat: parseN(customFat),
+    });
   };
 
   const handleGenerateWithAI = async () => {
@@ -431,22 +457,40 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
 
         {showFoodPicker && (
-          <View style={[tw`mt-3 rounded-2xl overflow-hidden`, { borderWidth: 1, borderColor }]}>
-            {MOCK_FOOD_SUGGESTIONS.map(food => (
-              <TouchableOpacity
-                key={food.id}
-                onPress={() => addFoodToDay(food)}
-                style={[tw`flex-row items-center p-4`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor }]}
-              >
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{food.name}</Text>
-                  <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
-                    {food.calories} kcal · P:{food.protein}g · C:{food.carbs}g · F:{food.fat}g
-                  </Text>
+          <View style={[tw`mt-3 p-4 rounded-2xl gap-3`, { borderWidth: 1, borderColor, backgroundColor: cardBg }]}>
+            <Text style={[tw`text-xs`, { color: subtextColor }]}>
+              Add a food manually (macros optional). Use Generate with AI above for a full plan from the server.
+            </Text>
+            <TextInput
+              value={customFoodName}
+              onChangeText={setCustomFoodName}
+              placeholder="Food name"
+              placeholderTextColor={subtextColor}
+              style={[tw`rounded-xl px-3 py-2`, { borderWidth: 1, borderColor, color: textPrimary }]}
+            />
+            <View style={tw`flex-row flex-wrap gap-2`}>
+              {[
+                ['kcal', customCalories, setCustomCalories] as const,
+                ['P g', customProtein, setCustomProtein] as const,
+                ['C g', customCarbs, setCustomCarbs] as const,
+                ['F g', customFat, setCustomFat] as const,
+              ].map(([label, val, setter]) => (
+                <View key={label} style={tw`flex-1 min-w-[22%]`}>
+                  <Text style={[tw`text-[10px] font-bold mb-1`, { color: subtextColor }]}>{label}</Text>
+                  <TextInput
+                    value={val}
+                    onChangeText={setter}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={subtextColor}
+                    style={[tw`rounded-lg px-2 py-1.5 text-xs`, { borderWidth: 1, borderColor, color: textPrimary }]}
+                  />
                 </View>
-                <MaterialIcons name="add-circle" size={22} color={accent} />
-              </TouchableOpacity>
-            ))}
+              ))}
+            </View>
+            <TouchableOpacity onPress={handleAddCustomFood} style={[tw`py-3 rounded-xl items-center`, { backgroundColor: accent }]}>
+              <Text style={tw`text-sm font-bold text-white`}>Add to {selectedMealType}</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>

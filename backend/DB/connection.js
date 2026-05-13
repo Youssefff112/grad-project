@@ -37,6 +37,21 @@ export const connectDB = async () => {
     // tables whose FK names differ between Sequelize and the live DB.
     await sequelize.sync({ alter: { drop: false } });
 
+    try {
+      const { CoachProfile } = await import('../SRC/Modules/Coach/coach.model.js');
+      const { Op } = await import('sequelize');
+      await CoachProfile.update(
+        { applicationStatus: 'approved', isApproved: true },
+        { where: { isApproved: true } }
+      );
+      await CoachProfile.update(
+        { applicationStatus: 'pending' },
+        { where: { isApproved: false, applicationStatus: { [Op.is]: null } } }
+      );
+    } catch (e) {
+      console.warn('Coach applicationStatus backfill:', e?.message || e);
+    }
+
     console.log('✅ PostgreSQL Connected');
     return sequelize;
   } catch (error) {

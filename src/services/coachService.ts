@@ -19,6 +19,7 @@ export interface Coach {
   rating?: number;
   ratingCount?: number;
   isApproved?: boolean;
+  applicationStatus?: 'pending' | 'approved' | 'rejected';
   /** Populated from User association by the backend */
   User?: { firstName?: string; lastName?: string; email?: string };
   /** Convenience field computed from User.firstName + User.lastName */

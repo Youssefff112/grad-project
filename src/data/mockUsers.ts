@@ -97,28 +97,3 @@ export const MOCK_USERS: MockUser[] = [
     role: 'admin',
   },
 ];
-
-/**
- * Find mock user by email
- */
-export function findMockUserByEmail(email: string): MockUser | undefined {
-  return MOCK_USERS.find((user) => user.email.toLowerCase() === email.toLowerCase());
-}
-
-/**
- * Find mock user by email and password
- */
-export function validateMockUser(email: string, password: string): MockUser | null {
-  const user = findMockUserByEmail(email);
-  if (user && user.password === password) {
-    return user;
-  }
-  return null;
-}
-
-/**
- * Get mock user by subscription plan
- */
-export function getMockUserByPlan(plan: SubscriptionPlan): MockUser | undefined {
-  return MOCK_USERS.find((user) => user.subscriptionPlan === plan);
-}

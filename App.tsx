@@ -75,22 +75,30 @@ import { CoachBrowsingScreen } from './src/screens/coach/CoachBrowsingScreen';
 import { CoachProfileDetailScreen } from './src/screens/coach/CoachProfileDetailScreen';
 import { CoachAssignmentScreen } from './src/screens/coach/CoachAssignmentScreen';
 import { CoachSettingsScreen } from './src/screens/coach/CoachSettingsScreen';
+import { CoachPendingApprovalScreen } from './src/screens/coach/CoachPendingApprovalScreen';
+import { CoachApplicationRejectedScreen } from './src/screens/coach/CoachApplicationRejectedScreen';
 
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
   const { isDark } = useTheme();
-  const { fullName, isLoading, subscriptionPlan, role } = useUser();
+  const { fullName, isLoading, subscriptionPlan, role, isAuthenticated, coachApplicationStatus } = useUser();
 
-  const initialRouteName = isLoading
-    ? 'Splash'
-    : fullName
-      ? role === 'admin'
-        ? 'AdminDashboard'
-        : (role === 'coach' || subscriptionPlan === 'ProCoach')
-          ? 'CoachCommandCenter'
-          : 'TraineeCommandCenter'
-      : 'Splash';
+  const initialRouteName = (() => {
+    if (isLoading) return 'Splash';
+    if (!fullName) return 'Splash';
+    if (isAuthenticated && role === 'coach' && coachApplicationStatus === 'pending') return 'CoachPendingApproval';
+    if (isAuthenticated && role === 'coach' && coachApplicationStatus === 'rejected') return 'CoachApplicationRejected';
+    if (role === 'admin') return 'AdminDashboard';
+    if (role === 'coach') {
+      if (coachApplicationStatus === 'approved') {
+        return subscriptionPlan === 'ProCoach' ? 'CoachCommandCenter' : 'CoachSubscription';
+      }
+      return 'CoachPendingApproval';
+    }
+    if (subscriptionPlan === 'ProCoach') return 'CoachCommandCenter';
+    return 'TraineeCommandCenter';
+  })();
 
   return (
     <Stack.Navigator
@@ -157,6 +165,8 @@ function AppNavigator() {
       <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionScreen} />
 
       {/* Coach flow */}
+      <Stack.Screen name="CoachPendingApproval" component={CoachPendingApprovalScreen} />
+      <Stack.Screen name="CoachApplicationRejected" component={CoachApplicationRejectedScreen} />
       <Stack.Screen name="CoachSubscription" component={CoachSubscriptionScreen} />
       <Stack.Screen name="CoachCommandCenter" component={CoachCommandCenterScreen} />
       <Stack.Screen name="CoachProfileEdit" component={CoachProfileEditScreen} />

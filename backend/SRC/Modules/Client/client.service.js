@@ -56,7 +56,7 @@ export const clientService = {
     }
 
     const coachProfile = await CoachProfile.findOne({ where: { userId: coachId } });
-    if (!coachProfile || !coachProfile.isApproved) {
+    if (!coachProfile || coachProfile.applicationStatus !== 'approved' || !coachProfile.isApproved) {
       throw new AppError('Coach is not approved yet', 403);
     }
 

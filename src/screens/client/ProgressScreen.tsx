@@ -26,6 +26,35 @@ const DAILY_TARGETS = {
   water: 8,
 };
 
+function calendarDateKey(input: string | undefined): string | null {
+  if (!input) return null;
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) {
+    return input.length >= 10 ? input.slice(0, 10) : null;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function mondayStart(ref: Date = new Date()): Date {
+  const d = new Date(ref);
+  d.setHours(0, 0, 0, 0);
+  const dow = d.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function addDays(base: Date, n: number): Date {
+  const x = new Date(base);
+  x.setDate(base.getDate() + n);
+  return x;
+}
+
+function todayMonSunIndex(): number {
+  const dow = new Date().getDay();
+  return dow === 0 ? 6 : dow - 1;
+}
+
 export const ProgressScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName } = useUser();
@@ -38,6 +67,7 @@ export const ProgressScreen = ({ navigation }: any) => {
   const [workoutLogs, setWorkoutLogs] = useState<workoutService.WorkoutSession[]>([]);
   const [dietLogs, setDietLogs] = useState<dietService.DietLog[]>([]);
   const [measurements, setMeasurements] = useState<progressService.Measurement[]>([]);
+  const [selectedWeekdayIndex, setSelectedWeekdayIndex] = useState(todayMonSunIndex);
 
   useEffect(() => {
     loadProgressData();
@@ -67,19 +97,33 @@ export const ProgressScreen = ({ navigation }: any) => {
 
   const firstName = fullName ? fullName.split(' ')[0] : 'Champ';
 
-  // Generate mock historical data for display
-  const generateWeekData = () => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days.map((day, i) => ({
-      day,
-      calories: 2000 + Math.random() * 600,
-      meals: Math.floor(2 + Math.random() * 3),
-      workouts: Math.floor(Math.random() * 2),
-      water: Math.floor(5 + Math.random() * 4),
-    }));
-  };
+  const weekData = useMemo(() => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const mon = mondayStart();
+    return labels.map((dayLabel, i) => {
+      const dayDate = addDays(mon, i);
+      const key = dayDate.toISOString().slice(0, 10);
+      let calories = 0;
+      let meals = 0;
+      let workouts = 0;
+      let water = 0;
+      dietLogs.forEach((log) => {
+        if (calendarDateKey(log.date) !== key) return;
+        calories += Number(log.caloriesConsumed) || 0;
+        const done = log.mealsCompleted ? Object.values(log.mealsCompleted).filter(Boolean).length : 0;
+        meals += done > 0 ? done : log.status !== 'missed' ? 1 : 0;
+        if (log.waterMl != null && Number(log.waterMl) > 0) {
+          water += Math.round(Number(log.waterMl) / 250);
+        }
+      });
+      workoutLogs.forEach((w) => {
+        if (calendarDateKey(w.date) === key && w.status === 'completed') workouts += 1;
+      });
+      return { day: dayLabel, calories, meals, workouts, water };
+    });
+  }, [dietLogs, workoutLogs]);
 
-  const weekData = useMemo(() => generateWeekData(), []);
+  const selectedDay = weekData[selectedWeekdayIndex] ?? weekData[0];
 
   const stats = [
     {
@@ -112,15 +156,6 @@ export const ProgressScreen = ({ navigation }: any) => {
       icon: 'trending-up',
       color: '#3b82f6',
     },
-  ];
-
-  const achievements = [
-    { icon: 'sprint', label: '100+ Workouts', unlocked: false },
-    { icon: 'local-fire-department', label: '7-Day Streak', unlocked: true },
-    { icon: 'restaurant', label: 'Meal Master', unlocked: true },
-    { icon: 'water-drop', label: 'Hydration Hero', unlocked: false },
-    { icon: 'trending-up', label: 'Consistency', unlocked: true },
-    { icon: 'star', label: 'Macro Expert', unlocked: false },
   ];
 
   const recentActivities = useMemo(() => {
@@ -259,10 +294,11 @@ export const ProgressScreen = ({ navigation }: any) => {
               {weekData.map((day, i) => (
                 <TouchableOpacity
                   key={day.day}
+                  onPress={() => setSelectedWeekdayIndex(i)}
                   style={[
                     tw`flex-1 items-center py-3 rounded-lg`,
                     {
-                      backgroundColor: i === 0 ? accent + '20' : isDark ? '#1e293b' : '#f1f5f9',
+                      backgroundColor: i === selectedWeekdayIndex ? accent + '20' : isDark ? '#1e293b' : '#f1f5f9',
                     },
                   ]}
                 >
@@ -270,7 +306,7 @@ export const ProgressScreen = ({ navigation }: any) => {
                     style={[
                       tw`text-xs font-bold`,
                       {
-                        color: i === 0 ? accent : textSecondary,
+                        color: i === selectedWeekdayIndex ? accent : textSecondary,
                       },
                     ]}
                   >
@@ -280,7 +316,7 @@ export const ProgressScreen = ({ navigation }: any) => {
                     style={[
                       tw`text-[10px] mt-1`,
                       {
-                        color: i === 0 ? accent : textMuted,
+                        color: i === selectedWeekdayIndex ? accent : textMuted,
                       },
                     ]}
                   >
@@ -295,28 +331,28 @@ export const ProgressScreen = ({ navigation }: any) => {
               {[
                 {
                   label: 'Calories',
-                  value: `${Math.round(weekData[0].calories)}`,
-                  target: '2400',
+                  value: `${Math.round(selectedDay.calories)}`,
+                  target: String(DAILY_TARGETS.calories),
                   icon: 'local-fire-department',
                   color: accent,
                 },
                 {
                   label: 'Meals',
-                  value: `${Math.round(weekData[0].meals)}`,
+                  value: `${Math.round(selectedDay.meals)}`,
                   target: '3',
                   icon: 'restaurant',
                   color: '#4ade80',
                 },
                 {
                   label: 'Water',
-                  value: `${Math.round(weekData[0].water)}`,
-                  target: '8',
+                  value: `${Math.round(selectedDay.water)}`,
+                  target: String(DAILY_TARGETS.water),
                   icon: 'water-drop',
                   color: '#38bdf8',
                 },
                 {
                   label: 'Workouts',
-                  value: `${Math.round(weekData[0].workouts)}`,
+                  value: `${Math.round(selectedDay.workouts)}`,
                   target: '1',
                   icon: 'fitness-center',
                   color: '#f87171',
@@ -336,49 +372,24 @@ export const ProgressScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Achievements */}
+        {/* Achievements — driven by backend when available */}
         <View style={tw`px-5 mt-6`}>
           <Text style={[tw`text-sm font-bold uppercase tracking-wider mb-3`, { color: textSecondary }]}>
             Achievements
           </Text>
-          <View style={tw`gap-2`}>
-            {achievements.map((achievement, i) => (
-              <View
-                key={i}
-                style={[
-                  tw`p-3 rounded-xl flex-row items-center gap-3`,
-                  {
-                    backgroundColor: cardBg,
-                    borderWidth: 1,
-                    borderColor: achievement.unlocked ? accent + '40' : cardBorder,
-                    opacity: achievement.unlocked ? 1 : 0.5,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    tw`w-12 h-12 rounded-lg items-center justify-center`,
-                    {
-                      backgroundColor: achievement.unlocked ? accent + '18' : isDark ? '#1e293b' : '#f1f5f9',
-                    },
-                  ]}
-                >
-                  <MaterialIcons
-                    name={achievement.unlocked ? 'star' : 'lock'}
-                    size={20}
-                    color={achievement.unlocked ? accent : textMuted}
-                  />
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
-                    {achievement.label}
-                  </Text>
-                  <Text style={[tw`text-xs`, { color: textMuted }]}>
-                    {achievement.unlocked ? '✓ Unlocked' : 'Keep going!'}
-                  </Text>
-                </View>
-              </View>
-            ))}
+          <View
+            style={[
+              tw`p-4 rounded-xl flex-row items-center gap-3`,
+              { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+            ]}
+          >
+            <MaterialIcons name="emoji-events" size={24} color={textMuted} />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>No achievements yet</Text>
+              <Text style={[tw`text-xs mt-0.5`, { color: textMuted }]}>
+                Badges will appear here when the app awards them from your logged progress.
+              </Text>
+            </View>
           </View>
         </View>
 

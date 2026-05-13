@@ -8,8 +8,37 @@ import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 
 export const authService = {
+  /**
+   * Snapshot for login/register payloads (coach marketplace gate).
+   */
+  async getCoachAuthSnapshot(userId) {
+    const profile = await CoachProfile.findOne({ where: { userId } });
+    if (!profile) {
+      const created = await CoachProfile.create({
+        userId,
+        isApproved: false,
+        applicationStatus: 'pending'
+      });
+      return {
+        isApproved: created.isApproved,
+        applicationStatus: created.applicationStatus
+      };
+    }
+    const applicationStatus =
+      profile.applicationStatus ||
+      (profile.isApproved ? 'approved' : 'pending');
+    return {
+      isApproved: profile.isApproved,
+      applicationStatus
+    };
+  },
+
   async register(userData) {
     const { email, password, confirmPassword, ...rest } = userData;
+
+    if (rest.role === 'admin' && String(email).toLowerCase().trim() !== 'admin@vertex.com') {
+      throw new AppError('Admin accounts cannot be created through self-service registration', 400);
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
@@ -25,7 +54,10 @@ export const authService = {
     });
 
     if (user.role === 'coach') {
-      await CoachProfile.findOrCreate({ where: { userId: user.id }, defaults: { userId: user.id } });
+      await CoachProfile.findOrCreate({
+        where: { userId: user.id },
+        defaults: { userId: user.id, isApproved: false, applicationStatus: 'pending' }
+      });
     }
 
     if (user.role === 'client') {

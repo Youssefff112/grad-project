@@ -29,7 +29,7 @@ export interface RegisterRequest {
   password: string;
   confirmPassword: string;
   userType: 'onsite' | 'offline';
-  role?: 'client' | 'coach';
+  role?: 'client' | 'coach' | 'admin';
 }
 
 export interface RegisterResponse {
@@ -50,6 +50,7 @@ export interface User {
   email: string;
   role: string;
   isActive: boolean;
+  coachProfile?: { isApproved: boolean; applicationStatus: 'pending' | 'approved' | 'rejected' };
   profile?: {
     age?: number;
     gender?: string;

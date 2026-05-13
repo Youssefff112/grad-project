@@ -137,7 +137,10 @@ export const adminService = {
       role: 'coach'
     });
 
-    await CoachProfile.findOrCreate({ where: { userId: user.id }, defaults: { userId: user.id } });
+    await CoachProfile.findOrCreate({
+      where: { userId: user.id },
+      defaults: { userId: user.id, isApproved: true, applicationStatus: 'approved' }
+    });
 
     return user;
   },
@@ -238,9 +241,23 @@ export const adminService = {
   },
 
   async getCoachApplications(filters) {
+    const rawStatus = filters.applicationStatus;
+    const legacyApproved = filters.isApproved === 'true';
+    const legacyPending = filters.isApproved === 'false';
+
+    let status = rawStatus;
+    if (!status && legacyApproved) status = 'approved';
+    if (!status && legacyPending) status = 'pending';
+
     const where = {};
-    if (filters.isApproved !== undefined) {
-      where.isApproved = filters.isApproved === 'true';
+    if (status === 'pending') {
+      where.applicationStatus = 'pending';
+    } else if (status === 'approved') {
+      where.applicationStatus = 'approved';
+    } else if (status === 'rejected') {
+      where.applicationStatus = 'rejected';
+    } else {
+      where.applicationStatus = 'pending';
     }
 
     return CoachProfile.findAll({
@@ -262,6 +279,27 @@ export const adminService = {
     }
 
     profile.isApproved = true;
+    profile.applicationStatus = 'approved';
+    profile.approvedBy = adminId;
+    profile.approvedAt = new Date();
+    await profile.save();
+
+    return profile;
+  },
+
+  async rejectCoach(userId, adminId) {
+    const user = await User.findByPk(userId);
+    if (!user || user.role !== 'coach') {
+      throw new AppError('Coach not found', 404);
+    }
+
+    let profile = await CoachProfile.findOne({ where: { userId } });
+    if (!profile) {
+      profile = await CoachProfile.create({ userId });
+    }
+
+    profile.isApproved = false;
+    profile.applicationStatus = 'rejected';
     profile.approvedBy = adminId;
     profile.approvedAt = new Date();
     await profile.save();
@@ -276,6 +314,7 @@ export const adminService = {
     }
 
     profile.isApproved = false;
+    profile.applicationStatus = 'rejected';
     profile.approvedBy = adminId;
     profile.approvedAt = new Date();
     await profile.save();

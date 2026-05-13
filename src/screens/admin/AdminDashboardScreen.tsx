@@ -47,7 +47,7 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
 
   const loadPendingCoaches = useCallback(async () => {
     try {
-      const { applications } = await adminService.getCoachApplications(false);
+      const { applications } = await adminService.getCoachApplications('pending');
       setPendingCoaches(applications);
       setNotifAvailable(true);
     } catch {

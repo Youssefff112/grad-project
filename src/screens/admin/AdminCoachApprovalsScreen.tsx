@@ -44,8 +44,8 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
     else setLoading(true);
     setError(null);
     try {
-      const isApproved = activeTab === 'approved';
-      const { applications: data } = await adminService.getCoachApplications(isApproved);
+      const status = activeTab === 'pending' ? 'pending' : 'approved';
+      const { applications: data } = await adminService.getCoachApplications(status);
       setApplications(data);
     } catch {
       setError('Failed to load coach applications');
@@ -80,6 +80,34 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
               setApplications(prev => prev.filter(a => a.id !== app.id));
             } catch {
               Alert.alert('Error', 'Failed to approve coach.');
+            } finally {
+              setActionLoading(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReject = (app: adminService.CoachApplication) => {
+    const name = app.User
+      ? `${app.User.firstName || ''} ${app.User.lastName || ''}`.trim() || `Coach #${app.userId}`
+      : `Coach #${app.userId}`;
+    Alert.alert(
+      'Reject application',
+      `Reject "${name}"? They will be notified that their coach application was not approved.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading(app.id);
+            try {
+              await adminService.rejectCoach(app.userId);
+              setApplications(prev => prev.filter(a => a.id !== app.id));
+            } catch {
+              Alert.alert('Error', 'Failed to reject application.');
             } finally {
               setActionLoading(null);
             }
@@ -210,9 +238,9 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
                       {app.isApproved && app.approvedAt ? ` · Approved ${formatDate(app.approvedAt)}` : ''}
                     </Text>
                   </View>
-                  <View style={[tw`px-2 py-0.5 rounded-full`, { backgroundColor: app.isApproved ? '#10b98120' : '#f59e0b20' }]}>
-                    <Text style={[tw`text-[10px] font-bold`, { color: app.isApproved ? '#10b981' : '#f59e0b' }]}>
-                      {app.isApproved ? 'Approved' : 'Pending'}
+                  <View style={[tw`px-2 py-0.5 rounded-full`, { backgroundColor: app.applicationStatus === 'approved' ? '#10b98120' : app.applicationStatus === 'rejected' ? '#ef444420' : '#f59e0b20' }]}>
+                    <Text style={[tw`text-[10px] font-bold`, { color: app.applicationStatus === 'approved' ? '#10b981' : app.applicationStatus === 'rejected' ? '#ef4444' : '#f59e0b' }]}>
+                      {app.applicationStatus === 'approved' ? 'Approved' : app.applicationStatus === 'rejected' ? 'Rejected' : 'Pending'}
                     </Text>
                   </View>
                 </View>
@@ -255,31 +283,47 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
                 {/* Action buttons */}
                 <View style={tw`flex-row gap-2`}>
                   {activeTab === 'pending' && (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => handleApprove(app)}
+                        disabled={isActioning}
+                        style={[tw`flex-1 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`, { backgroundColor: '#10b98118', borderWidth: 1, borderColor: '#10b98130' }]}
+                      >
+                        {isActioning ? <ActivityIndicator size="small" color="#10b981" /> : (
+                          <>
+                            <MaterialIcons name="check-circle" size={16} color="#10b981" />
+                            <Text style={tw`text-sm font-bold text-green-500`}>Approve</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleReject(app)}
+                        disabled={isActioning}
+                        style={[tw`flex-1 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`, { backgroundColor: '#ef444414', borderWidth: 1, borderColor: '#ef444428' }]}
+                      >
+                        {isActioning ? <ActivityIndicator size="small" color="#ef4444" /> : (
+                          <>
+                            <MaterialIcons name="cancel" size={16} color="#ef4444" />
+                            <Text style={tw`text-sm font-bold text-red-500`}>Reject</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  {activeTab === 'approved' && (
                     <TouchableOpacity
-                      onPress={() => handleApprove(app)}
+                      onPress={() => handleRevoke(app)}
                       disabled={isActioning}
-                      style={[tw`flex-1 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`, { backgroundColor: '#10b98118', borderWidth: 1, borderColor: '#10b98130' }]}
+                      style={[tw`flex-1 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`, { backgroundColor: '#ef444414', borderWidth: 1, borderColor: '#ef444428' }]}
                     >
-                      {isActioning ? <ActivityIndicator size="small" color="#10b981" /> : (
+                      {isActioning ? <ActivityIndicator size="small" color="#ef4444" /> : (
                         <>
-                          <MaterialIcons name="check-circle" size={16} color="#10b981" />
-                          <Text style={tw`text-sm font-bold text-green-500`}>Approve</Text>
+                          <MaterialIcons name="cancel" size={16} color="#ef4444" />
+                          <Text style={tw`text-sm font-bold text-red-500`}>Revoke</Text>
                         </>
                       )}
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity
-                    onPress={() => handleRevoke(app)}
-                    disabled={isActioning}
-                    style={[tw`flex-1 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5`, { backgroundColor: '#ef444414', borderWidth: 1, borderColor: '#ef444428' }]}
-                  >
-                    {isActioning && activeTab === 'approved' ? <ActivityIndicator size="small" color="#ef4444" /> : (
-                      <>
-                        <MaterialIcons name="cancel" size={16} color="#ef4444" />
-                        <Text style={tw`text-sm font-bold text-red-500`}>{activeTab === 'pending' ? 'Reject' : 'Revoke'}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
                 </View>
               </View>
             );

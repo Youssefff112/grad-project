@@ -150,5 +150,14 @@ export const adminController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async rejectCoach(req, res, next) {
+    try {
+      const profile = await adminService.rejectCoach(req.params.id, req.user.id);
+      successResponse(res, 200, 'Coach application rejected', { profile });
+    } catch (error) {
+      next(error);
+    }
   }
 };

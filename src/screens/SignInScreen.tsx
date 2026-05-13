@@ -16,15 +16,16 @@ import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
-import { validateMockUser, MOCK_USERS, MockUser } from '../data/mockUsers';
+import { MOCK_USERS, MockUser } from '../data/mockUsers';
 import * as authService from '../services/auth.service';
 import * as subscriptionService from '../services/subscriptionService';
 import { getClientSubscriptionStatus } from '../services/clientService';
 import { PLAN_FEATURES } from '../constants/plans';
+import { resolveCoachGate } from '../utils/coachGate';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole, setUserId } = useUser();
+  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole, setUserId, setCoachApplicationStatus } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,9 +51,9 @@ export const SignInScreen = ({ navigation }: any) => {
     return newErrors;
   };
 
-  // Ensures a mock demo user has an active subscription for their plan tier.
+  // Ensures a demo quick-login user has an active subscription for their plan tier in the DB.
   // Called after successful login/auto-register so AI features work immediately.
-  const _ensureMockSubscription = async (mockUser: MockUser) => {
+  const _ensureDemoQuickLoginSubscription = async (mockUser: MockUser) => {
     const { subscription: existing } = await subscriptionService.getActiveSubscription('client').catch(() => ({ subscription: null }));
     if (existing?.status === 'active') return; // already active — nothing to do
 
@@ -102,6 +103,13 @@ export const SignInScreen = ({ navigation }: any) => {
         // Persist role to context + AsyncStorage
         setRole(user.role as any);
 
+        const coachGate = user.role === 'coach' ? resolveCoachGate((user as any).coachProfile) : null;
+        if (user.role === 'coach' && coachGate) {
+          await setCoachApplicationStatus(coachGate);
+        } else {
+          await setCoachApplicationStatus(null);
+        }
+
         if (user.role === 'client') {
           try {
             const { subscription } = await getClientSubscriptionStatus();
@@ -114,7 +122,11 @@ export const SignInScreen = ({ navigation }: any) => {
             setSubscriptionPlan(((user as any).subscriptionPlan ?? 'Free') as any);
           }
         } else if (user.role === 'coach') {
-          setSubscriptionPlan('ProCoach');
+          if (coachGate === 'pending' || coachGate === 'rejected') {
+            setSubscriptionPlan('Free');
+          } else {
+            setSubscriptionPlan(((user as any).subscriptionPlan as any) ?? 'ProCoach');
+          }
         } else {
           setSubscriptionPlan('Free');
         }
@@ -122,8 +134,10 @@ export const SignInScreen = ({ navigation }: any) => {
         // Navigate based on role
         if (user.role === 'admin') {
           navigation.navigate('AdminDashboard');
-        } else if (user.role === 'coach') {
-          navigation.navigate('CoachCommandCenter');
+        } else if (user.role === 'coach' && coachGate) {
+          if (coachGate === 'pending') navigation.navigate('CoachPendingApproval');
+          else if (coachGate === 'rejected') navigation.navigate('CoachApplicationRejected');
+          else navigation.navigate('CoachCommandCenter');
         } else {
           navigation.navigate('TraineeCommandCenter');
         }
@@ -136,24 +150,6 @@ export const SignInScreen = ({ navigation }: any) => {
       } else if (error.response?.status === 429) {
         errorMessage = 'Too many login attempts. Please try again later.';
       } else if (error.message === 'Network Error' || !error.response) {
-        // Fallback to mock user for demo/offline mode
-        console.log('Backend unavailable, trying mock user...');
-        const mockUser = validateMockUser(email, password);
-        if (mockUser) {
-          setFullName(mockUser.fullName);
-          saveEmail(mockUser.email);
-          setRole(mockUser.role as any);
-          if (mockUser.role === 'admin') {
-            navigation.navigate('AdminDashboard');
-          } else if (mockUser.role === 'coach') {
-            setSubscriptionPlan('ProCoach');
-            navigation.navigate('CoachCommandCenter');
-          } else {
-            setSubscriptionPlan(mockUser.subscriptionPlan);
-            navigation.navigate('TraineeCommandCenter');
-          }
-          return;
-        }
         errorMessage = 'Backend is unavailable. Please check your connection.';
       }
 
@@ -192,7 +188,7 @@ export const SignInScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`flex-col gap-5`}>
-          {/* Quick Mock User Login Section */}
+          {/* Demo quick-login chips — credentials align with backend seed */}
           <View>
             <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
               Demo: Quick Login
@@ -229,7 +225,7 @@ export const SignInScreen = ({ navigation }: any) => {
                         password: user.password,
                         confirmPassword: user.password,
                         userType: 'onsite',
-                        role: user.role === 'coach' ? 'coach' : 'client',
+                        role: user.role,
                       });
                       return authService.login({ email: user.email, password: user.password });
                     }
@@ -246,14 +242,29 @@ export const SignInScreen = ({ navigation }: any) => {
                     setRole(u.role as any);
 
                     if (u.role === 'client' || u.role === 'coach') {
-                      await _ensureMockSubscription(user).catch(() => { /* may already exist */ });
+                      await _ensureDemoQuickLoginSubscription(user).catch(() => { /* may already exist */ });
+                    }
+
+                    const coachGate = u.role === 'coach' ? resolveCoachGate((u as any).coachProfile) : null;
+                    if (u.role === 'coach' && coachGate) {
+                      await setCoachApplicationStatus(coachGate);
+                    } else {
+                      await setCoachApplicationStatus(null);
                     }
 
                     if (u.role === 'admin') {
                       navigation.navigate('AdminDashboard');
-                    } else if (u.role === 'coach') {
-                      setSubscriptionPlan('ProCoach');
-                      navigation.navigate('CoachCommandCenter');
+                    } else if (u.role === 'coach' && coachGate) {
+                      if (coachGate === 'pending') {
+                        setSubscriptionPlan('Free');
+                        navigation.navigate('CoachPendingApproval');
+                      } else if (coachGate === 'rejected') {
+                        setSubscriptionPlan('Free');
+                        navigation.navigate('CoachApplicationRejected');
+                      } else {
+                        setSubscriptionPlan('ProCoach');
+                        navigation.navigate('CoachCommandCenter');
+                      }
                     } else {
                       try {
                         const { subscription } = await getClientSubscriptionStatus();

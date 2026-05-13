@@ -138,7 +138,7 @@ export const coachService = {
     const { specialty, minRating, page = 1, limit = 20 } = filters;
     const offset = (page - 1) * limit;
 
-    const where = { isApproved: true };
+    const where = { isApproved: true, applicationStatus: 'approved' };
     if (minRating) {
       where.rating = { [Op.gte]: minRating };
     }
@@ -275,7 +275,7 @@ export const coachService = {
 
   async requireApprovedCoach(userId) {
     const profile = await CoachProfile.findOne({ where: { userId } });
-    if (!profile || !profile.isApproved) {
+    if (!profile || profile.applicationStatus !== 'approved' || !profile.isApproved) {
       throw new AppError('Coach profile is not approved yet', 403);
     }
     return profile;

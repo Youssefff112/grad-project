@@ -32,6 +32,7 @@ export interface CoachApplication {
   id: number;
   userId: number;
   isApproved: boolean;
+  applicationStatus?: 'pending' | 'approved' | 'rejected';
   approvedBy?: number;
   approvedAt?: string;
   bio?: string;
@@ -113,10 +114,9 @@ export const deactivateUser = async (id: number): Promise<void> => {
 // ─── Coach Approvals ──────────────────────────────────────────
 
 export const getCoachApplications = async (
-  isApproved?: boolean
+  applicationStatus: 'pending' | 'approved' | 'rejected'
 ): Promise<{ applications: CoachApplication[] }> => {
-  const qs = isApproved !== undefined ? `?isApproved=${isApproved}` : '';
-  const response: any = await apiGet(`/admin/coach-applications${qs}`);
+  const response: any = await apiGet(`/admin/coach-applications?applicationStatus=${applicationStatus}`);
   return { applications: response.data?.applications || response.data || [] };
 };
 
@@ -124,8 +124,12 @@ export const approveCoach = async (coachProfileId: number): Promise<void> => {
   await apiPatch(`/admin/coaches/${coachProfileId}/approve`, {});
 };
 
-export const revokeCoach = async (coachProfileId: number): Promise<void> => {
-  await apiPatch(`/admin/coaches/${coachProfileId}/revoke`, {});
+export const revokeCoach = async (coachUserId: number): Promise<void> => {
+  await apiPatch(`/admin/coaches/${coachUserId}/revoke`, {});
+};
+
+export const rejectCoach = async (coachUserId: number): Promise<void> => {
+  await apiPatch(`/admin/coaches/${coachUserId}/reject`, {});
 };
 
 // ─── Subscription Management ──────────────────────────────────
@@ -166,6 +170,7 @@ export default {
   deactivateUser,
   getCoachApplications,
   approveCoach,
+  rejectCoach,
   revokeCoach,
   getAllSubscriptions,
   updateSubscriptionStatus,
