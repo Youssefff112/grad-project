@@ -4,6 +4,8 @@ import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { Op } from 'sequelize';
 import { notificationService } from '../Notification/notification.service.js';
+import { generateAiDietPlan } from '../../Utils/aiService.js';
+import { pickFitnessGoal } from '../../Utils/mergeClientGoal.utils.js';
 
 export const dietService = {
   // ─── AI INTEGRATION POINT ────────────────────────────────────────────────────
@@ -178,20 +180,60 @@ export const dietService = {
 
   async _generateDietPlanForUser(userId, coachId = null, planName = null, pendingReview = false) {
     const user = await User.findByPk(userId);
-    if (!user || !user.profile || !user.profile.goal) {
-      throw new AppError('Please complete your profile first', 400);
+    const clientRow = await ClientProfile.findOne({ where: { userId } });
+    const profile = user?.profile || {};
+    const mergedGoal = pickFitnessGoal(profile, clientRow, coachId);
+
+    if (!user || !mergedGoal) {
+      throw new AppError(
+        'Please complete your profile first — add a fitness goal (Goals screen or Profile).',
+        400
+      );
     }
 
     // Coerce biometrics to numbers; use safe fallbacks so we never pass NaN to the DB
-    const weight  = parseFloat(user.profile.currentWeight)  || 70;   // kg
-    const height  = parseFloat(user.profile.height)          || 170;  // cm
-    const age     = parseInt(user.profile.age, 10)            || 25;
-    const gender  = user.profile.gender || 'male';
+    const weight  = parseFloat(profile.currentWeight)  || 70;   // kg
+    const height  = parseFloat(profile.height)          || 170;  // cm
+    const age     = parseInt(profile.age, 10)            || 25;
+    const gender  = profile.gender || 'male';
 
     // Normalize raw goal to a valid DB enum value
-    const goal = this._normalizeGoal(user.profile.goal);
-    const rawDietPref = user.profile.dietaryPreference || user.profile.dietaryPreferences;
+    const goal = this._normalizeGoal(mergedGoal);
+    const rawDietPref = profile.dietaryPreference || profile.dietaryPreferences;
     const dietaryPreference = this._normalizeDietaryPreference(rawDietPref);
+
+    // Try Python AI service first (AI_SERVICE_URL, default http://localhost:8000)
+    const savedProfile = user.profile;
+    user.profile = { ...profile, goal: mergedGoal };
+    try {
+      const aiBundle = await generateAiDietPlan(user);
+      if (aiBundle?.weeklyMealPlan?.length) {
+        await DietPlan.update(
+          { isActive: false },
+          { where: { userId, isActive: true } }
+        );
+
+        const dietPlan = await DietPlan.create({
+          userId,
+          planName: planName || null,
+          goal,
+          dietaryPreference,
+          dailyCalorieTarget: aiBundle.dailyCalorieTarget || 2000,
+          macronutrients: aiBundle.macronutrients || { protein: 150, carbs: 200, fats: 60 },
+          weeklyMealPlan: aiBundle.weeklyMealPlan,
+          assignedByCoachId: coachId || null,
+          assignedAt: coachId ? new Date() : null,
+          weekStartDate: this._getStartOfWeek(),
+          isActive: !pendingReview,
+          pendingCoachReview: pendingReview,
+        });
+        return dietPlan;
+      }
+    } catch (e) {
+      console.warn('[diet] AI service unavailable, using built-in meal planner:', e?.message || e);
+    } finally {
+      user.profile = savedProfile;
+    }
 
     // Deactivate previous plans
     await DietPlan.update(

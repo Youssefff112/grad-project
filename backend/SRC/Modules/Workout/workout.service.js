@@ -4,6 +4,8 @@ import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { notificationService } from '../Notification/notification.service.js';
+import { generateAiWorkoutPlan } from '../../Utils/aiService.js';
+import { pickFitnessGoal } from '../../Utils/mergeClientGoal.utils.js';
 
 export const workoutService = {
   // ─── AI INTEGRATION POINT ────────────────────────────────────────────────────
@@ -160,13 +162,22 @@ export const workoutService = {
 
   async _generateWorkoutPlanForUser(userId, coachId = null, location = null, equipment = null, planName = null, pendingReview = false) {
     const user = await User.findByPk(userId);
-    if (!user || !user.profile || !user.profile.goal || !user.profile.experienceLevel) {
-      throw new AppError('Please complete your profile first', 400);
+    const clientRow = await ClientProfile.findOne({ where: { userId } });
+    const profile = user?.profile || {};
+    const mergedGoal = pickFitnessGoal(profile, clientRow, coachId);
+    // Experience is stored on users.profile; default for generation if goal exists (avoids false 400 after partial onboarding)
+    const mergedExperience =
+      profile.experienceLevel || profile.experience_level || 'beginner';
+
+    if (!user || !mergedGoal) {
+      throw new AppError(
+        'Please complete your profile first — add a fitness goal (Goals screen or Profile).',
+        400
+      );
     }
 
-    const profile = user.profile || {};
-    const rawGoal = profile.goal || user.goal;
-    const rawExperience = profile.experienceLevel || user.experienceLevel;
+    const rawGoal = mergedGoal;
+    const rawExperience = mergedExperience;
 
     // Normalize to DB enum values
     const goal = this._normalizeGoal(rawGoal);
@@ -185,10 +196,26 @@ export const workoutService = {
       { where: { userId, isActive: true } }
     );
 
-    // Generate weekly schedule
-    const weeklySchedule = this._generateWeeklySchedule(
-      goal, experienceLevel, effectiveLocation, effectiveEquipment
-    );
+    // Prefer Python AI service (see AI_SERVICE_URL); fall back to built-in rules if it is down or errors.
+    const savedProfile = user.profile;
+    user.profile = { ...profile, goal: mergedGoal, experienceLevel: mergedExperience };
+    let weeklySchedule;
+    try {
+      weeklySchedule = await generateAiWorkoutPlan(user, 4, effectiveLocation, effectiveEquipment);
+      if (!Array.isArray(weeklySchedule) || weeklySchedule.length === 0) {
+        throw new Error('empty AI schedule');
+      }
+    } catch (e) {
+      console.warn('[workout] AI service unavailable, using built-in plan generator:', e?.message || e);
+      weeklySchedule = this._generateWeeklySchedule(
+        goal,
+        experienceLevel,
+        effectiveLocation,
+        effectiveEquipment
+      );
+    } finally {
+      user.profile = savedProfile;
+    }
 
     const workoutPlan = await WorkoutPlan.create({
       userId,

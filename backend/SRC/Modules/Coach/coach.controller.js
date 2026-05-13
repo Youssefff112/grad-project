@@ -141,6 +141,7 @@ export const coachController = {
     try {
       await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(parseInt(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const plan = await workoutService.generateWorkoutPlanForUser(userId, req.user.id);
       successResponse(res, 201, 'Workout plan generated for client', { plan });
     } catch (error) {
@@ -152,6 +153,7 @@ export const coachController = {
     try {
       await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(parseInt(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const plan = await dietService.generateDietPlanForUser(userId, req.user.id);
       successResponse(res, 201, 'Diet plan generated for client', { plan });
     } catch (error) {
