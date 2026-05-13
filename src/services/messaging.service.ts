@@ -69,6 +69,19 @@ export interface Conversation {
 /** Unwrap FitCore `{ success, message, data: { ... } }` bodies from apiGet/apiPost */
 const unwrapData = (response: any) => response?.data ?? response;
 
+export const getThreadWithUser = async (otherUserId: number): Promise<{
+  conversation: { id: string };
+  messages: ChatMessage[];
+}> => {
+  const response: any = await apiGet(`/messages/with-user/${otherUserId}`);
+  const data = unwrapData(response);
+  const rawList = Array.isArray(data?.messages) ? data.messages : [];
+  return {
+    conversation: data?.conversation || { id: '' },
+    messages: rawList.map(normalizeChatMessage),
+  };
+};
+
 export const getConversations = async (): Promise<Conversation[]> => {
   const response: any = await apiGet('/messages');
   const data = unwrapData(response);

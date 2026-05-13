@@ -2,7 +2,68 @@
 import { Op } from 'sequelize';
 import { Conversation, Message } from './messaging.model.js';
 import { User } from '../User/user.model.js';
+import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+
+/**
+ * Open (or create) the coach–client thread and return existing messages — no new message required.
+ */
+export const getThreadWithUser = async (req, res, next) => {
+  try {
+    const otherUserId = parseInt(req.params.otherUserId, 10);
+    if (!Number.isFinite(otherUserId) || otherUserId <= 0) {
+      return next(new AppError('Invalid user id', 400));
+    }
+    const senderId = req.user.id;
+    const sender = await User.findByPk(senderId, { attributes: ['id', 'role'] });
+    const other = await User.findByPk(otherUserId, { attributes: ['id', 'role'] });
+    if (!other) {
+      return next(new AppError('User not found', 404));
+    }
+    if (senderId === otherUserId) {
+      return next(new AppError('Cannot open a thread with yourself', 400));
+    }
+    const isClientToCoach = sender?.role === 'client' && other?.role === 'coach';
+    const isCoachToClient = sender?.role === 'coach' && other?.role === 'client';
+    if (!isClientToCoach && !isCoachToClient) {
+      return next(new AppError('Messaging is only supported between clients and coaches', 403));
+    }
+
+    const clientId = isClientToCoach ? senderId : otherUserId;
+    const coachId = isClientToCoach ? otherUserId : senderId;
+
+    const clientProfile = await ClientProfile.findOne({ where: { userId: clientId } });
+    if (!clientProfile || clientProfile.selectedCoachId !== coachId) {
+      return next(new AppError('You can only message your assigned coach or clients', 403));
+    }
+
+    const [conversation] = await Conversation.findOrCreate({
+      where: { clientId, coachId },
+      defaults: { lastMessageAt: new Date() },
+    });
+
+    const messages = await Message.findAll({
+      where: { conversationId: conversation.id },
+      order: [['createdAt', 'ASC']],
+      limit: 100,
+      include: [{ model: User, as: 'sender', attributes: ['id', 'firstName', 'lastName'] }],
+    });
+
+    const convPlain = typeof conversation.get === 'function' ? conversation.get({ plain: true }) : conversation;
+    const rowsPlain = messages.map((m) => (typeof m.get === 'function' ? m.get({ plain: true }) : m));
+
+    res.status(200).json({
+      success: true,
+      message: 'Thread loaded',
+      data: {
+        conversation: convPlain,
+        messages: rowsPlain,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getConversations = async (req, res, next) => {
   try {
@@ -23,7 +84,8 @@ export const getConversations = async (req, res, next) => {
           model: Message,
           as: 'messages',
           limit: 1,
-          order: [['createdAt', 'DESC']]
+          separate: true,
+          order: [['createdAt', 'DESC']],
         }
       ],
       order: [['lastMessageAt', 'DESC']]
@@ -135,6 +197,11 @@ export const sendMessage = async (req, res, next) => {
 
       const clientId = isClientToCoach ? senderId : receiverId;
       const coachId = isClientToCoach ? receiverId : senderId;
+
+      const clientProfile = await ClientProfile.findOne({ where: { userId: clientId } });
+      if (!clientProfile || clientProfile.selectedCoachId !== coachId) {
+        return next(new AppError('You can only message your assigned coach or clients', 403));
+      }
 
       [conversation] = await Conversation.findOrCreate({
         where: { clientId, coachId },

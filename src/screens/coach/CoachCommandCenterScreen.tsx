@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,8 +9,6 @@ import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 import * as coachService from '../../services/coachService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as messagingService from '../../services/messaging.service';
 
 export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -34,10 +32,6 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   });
   const [showQuickMessage, setShowQuickMessage] = useState(false);
   const [messagingClientId, setMessagingClientId] = useState<string | null>(null);
-
-  const WATER_TARGET = 8;
-  const today = new Date().toISOString().split('T')[0];
-  const [clientWater, setClientWater] = useState<Record<string, number>>({});
 
   const mapClient = (c: coachService.CoachClient): ClientRow => ({
     id: String(c.id),
@@ -85,34 +79,14 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     (c) => c.status === 'active' && isInactive(c.lastCheckin),
   );
 
-  useEffect(() => {
-    const loadClientWater = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(`coach_client_water_${today}`);
-        if (stored) setClientWater(JSON.parse(stored));
-      } catch {}
-    };
-    loadClientWater();
-  }, [today]);
-
-  const setClientGlasses = useCallback((clientId: string, delta: number) => {
-    setClientWater((prev) => {
-      const next = Math.max(0, Math.min((prev[clientId] ?? 0) + delta, 16));
-      const updated = { ...prev, [clientId]: next };
-      AsyncStorage.setItem(`coach_client_water_${today}`, JSON.stringify(updated)).catch(() => {});
-      return updated;
-    });
-  }, [today]);
-
   const startChat = async (client: ClientRow) => {
     setMessagingClientId(client.id);
     try {
-      const msg = await messagingService.sendMessage(null, client.userId, '👋');
       setShowQuickMessage(false);
       navigation.navigate('Chat', {
-        conversationId: msg.conversationId,
         conversationName: client.name,
         receiverId: client.userId,
+        conversationId: null,
       });
     } catch {
       setShowQuickMessage(false);
@@ -345,83 +319,17 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {/* Client Hydration Tracker */}
-        {allClients.filter(c => c.status === 'active').length > 0 && (
+        {/* Hydration: coaches set targets in meal plans; clients log intake in the app */}
+        {allClients.filter((c) => c.status === 'active').length > 0 && (
           <View style={tw`px-4 mt-8`}>
-            <View style={tw`flex-row items-center gap-2 mb-4`}>
-              <MaterialIcons name="water-drop" size={20} color="#38bdf8" />
-              <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: textPrimary }]}>
-                Client Hydration
-              </Text>
-              <Text style={[tw`text-sm font-medium ml-1`, { color: subtextColor }]}>Today</Text>
-            </View>
-            <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
-              {allClients.filter(c => c.status === 'active').map((client, i, arr) => {
-                const glasses = clientWater[client.id] ?? 0;
-                const goalMet = glasses >= WATER_TARGET;
-                return (
-                  <View
-                    key={client.id}
-                    style={[
-                      tw`px-4 py-3.5`,
-                      i < arr.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                    ]}
-                  >
-                    {/* Name row */}
-                    <View style={tw`flex-row items-center justify-between mb-2`}>
-                      <View style={tw`flex-row items-center gap-2`}>
-                        <View style={[tw`w-7 h-7 rounded-full items-center justify-center`, { backgroundColor: goalMet ? '#10b98120' : '#38bdf818' }]}>
-                          <MaterialIcons name="person" size={15} color={goalMet ? '#10b981' : '#38bdf8'} />
-                        </View>
-                        <Text style={[tw`text-sm font-semibold`, { color: textPrimary }]}>{client.name}</Text>
-                      </View>
-                      <View style={tw`flex-row items-center gap-1.5`}>
-                        {goalMet && <MaterialIcons name="check-circle" size={13} color="#10b981" />}
-                        <Text style={[tw`text-xs font-black`, { color: goalMet ? '#10b981' : '#38bdf8' }]}>
-                          {glasses}/{WATER_TARGET}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Progress dots + controls */}
-                    <View style={tw`flex-row items-center gap-2`}>
-                      <TouchableOpacity
-                        onPress={() => setClientGlasses(client.id, -1)}
-                        disabled={glasses === 0}
-                        style={[
-                          tw`w-7 h-7 rounded-full items-center justify-center flex-shrink-0`,
-                          { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', opacity: glasses === 0 ? 0.3 : 1 },
-                        ]}
-                      >
-                        <MaterialIcons name="remove" size={16} color={textPrimary} />
-                      </TouchableOpacity>
-
-                      <View style={tw`flex-1 flex-row gap-1`}>
-                        {Array.from({ length: WATER_TARGET }).map((_, idx) => (
-                          <View
-                            key={idx}
-                            style={[
-                              tw`flex-1 h-1.5 rounded-full`,
-                              { backgroundColor: idx < glasses ? (goalMet ? '#10b981' : '#38bdf8') : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
-                            ]}
-                          />
-                        ))}
-                      </View>
-
-                      <TouchableOpacity
-                        onPress={() => setClientGlasses(client.id, 1)}
-                        disabled={glasses >= 16}
-                        style={[
-                          tw`w-7 h-7 rounded-full items-center justify-center flex-shrink-0`,
-                          { backgroundColor: '#38bdf818', opacity: glasses >= 16 ? 0.3 : 1 },
-                        ]}
-                      >
-                        <MaterialIcons name="add" size={16} color="#38bdf8" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
+            <View style={[tw`rounded-2xl p-4 flex-row gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+              <MaterialIcons name="water-drop" size={22} color="#38bdf8" style={tw`mt-0.5`} />
+              <View style={tw`flex-1`}>
+                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Water goals vs. intake</Text>
+                <Text style={[tw`text-xs mt-1 leading-relaxed`, { color: subtextColor }]}>
+                  Set how much water each client should aim for in their active meal plan (hydration goal). Only the client logs glasses or litres in the app—you do not log water for them.
+                </Text>
+              </View>
             </View>
           </View>
         )}

@@ -22,7 +22,8 @@
     "dev": "node --watch index.js",
     "start": "node index.js",
     "seed": "node seed.js",
-    "tunnel": "ngrok http --log=stdout 5000"
+    "tunnel": "ngrok http --log=stdout 5000",
+    "check-syntax": "node scripts/check-syntax.mjs"
   },
   "keywords": [],
   "author": "",

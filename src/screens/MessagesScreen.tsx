@@ -136,7 +136,7 @@ export const MessagesScreen = ({ navigation }: any) => {
     }
 
     return result;
-  }, [filter, searchText]);
+  }, [conversations, filter, searchText]);
 
   const handleOpenChat = (conversation: UIConversation) => {
     navigation.navigate('Chat', {

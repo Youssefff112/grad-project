@@ -11,7 +11,8 @@
     "tunnel": "cd backend && npm run tunnel",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint"
+    "check": "npm run typecheck && npm run lint && npm run check:backend-syntax",
+    "check:backend-syntax": "npm run check-syntax --prefix backend"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",

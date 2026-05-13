@@ -18,7 +18,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../config/environment';
-import { getMessages, sendMessage, ChatMessage, normalizeChatMessage } from '../services/messaging.service';
+import {
+  getMessages,
+  sendMessage,
+  getThreadWithUser,
+  ChatMessage,
+  normalizeChatMessage,
+} from '../services/messaging.service';
 import tokenManager from '../utils/tokenManager';
 
 const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
@@ -74,6 +80,42 @@ export const ChatScreen = ({ navigation, route }: any) => {
       reloadMessages(id);
     }, [reloadMessages])
   );
+
+  // Open thread by receiver (no conversation id yet) or load history when we already have an id
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const hasConv =
+        !!conversationIdFromRoute &&
+        conversationIdFromRoute !== 'undefined' &&
+        conversationIdFromRoute !== 'null';
+
+      if (hasConv) {
+        await reloadMessages(conversationIdFromRoute);
+        return;
+      }
+
+      if (!receiverId || receiverId <= 0) return;
+
+      try {
+        const { conversation, messages: threadMessages } = await getThreadWithUser(receiverId);
+        if (cancelled) return;
+        const convId = conversation?.id ? String(conversation.id) : '';
+        if (convId) {
+          setActiveConversationId(convId);
+          activeConversationIdRef.current = convId;
+        }
+        setMessages(Array.isArray(threadMessages) ? threadMessages : []);
+      } catch (e) {
+        console.log('Chat: could not open thread', e);
+        if (!cancelled) setMessages([]);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [receiverId, conversationIdFromRoute, reloadMessages]);
 
   // Socket joins the user's room when auth context is ready (not only on first mount)
   useEffect(() => {

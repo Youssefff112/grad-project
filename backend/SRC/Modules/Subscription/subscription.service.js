@@ -103,6 +103,18 @@ export const subscriptionService = {
   },
 
   async requireActiveSubscription(userId, role) {
+    // Coaches use roster / messaging / plans without a separate billing row in dev & small teams.
+    if (role === 'coach') {
+      const subscription = await this.getActiveSubscription(userId, 'coach');
+      if (!subscription) return null;
+      if (subscription.endDate && subscription.endDate < new Date()) {
+        subscription.status = 'expired';
+        await subscription.save();
+        throw new AppError('Subscription expired', 403);
+      }
+      return subscription;
+    }
+
     const subscription = await this.getActiveSubscription(userId, role);
     if (!subscription) {
       throw new AppError('Active subscription required', 403);

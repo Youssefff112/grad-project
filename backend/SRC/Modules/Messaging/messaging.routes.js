@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', messagingController.getConversations);
+router.get('/with-user/:otherUserId', messagingController.getThreadWithUser);
 router.post('/send', messagingController.sendMessage);
 router.get('/:conversationId/messages', messagingController.getMessages);
 router.post('/:conversationId/messages', messagingController.sendMessage);
