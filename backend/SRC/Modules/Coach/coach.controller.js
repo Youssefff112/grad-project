@@ -6,6 +6,7 @@ import { workoutService } from '../Workout/workout.service.js';
 import { WorkoutPlan } from '../Workout/workout.model.js';
 import { dietService } from '../Diet/diet.service.js';
 import { DietPlan } from '../Diet/diet.model.js';
+import { progressService } from '../Progress/progress.service.js';
 import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
@@ -422,6 +423,59 @@ export const coachController = {
     } catch (error) {
       next(error);
     }
-  }
+  },
+
+  // ─── Pending plan approval (coach approves client-generated plans) ─────────
+
+  async getClientPendingWorkoutPlans(req, res, next) {
+    try {
+      const userId = await resolveUserId(Number(req.params.clientId));
+      const plans = await workoutService.getPendingCoachReviewPlans(userId);
+      successResponse(res, 200, 'Pending workout plans retrieved', { plans });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async approveClientWorkoutPlan(req, res, next) {
+    try {
+      const { planId } = req.params;
+      const plan = await workoutService.approveWorkoutPlan(Number(planId), req.user.id);
+      successResponse(res, 200, 'Workout plan approved and activated', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getClientPendingDietPlans(req, res, next) {
+    try {
+      const userId = await resolveUserId(Number(req.params.clientId));
+      const plans = await dietService.getPendingCoachReviewDietPlans(userId);
+      successResponse(res, 200, 'Pending diet plans retrieved', { plans });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async approveClientDietPlan(req, res, next) {
+    try {
+      const { planId } = req.params;
+      const plan = await dietService.approveDietPlan(Number(planId), req.user.id);
+      successResponse(res, 200, 'Diet plan approved and activated', { plan });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Coach reads a specific client's body measurements
+  async getClientMeasurements(req, res, next) {
+    try {
+      const userId = await resolveUserId(Number(req.params.clientId));
+      const { measurements } = await progressService.getMeasurements(userId);
+      successResponse(res, 200, 'Client measurements retrieved', { measurements });
+    } catch (error) {
+      next(error);
+    }
+  },
 };
 

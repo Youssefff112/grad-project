@@ -88,7 +88,8 @@ interface GeneratedMealPlan {
   approvedBy?: string;
 }
 
-const dietPlanToDisplay = (plan: dietService.DietPlan, status: 'pending' | 'approved' = 'approved'): GeneratedMealPlan => {
+const dietPlanToDisplay = (plan: dietService.DietPlan, status?: 'pending' | 'approved'): GeneratedMealPlan => {
+  const resolvedStatus = status ?? (plan.pendingCoachReview ? 'pending' : 'approved');
   const firstDay = plan.weeklyMealPlan?.[0];
   return {
     id: String(plan.id),
@@ -104,12 +105,12 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status: 'pending' | 'appr
         calories: m.nutrition.calories,
         protein: m.nutrition.protein,
         carbs: m.nutrition.carbs,
-        fat: m.nutrition.fats ?? m.nutrition.fat ?? 0,
-        serving: m.servingSize || '1 serving',
+        fat: m.nutrition.fats ?? (m.nutrition as any).fat ?? 0,
+        serving: (m as any).servingSize || '1 serving',
         ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
       }],
     })),
-    status,
+    status: resolvedStatus,
   };
 };
 
@@ -141,7 +142,8 @@ export const MealGenerationScreen = ({ navigation }: any) => {
       // Always mirror server truth. Without the else-branch the previously
       // deleted plan would stick on screen forever.
       if (plan && plan.weeklyMealPlan?.length > 0) {
-        setAvailableMeals([dietPlanToDisplay(plan, 'approved')]);
+        // Let dietPlanToDisplay determine the status from plan.pendingCoachReview
+        setAvailableMeals([dietPlanToDisplay(plan)]);
       } else {
         setAvailableMeals([]);
       }
@@ -366,6 +368,19 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   • Track macros in detail for each meal
                 </Text>
               </View>
+            </View>
+          </View>
+        )}
+
+        {/* Pending coach review banner */}
+        {!isLoadingPlan && availableMeals.length > 0 && availableMeals.some(m => m.status === 'pending') && (
+          <View style={[tw`mt-6 rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: '#f59e0b12', borderWidth: 1, borderColor: '#f59e0b30' }]}>
+            <MaterialIcons name="pending-actions" size={20} color="#f59e0b" />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`font-bold text-sm`, { color: '#f59e0b' }]}>Awaiting Coach Review</Text>
+              <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                {`Your meal plan has been sent to ${coachName || 'your coach'} for review. It will activate once approved.`}
+              </Text>
             </View>
           </View>
         )}

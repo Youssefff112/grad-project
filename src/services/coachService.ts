@@ -284,3 +284,32 @@ export const updateClientDietPlan = async (
   const response = await apiPatch(`/coach/plans/diet/${planId}`, updates);
   return { plan: response.data?.plan };
 };
+
+// ─── Coach reads client measurements ──────────────────────────────────────────
+
+export const getClientMeasurements = async (clientId: number): Promise<{ measurements: any[] }> => {
+  const response = await apiGet(`/coach/clients/${clientId}/measurements`);
+  return { measurements: response.data?.measurements || [] };
+};
+
+// ─── Coach approval of client-generated pending plans ─────────────────────────
+
+export const getClientPendingWorkoutPlans = async (clientId: number): Promise<{ plans: any[] }> => {
+  const response = await apiGet(`/coach/clients/${clientId}/pending-workout-plans`);
+  return { plans: response.data?.plans || [] };
+};
+
+export const approveClientWorkoutPlan = async (planId: number): Promise<{ plan: any }> => {
+  const response = await apiPatch(`/coach/plans/workout/${planId}/approve`, {});
+  return { plan: response.data?.plan };
+};
+
+export const getClientPendingDietPlans = async (clientId: number): Promise<{ plans: any[] }> => {
+  const response = await apiGet(`/coach/clients/${clientId}/pending-diet-plans`);
+  return { plans: response.data?.plans || [] };
+};
+
+export const approveClientDietPlan = async (planId: number): Promise<{ plan: any }> => {
+  const response = await apiPatch(`/coach/plans/diet/${planId}/approve`, {});
+  return { plan: response.data?.plan };
+};

@@ -23,7 +23,7 @@ import { PLAN_FEATURES } from '../constants/plans';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole } = useUser();
+  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole, setUserId } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -90,6 +90,9 @@ export const SignInScreen = ({ navigation }: any) => {
 
         // Save tokens to context (which also handles AsyncStorage)
         await setAuthTokens(response.data.token, response.data.refreshToken);
+
+        // Persist user ID so the app can identify the logged-in user after restart
+        if (user.id) await setUserId(String(user.id));
 
         // Update user profile info
         setFullName(fullName);
@@ -222,6 +225,7 @@ export const SignInScreen = ({ navigation }: any) => {
                     const u = loginResp.data.user;
                     const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
                     await setAuthTokens(loginResp.data.token, loginResp.data.refreshToken);
+                    if (u.id) await setUserId(String(u.id));
                     setFullName(fullName);
                     saveEmail(u.email);
                     setRole(u.role as any);

@@ -21,7 +21,7 @@ import * as authService from '../services/auth.service';
 
 export const AccountCreationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setAuthTokens, setSubscriptionPlan } = useUser();
+  const { setFullName, setEmail: saveEmail, setAuthTokens, setSubscriptionPlan, setRole, setUserId } = useUser();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,10 +88,14 @@ export const AccountCreationScreen = ({ navigation }: any) => {
 
       if (response.success && response.data?.token) {
         await setAuthTokens(response.data.token, response.data.refreshToken);
+        // Persist user ID so the app can identify the logged-in user after restart
+        if (response.data.user?.id) await setUserId(String(response.data.user.id));
         setFullName(name);
         saveEmail(email);
-
+        // Persist role so the app routes correctly after re-launch
+        setRole(isCoachSignup ? 'coach' : 'client');
         if (isCoachSignup) {
+          setSubscriptionPlan('ProCoach');
           navigation.navigate('CoachSubscription');
         } else {
           navigation.navigate('SubscriptionSelection');

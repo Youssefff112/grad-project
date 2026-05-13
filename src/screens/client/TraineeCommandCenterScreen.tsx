@@ -15,6 +15,8 @@ import * as progressService from '../../services/progressService';
 import * as workoutService from '../../services/workoutService';
 import * as dietService from '../../services/dietService';
 import * as offlineService from '../../services/offlineService';
+import { getClientProfile } from '../../services/clientService';
+import { getCoaches } from '../../services/coachService';
 import type { WorkoutPlan, WorkoutDay } from '../../services/workoutService';
 
 const prettyLabel = (s?: string) =>
@@ -60,7 +62,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [calorieTarget, setCalorieTarget] = useState(2000);
   const [waterGlasses, setWaterGlasses] = useState(0);
   const { isDark, accent } = useTheme();
-  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage } = useUser();
+  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach } = useUser();
   const { totalUnread } = useNotifications();
   const { isOnline, syncInProgress, queuedCount } = useOffline();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
@@ -79,6 +81,34 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       setActivePlan(null);
     }
   }, []);
+
+  // Sync assigned coach from the server so it persists correctly after restart
+  const syncCoachInfo = useCallback(async () => {
+    try {
+      const profile = await getClientProfile();
+      const profileData = (profile as any)?.profile ?? profile;
+      const serverCoachId = profileData?.selectedCoachId ?? null;
+      if (serverCoachId) {
+        // Resolve coach name if we don't already have it
+        if (!coachName) {
+          try {
+            const { coaches } = await getCoaches();
+            const found = coaches?.find((c: any) => String(c.userId) === String(serverCoachId));
+            setCoach(String(serverCoachId), found?.name || found?.fullName || 'Coach');
+          } catch {
+            setCoach(String(serverCoachId), coachName || 'Coach');
+          }
+        } else {
+          setCoach(String(serverCoachId), coachName);
+        }
+      } else if (!serverCoachId && coachId) {
+        // Server says no coach but local state has one — clear it
+        clearCoach();
+      }
+    } catch {
+      // Non-critical — silently fail, coach card will show based on AsyncStorage
+    }
+  }, [coachId, coachName, setCoach, clearCoach]);
 
   const loadDailyProgress = useCallback(async () => {
     try {
@@ -119,7 +149,8 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     useCallback(() => {
       loadDailyProgress();
       loadActivePlan();
-    }, [loadDailyProgress, loadActivePlan]),
+      syncCoachInfo();
+    }, [loadDailyProgress, loadActivePlan, syncCoachInfo]),
   );
 
   // Get today's workout day from the active plan
@@ -289,6 +320,25 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Welcome back,</Text>
           <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{firstName}</Text>
         </View>
+
+        {/* Coach Info Card — shows only when client has an assigned coach */}
+        {!!coachId && (
+          <View style={tw`px-4 mb-2`}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CoachAssignment')}
+              style={[tw`flex-row items-center gap-3 p-3 rounded-xl`, { backgroundColor: accent + '12', borderWidth: 1, borderColor: accent + '28' }]}
+            >
+              <View style={[tw`w-9 h-9 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
+                <MaterialIcons name="sports" size={18} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`text-xs font-semibold`, { color: accent }]}>Your Coach</Text>
+                <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{coachName || 'Coach'}</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={18} color={accent} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Daily Dial Section */}
         <View style={tw`px-4 pt-2`}>

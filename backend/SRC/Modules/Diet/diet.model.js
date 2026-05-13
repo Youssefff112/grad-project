@@ -57,6 +57,11 @@ DietPlan.init({
     type: DataTypes.BOOLEAN,
     defaultValue: true
   },
+  // True when the client submitted this plan to their coach for review.
+  pendingCoachReview: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
   generatedAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

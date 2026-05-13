@@ -25,7 +25,8 @@ export const adminService = {
       totalUsers,
       totalExercises,
       newUsersThisWeek: newUsers,
-      usersByType: usersByType.map(item => ({ _id: item.userType, count: Number(item.count) }))
+      // Use "userType" key so the mobile dashboard can read item.userType directly
+      usersByType: usersByType.map(item => ({ userType: item.userType, count: Number(item.count) }))
     };
   },
 
@@ -244,6 +245,7 @@ export const adminService = {
 
     return CoachProfile.findAll({
       where,
+      include: [{ model: User, as: 'User', attributes: ['id', 'firstName', 'lastName', 'email'] }],
       order: [['createdAt', 'DESC']]
     });
   },

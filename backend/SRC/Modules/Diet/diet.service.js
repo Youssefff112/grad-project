@@ -1,5 +1,6 @@
 import { DietPlan, DietLog } from './diet.model.js';
 import { User } from '../User/user.model.js';
+import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { Op } from 'sequelize';
 
@@ -15,7 +16,10 @@ export const dietService = {
   // See: diet.model.js for the DietPlan schema, diet.service.js _generateDietPlanForUser for context.
   // ─────────────────────────────────────────────────────────────────────────────
   async generateDietPlan(userId) {
-    return this._generateDietPlanForUser(userId);
+    // Check if the user has an assigned coach — if so, plan starts as pending review
+    const clientProfile = await ClientProfile.findOne({ where: { userId } });
+    const hasCoach = !!(clientProfile?.selectedCoachId);
+    return this._generateDietPlanForUser(userId, null, null, hasCoach);
   },
 
   async generateDietPlanForUser(targetUserId, coachId, planName = null) {
@@ -23,8 +27,27 @@ export const dietService = {
   },
 
   async getActiveDietPlan(userId) {
+    // Return active plan first; fall back to pending-review plan
     const plan = await DietPlan.findOne({ where: { userId, isActive: true } });
-    return plan || null; // null = no plan yet, not an error
+    if (plan) return plan;
+    const pending = await DietPlan.findOne({ where: { userId, pendingCoachReview: true }, order: [['createdAt', 'DESC']] });
+    return pending || null;
+  },
+
+  async getPendingCoachReviewDietPlans(userId) {
+    return DietPlan.findAll({ where: { userId, pendingCoachReview: true }, order: [['createdAt', 'DESC']] });
+  },
+
+  async approveDietPlan(planId, coachId) {
+    const plan = await DietPlan.findByPk(planId);
+    if (!plan) throw new AppError('Diet plan not found', 404);
+    await DietPlan.update({ isActive: false }, { where: { userId: plan.userId, isActive: true } });
+    plan.isActive = true;
+    plan.pendingCoachReview = false;
+    plan.assignedByCoachId = coachId;
+    plan.assignedAt = new Date();
+    await plan.save();
+    return plan;
   },
 
   async deleteActiveDietPlan(userId) {
@@ -113,7 +136,7 @@ export const dietService = {
     };
   },
 
-  async _generateDietPlanForUser(userId, coachId = null, planName = null) {
+  async _generateDietPlanForUser(userId, coachId = null, planName = null, pendingReview = false) {
     const user = await User.findByPk(userId);
     if (!user || !user.profile || !user.profile.goal) {
       throw new AppError('Please complete your profile first', 400);
@@ -161,7 +184,10 @@ export const dietService = {
       weeklyMealPlan,
       assignedByCoachId: coachId || null,
       assignedAt: coachId ? new Date() : null,
-      weekStartDate: this._getStartOfWeek()
+      weekStartDate: this._getStartOfWeek(),
+      // When client has a coach, plan is inactive until coach approves it
+      isActive: !pendingReview,
+      pendingCoachReview: pendingReview,
     });
 
     return dietPlan;

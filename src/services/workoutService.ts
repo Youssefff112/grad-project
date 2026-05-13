@@ -34,6 +34,7 @@ export interface WorkoutPlan {
   experienceLevel: string;
   weeklySchedule: WorkoutDay[];
   isActive: boolean;
+  pendingCoachReview?: boolean;
   assignedByCoachId?: number;
   assignedAt?: string;
   weekStartDate: string;

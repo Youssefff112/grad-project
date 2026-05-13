@@ -45,6 +45,7 @@ export interface DietPlan {
   macronutrients: MacroNutrients;
   weeklyMealPlan: DayPlan[];
   isActive: boolean;
+  pendingCoachReview?: boolean;
   assignedByCoachId?: number;
   assignedAt?: string;
   weekStartDate: string;

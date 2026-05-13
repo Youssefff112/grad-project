@@ -67,6 +67,7 @@ const prettyLabel = (s?: string) =>
 
 const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => {
   const workoutDays = plan.weeklySchedule?.filter((d) => !d.isRestDay) || [];
+  const status = plan.pendingCoachReview ? 'pending' : 'approved';
   return workoutDays.map((day) => ({
     id: `${plan.id}-${day.day}`,
     name: `${prettyLabel(day.day)}: ${prettyLabel(day.focus) || 'Workout'}`,
@@ -80,7 +81,7 @@ const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => 
       rest: e.restTime,
     })),
     notes: `${workoutDays.length} workout days per week · Goal: ${prettyLabel(plan.goal) || 'Fitness'}`,
-    status: 'approved' as const,
+    status,
   }));
 };
 
@@ -475,6 +476,18 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         )}
 
         {/* Active Workout Plan Days */}
+        {!isLoadingPlan && availableWorkouts.length > 0 && availableWorkouts.some(w => w.status === 'pending') && (
+          <View style={[tw`mt-6 rounded-xl p-4 flex-row items-start gap-3`, { backgroundColor: '#f59e0b12', borderWidth: 1, borderColor: '#f59e0b30' }]}>
+            <MaterialIcons name="pending-actions" size={20} color="#f59e0b" />
+            <View style={tw`flex-1`}>
+              <Text style={[tw`font-bold text-sm`, { color: '#f59e0b' }]}>Awaiting Coach Review</Text>
+              <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                {`Your workout plan has been sent to ${coachName || 'your coach'} for review. It will activate once approved.`}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {!isLoadingPlan && availableWorkouts.length > 0 && (
           <View style={tw`mt-8`}>
             <View style={tw`flex-row items-center justify-between mb-4`}>

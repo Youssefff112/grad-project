@@ -40,6 +40,15 @@ router.post('/clients/:clientId/generate-diet', authenticate, restrictTo('coach'
 router.patch('/plans/workout/:planId', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.updateClientWorkoutPlan);
 router.patch('/plans/diet/:planId', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.updateClientDietPlan);
 
+// Coach reads a client's measurements
+router.get('/clients/:clientId/measurements', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientMeasurements);
+
+// Coach-approval of client-generated pending plans
+router.get('/clients/:clientId/pending-workout-plans', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientPendingWorkoutPlans);
+router.patch('/plans/workout/:planId/approve', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.approveClientWorkoutPlan);
+router.get('/clients/:clientId/pending-diet-plans', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientPendingDietPlans);
+router.patch('/plans/diet/:planId/approve', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.approveClientDietPlan);
+
 // Parameterized client-facing routes (after specific routes)
 router.get('/:coachId/detail', coachController.getCoachDetail);
 router.get('/:coachId/reviews', coachController.getCoachReviews);

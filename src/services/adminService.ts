@@ -63,7 +63,10 @@ export type SubscriptionStatus = 'pending' | 'active' | 'expired' | 'cancelled';
 
 export const getDashboardStats = async (): Promise<{ stats: DashboardStats }> => {
   const response: any = await apiGet('/admin/dashboard');
-  return { stats: response.data || response };
+  // Backend sends: { success, message, data: { stats: {...} } }
+  // apiGet returns the full body, so response.data.stats is the actual stats object
+  const stats = response?.data?.stats ?? response?.data ?? response;
+  return { stats };
 };
 
 // ─── User Management ──────────────────────────────────────────

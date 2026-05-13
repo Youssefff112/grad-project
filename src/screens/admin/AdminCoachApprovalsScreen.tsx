@@ -63,8 +63,8 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
 
   const handleApprove = (app: adminService.CoachApplication) => {
     const name = app.User
-      ? `${app.User.firstName || ''} ${app.User.lastName || ''}`.trim() || `Coach #${app.id}`
-      : `Coach #${app.id}`;
+      ? `${app.User.firstName || ''} ${app.User.lastName || ''}`.trim() || `Coach #${app.userId}`
+      : `Coach #${app.userId}`;
     Alert.alert(
       'Approve Coach',
       `Approve "${name}" as a verified coach? They will gain access to the coach dashboard.`,
@@ -75,7 +75,8 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
           onPress: async () => {
             setActionLoading(app.id);
             try {
-              await adminService.approveCoach(app.id);
+              // Backend approveCoach expects the user's PK (userId), not the profile PK (id)
+              await adminService.approveCoach(app.userId);
               setApplications(prev => prev.filter(a => a.id !== app.id));
             } catch {
               Alert.alert('Error', 'Failed to approve coach.');
@@ -90,8 +91,8 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
 
   const handleRevoke = (app: adminService.CoachApplication) => {
     const name = app.User
-      ? `${app.User.firstName || ''} ${app.User.lastName || ''}`.trim() || `Coach #${app.id}`
-      : `Coach #${app.id}`;
+      ? `${app.User.firstName || ''} ${app.User.lastName || ''}`.trim() || `Coach #${app.userId}`
+      : `Coach #${app.userId}`;
     Alert.alert(
       'Revoke Approval',
       `Revoke coach approval for "${name}"? They will lose access to coaching features.`,
@@ -103,7 +104,8 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
           onPress: async () => {
             setActionLoading(app.id);
             try {
-              await adminService.revokeCoach(app.id);
+              // Backend revokeCoachApproval expects the user's PK (userId), not the profile PK (id)
+              await adminService.revokeCoach(app.userId);
               setApplications(prev => prev.filter(a => a.id !== app.id));
             } catch {
               Alert.alert('Error', 'Failed to revoke approval.');

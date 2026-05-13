@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -48,25 +49,29 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     status: c.status || 'active',
   });
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [clientsRes, analyticsRes] = await Promise.allSettled([
-          coachService.getMyClients(),
-          coachService.getCoachAnalytics(),
-        ]);
-        if (clientsRes.status === 'fulfilled') {
-          setAllClients(clientsRes.value.clients.map(mapClient));
-        }
-        if (analyticsRes.status === 'fulfilled') {
-          setAnalytics(analyticsRes.value.analytics);
-        }
-      } catch {
-        // keep defaults
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [clientsRes, analyticsRes] = await Promise.allSettled([
+        coachService.getMyClients(),
+        coachService.getCoachAnalytics(),
+      ]);
+      if (clientsRes.status === 'fulfilled') {
+        setAllClients(clientsRes.value.clients.map(mapClient));
       }
-    };
-    load();
+      if (analyticsRes.status === 'fulfilled') {
+        setAnalytics(analyticsRes.value.analytics);
+      }
+    } catch {
+      // keep defaults on error
+    }
   }, []);
+
+  // Reload on every focus so newly assigned clients appear when navigating back
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard();
+    }, [loadDashboard])
+  );
 
   // Derive the four most-recent clients and inactive ones
   const recentClients = allClients.slice(0, 4);
@@ -213,7 +218,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           ) : recentClients.map(client => (
             <TouchableOpacity
               key={client.id}
-              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, clientName: client.name })}
+              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name })}
               style={[tw`flex-row items-center gap-3 p-4 rounded-xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
             >
               <View style={[tw`w-11 h-11 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '20' }]}>
@@ -254,7 +259,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
               {inactiveClients.map((client, i) => (
                 <TouchableOpacity
                   key={client.id}
-                  onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, clientName: client.name })}
+                  onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name })}
                   style={[
                     tw`flex-row items-center gap-3 px-4 py-3.5`,
                     i < inactiveClients.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },

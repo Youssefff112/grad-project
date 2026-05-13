@@ -1,6 +1,7 @@
 // src/Modules/Workout/workout.service.js
 import { WorkoutPlan, WorkoutLog } from './workout.model.js';
 import { User } from '../User/user.model.js';
+import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 
 export const workoutService = {
@@ -16,7 +17,10 @@ export const workoutService = {
   // See: workout.model.js for the WorkoutPlan schema.
   // ─────────────────────────────────────────────────────────────────────────────
   async generateWorkoutPlan(userId, location = null, equipment = null) {
-    return this._generateWorkoutPlanForUser(userId, null, location, equipment);
+    // Check if the user has an assigned coach — if so, plan starts as pending review
+    const clientProfile = await ClientProfile.findOne({ where: { userId } });
+    const hasCoach = !!(clientProfile?.selectedCoachId);
+    return this._generateWorkoutPlanForUser(userId, null, location, equipment, null, hasCoach);
   },
 
   async generateWorkoutPlanForUser(targetUserId, coachId, planName = null) {
@@ -24,8 +28,29 @@ export const workoutService = {
   },
 
   async getActiveWorkoutPlan(userId) {
+    // Return active plan first; fall back to most recent pending-review plan
     const plan = await WorkoutPlan.findOne({ where: { userId, isActive: true } });
-    return plan || null; // null = no plan yet, not an error
+    if (plan) return plan;
+    // Show pending-review plans so the client sees something while awaiting approval
+    const pending = await WorkoutPlan.findOne({ where: { userId, pendingCoachReview: true }, order: [['createdAt', 'DESC']] });
+    return pending || null;
+  },
+
+  async getPendingCoachReviewPlans(userId) {
+    return WorkoutPlan.findAll({ where: { userId, pendingCoachReview: true }, order: [['createdAt', 'DESC']] });
+  },
+
+  async approveWorkoutPlan(planId, coachId) {
+    const plan = await WorkoutPlan.findByPk(planId);
+    if (!plan) throw new AppError('Workout plan not found', 404);
+    // Deactivate old active plan first
+    await WorkoutPlan.update({ isActive: false }, { where: { userId: plan.userId, isActive: true } });
+    plan.isActive = true;
+    plan.pendingCoachReview = false;
+    plan.assignedByCoachId = coachId;
+    plan.assignedAt = new Date();
+    await plan.save();
+    return plan;
   },
 
   async deleteActiveWorkoutPlan(userId) {
@@ -127,7 +152,7 @@ export const workoutService = {
     };
   },
 
-  async _generateWorkoutPlanForUser(userId, coachId = null, location = null, equipment = null, planName = null) {
+  async _generateWorkoutPlanForUser(userId, coachId = null, location = null, equipment = null, planName = null, pendingReview = false) {
     const user = await User.findByPk(userId);
     if (!user || !user.profile || !user.profile.goal || !user.profile.experienceLevel) {
       throw new AppError('Please complete your profile first', 400);
@@ -167,7 +192,10 @@ export const workoutService = {
       weeklySchedule,
       assignedByCoachId: coachId || null,
       assignedAt: coachId ? new Date() : null,
-      weekStartDate: this._getStartOfWeek()
+      weekStartDate: this._getStartOfWeek(),
+      // When client has a coach, plan is inactive until coach approves it
+      isActive: !pendingReview,
+      pendingCoachReview: pendingReview,
     });
 
     return workoutPlan;

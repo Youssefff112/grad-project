@@ -62,6 +62,7 @@ interface UserContextType {
 
   // Authentication methods
   setAuthTokens: (accessToken: string, refreshToken: string) => Promise<void>;
+  setUserId: (id: string) => Promise<void>;
   clearAuth: () => Promise<void>;
   logout: () => Promise<void>;
 
@@ -118,6 +119,7 @@ const UserContext = createContext<UserContextType>({
 
   // Authentication methods defaults
   setAuthTokens: async () => {},
+  setUserId: async () => {},
   clearAuth: async () => {},
   logout: async () => {},
 
@@ -401,6 +403,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, []);
 
+  const setUserId = useCallback(async (id: string) => {
+    setUserIdState(id);
+    await AsyncStorage.setItem('user_id', id).catch((error) =>
+      console.log('Failed to save user_id:', error)
+    );
+  }, []);
+
   const setAuthTokens = useCallback(async (accessToken: string, refreshToken: string) => {
     try {
       setAuthTokenState(accessToken);
@@ -522,6 +531,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Authentication methods
       setAuthTokens,
+      setUserId,
       clearAuth,
       logout,
 

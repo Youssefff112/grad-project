@@ -41,6 +41,12 @@ WorkoutPlan.init({
     type: DataTypes.BOOLEAN,
     defaultValue: true
   },
+  // True when the client submitted this plan to their coach for review.
+  // Plan stays inactive (isActive: false) until the coach approves it.
+  pendingCoachReview: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
   generatedAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

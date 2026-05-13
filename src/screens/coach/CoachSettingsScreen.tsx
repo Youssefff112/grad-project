@@ -29,7 +29,7 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     coachService.getCoachAnalytics()
-      .then(setAnalytics)
+      .then(({ analytics: data }) => setAnalytics(data))
       .catch(() => {});
   }, []);
 
@@ -298,8 +298,8 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
                     text: 'Sign Out',
                     style: 'destructive',
                     onPress: async () => {
-                      await logout();
-                      navigation.navigate('Splash');
+                      try { await logout(); } catch { /* still reset */ }
+                      navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
                     },
                   },
                 ],

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
-import * as progressService from '../../services/progressService';
 import * as coachService from '../../services/coachService';
 
 interface Measurement {
@@ -36,8 +35,11 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [workoutPlan, setWorkoutPlan] = useState<any>(null);
   const [dietPlan, setDietPlan] = useState<any>(null);
+  const [pendingWorkoutPlans, setPendingWorkoutPlans] = useState<any[]>([]);
+  const [pendingDietPlans, setPendingDietPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [plansLoading, setPlansLoading] = useState(false);
+  const [approvingPlanId, setApprovingPlanId] = useState<number | null>(null);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -46,11 +48,13 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     const load = async () => {
+      if (!planClientId) { setLoading(false); return; }
       setLoading(true);
       try {
-        const { measurements: data } = await progressService.getMeasurements();
+        // Use the coach-specific endpoint so we read the CLIENT's measurements, not the coach's
+        const { measurements: data } = await coachService.getClientMeasurements(Number(planClientId));
         const mapped: Measurement[] = (data || []).map((m: any) => ({
-          date: new Date(m.recordedAt || m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          date: new Date(m.recordedAt || m.date || m.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           weight: m.weight,
           bodyFat: m.bodyFat,
           notes: m.notes,
@@ -63,22 +67,52 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
       }
     };
     load();
-  }, [clientId]);
+  }, [planClientId]);
 
   const loadPlans = useCallback(async () => {
     if (!planClientId) return;
     setPlansLoading(true);
     try {
-      const [wRes, dRes] = await Promise.allSettled([
+      const [wRes, dRes, pwRes, pdRes] = await Promise.allSettled([
         coachService.getClientWorkoutPlan(Number(planClientId)),
         coachService.getClientDietPlan(Number(planClientId)),
+        coachService.getClientPendingWorkoutPlans(Number(planClientId)),
+        coachService.getClientPendingDietPlans(Number(planClientId)),
       ]);
       setWorkoutPlan(wRes.status === 'fulfilled' ? wRes.value.plan : null);
       setDietPlan(dRes.status === 'fulfilled' ? dRes.value.plan : null);
+      setPendingWorkoutPlans(pwRes.status === 'fulfilled' ? pwRes.value.plans : []);
+      setPendingDietPlans(pdRes.status === 'fulfilled' ? pdRes.value.plans : []);
     } finally {
       setPlansLoading(false);
     }
-  }, [clientId]);
+  }, [planClientId]);
+
+  const handleApproveWorkoutPlan = async (planId: number) => {
+    setApprovingPlanId(planId);
+    try {
+      await coachService.approveClientWorkoutPlan(planId);
+      Alert.alert('Approved', 'Workout plan has been approved and activated for the client.');
+      loadPlans();
+    } catch {
+      Alert.alert('Error', 'Failed to approve workout plan.');
+    } finally {
+      setApprovingPlanId(null);
+    }
+  };
+
+  const handleApproveDietPlan = async (planId: number) => {
+    setApprovingPlanId(planId);
+    try {
+      await coachService.approveClientDietPlan(planId);
+      Alert.alert('Approved', 'Meal plan has been approved and activated for the client.');
+      loadPlans();
+    } catch {
+      Alert.alert('Error', 'Failed to approve meal plan.');
+    } finally {
+      setApprovingPlanId(null);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'plans') loadPlans();
@@ -465,6 +499,70 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                       <MaterialIcons name="refresh" size={20} color={subtextColor} />
                     </TouchableOpacity>
                   </View>
+
+                  {/* Pending Coach Review Plans */}
+                  {(pendingWorkoutPlans.length > 0 || pendingDietPlans.length > 0) && (
+                    <View style={[tw`rounded-2xl p-4 mb-4`, { backgroundColor: '#f59e0b10', borderWidth: 1, borderColor: '#f59e0b30' }]}>
+                      <View style={tw`flex-row items-center gap-2 mb-3`}>
+                        <MaterialIcons name="pending-actions" size={18} color="#f59e0b" />
+                        <Text style={[tw`text-sm font-bold`, { color: '#f59e0b' }]}>Awaiting Your Review</Text>
+                      </View>
+
+                      {pendingWorkoutPlans.map((plan: any) => (
+                        <View key={plan.id} style={[tw`flex-row items-center justify-between p-3 rounded-xl mb-2`, { backgroundColor: isDark ? '#111128' : '#fff', borderWidth: 1, borderColor }]}>
+                          <View style={tw`flex-1`}>
+                            <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                              {plan.planName || 'Workout Plan'}
+                            </Text>
+                            <Text style={[tw`text-xs`, { color: subtextColor }]}>
+                              Workout · {capitalise(plan.goal || '')} · {(plan.weeklySchedule || []).filter((d: any) => !d.isRestDay).length} days/week
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleApproveWorkoutPlan(plan.id)}
+                            disabled={approvingPlanId === plan.id}
+                            style={[tw`ml-2 px-3 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#10b98120', borderWidth: 1, borderColor: '#10b98130' }]}
+                          >
+                            {approvingPlanId === plan.id ? (
+                              <ActivityIndicator size="small" color="#10b981" />
+                            ) : (
+                              <>
+                                <MaterialIcons name="check-circle" size={14} color="#10b981" />
+                                <Text style={tw`text-xs font-bold text-green-500`}>Approve</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+
+                      {pendingDietPlans.map((plan: any) => (
+                        <View key={plan.id} style={[tw`flex-row items-center justify-between p-3 rounded-xl mb-2`, { backgroundColor: isDark ? '#111128' : '#fff', borderWidth: 1, borderColor }]}>
+                          <View style={tw`flex-1`}>
+                            <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                              {plan.planName || 'Meal Plan'}
+                            </Text>
+                            <Text style={[tw`text-xs`, { color: subtextColor }]}>
+                              Meal Plan · {plan.dailyCalorieTarget} kcal/day · {capitalise(plan.goal || '')}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleApproveDietPlan(plan.id)}
+                            disabled={approvingPlanId === plan.id}
+                            style={[tw`ml-2 px-3 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#10b98120', borderWidth: 1, borderColor: '#10b98130' }]}
+                          >
+                            {approvingPlanId === plan.id ? (
+                              <ActivityIndicator size="small" color="#10b981" />
+                            ) : (
+                              <>
+                                <MaterialIcons name="check-circle" size={14} color="#10b981" />
+                                <Text style={tw`text-xs font-bold text-green-500`}>Approve</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
                   <Text style={[tw`text-xs font-bold mb-2`, { color: subtextColor }]}>WORKOUT PLAN</Text>
                   {workoutPlan ? renderWorkoutPlanCard() : renderEmptyPlanCard('workout')}

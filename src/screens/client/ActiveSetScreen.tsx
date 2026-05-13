@@ -65,6 +65,9 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const [angles, setAngles] = useState<aiVisionService.FrameAngles>({});
   const [poseDetected, setPoseDetected] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  // Count consecutive errors so we can detect when AI goes offline mid-session
+  const consecutiveErrorsRef = useRef(0);
+  const CONSECUTIVE_ERROR_THRESHOLD = 5;
 
   useEffect(() => {
     if (!permission?.granted) requestPermission();
@@ -91,15 +94,25 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
 
     inFlightRef.current = true;
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.5,
-        base64: true,
-        shutterSound: false,
-        exif: false,
-      });
+      // Guard: takePictureAsync can fail if camera isn't fully ready despite cameraReady flag
+      let photo;
+      try {
+        photo = await cameraRef.current.takePictureAsync({
+          quality: 0.5,
+          base64: true,
+          shutterSound: false,
+          exif: false,
+        });
+      } catch {
+        // Camera capture failed — silently skip this frame
+        return;
+      }
       if (!photo?.base64) return;
 
       const result = await aiVisionService.analyzeFrame(photo.base64, rawExerciseName);
+      // Successful analysis — reset error counter
+      consecutiveErrorsRef.current = 0;
+
       if (result.poseDetected) {
         const smoothed = smootherRef.current.update(result.angles);
         setAngles(smoothed);
@@ -133,8 +146,14 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
         }
       }
     } catch (err: any) {
+      consecutiveErrorsRef.current += 1;
       const msg = err?.message || 'Analysis failed';
-      setAnalysisError(msg);
+      // Only surface the error to the UI after repeated failures (avoids transient flashes)
+      if (consecutiveErrorsRef.current >= CONSECUTIVE_ERROR_THRESHOLD) {
+        setAnalysisError(msg);
+        // Mark AI as offline so the banner shows even if it was initially OK
+        setAiBackendOk(false);
+      }
     } finally {
       inFlightRef.current = false;
     }
@@ -177,6 +196,8 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   };
 
   const togglePause = () => {
+    // Reset error counter when resuming so transient errors don't lock the banner
+    consecutiveErrorsRef.current = 0;
     setSessionState((prev) => (prev === 'paused' ? 'running' : 'paused'));
   };
 
