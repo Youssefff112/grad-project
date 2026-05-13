@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -8,6 +8,8 @@ import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 import * as coachService from '../../services/coachService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as messagingService from '../../services/messaging.service';
 
 export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -20,14 +22,30 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
 
-  const [recentClients, setRecentClients] = useState<Array<{
-    id: string; name: string; plan: string; lastCheckin: string; progress: number; status: string;
-  }>>([]);
+  type ClientRow = { id: string; userId: number; name: string; plan: string; lastCheckin: string; progress: number; status: string; };
+
+  const [allClients, setAllClients] = useState<ClientRow[]>([]);
   const [analytics, setAnalytics] = useState<coachService.CoachAnalytics>({
     totalClients: 0,
     activeClients: 0,
     pendingClients: 0,
     monthlyRevenue: 0,
+  });
+  const [showQuickMessage, setShowQuickMessage] = useState(false);
+  const [messagingClientId, setMessagingClientId] = useState<string | null>(null);
+
+  const WATER_TARGET = 8;
+  const today = new Date().toISOString().split('T')[0];
+  const [clientWater, setClientWater] = useState<Record<string, number>>({});
+
+  const mapClient = (c: coachService.CoachClient): ClientRow => ({
+    id: String(c.id),
+    userId: c.userId,
+    name: c.User ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}` : `Client #${c.id}`,
+    plan: (c.goals as any)?.primary || 'General Fitness',
+    lastCheckin: c.lastActivity || 'Recently',
+    progress: 0,
+    status: c.status || 'active',
   });
 
   useEffect(() => {
@@ -38,15 +56,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           coachService.getCoachAnalytics(),
         ]);
         if (clientsRes.status === 'fulfilled') {
-          const mapped = clientsRes.value.clients.slice(0, 4).map((c) => ({
-            id: String(c.id),
-            name: c.User ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}` : `Client #${c.id}`,
-            plan: (c.goals as any)?.primary || 'General Fitness',
-            lastCheckin: c.lastActivity || 'Recently',
-            progress: 0,
-            status: c.status || 'active',
-          }));
-          setRecentClients(mapped);
+          setAllClients(clientsRes.value.clients.map(mapClient));
         }
         if (analyticsRes.status === 'fulfilled') {
           setAnalytics(analyticsRes.value.analytics);
@@ -57,6 +67,51 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     };
     load();
   }, []);
+
+  // Derive the four most-recent clients and inactive ones
+  const recentClients = allClients.slice(0, 4);
+
+  const isInactive = (lastCheckin: string): boolean => {
+    const d = new Date(lastCheckin);
+    if (isNaN(d.getTime())) return false;
+    return (Date.now() - d.getTime()) > 3 * 24 * 60 * 60 * 1000;
+  };
+  const inactiveClients = allClients.filter(
+    (c) => c.status === 'active' && isInactive(c.lastCheckin),
+  );
+
+  useEffect(() => {
+    const loadClientWater = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(`coach_client_water_${today}`);
+        if (stored) setClientWater(JSON.parse(stored));
+      } catch {}
+    };
+    loadClientWater();
+  }, [today]);
+
+  const setClientGlasses = useCallback((clientId: string, delta: number) => {
+    setClientWater((prev) => {
+      const next = Math.max(0, Math.min((prev[clientId] ?? 0) + delta, 16));
+      const updated = { ...prev, [clientId]: next };
+      AsyncStorage.setItem(`coach_client_water_${today}`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+  }, [today]);
+
+  const startChat = async (client: ClientRow) => {
+    setMessagingClientId(client.id);
+    try {
+      const msg = await messagingService.sendMessage(null, client.userId, '👋');
+      setShowQuickMessage(false);
+      navigation.navigate('Chat', { conversationId: msg.conversationId, conversationName: client.name });
+    } catch {
+      setShowQuickMessage(false);
+      navigation.navigate('Messages');
+    } finally {
+      setMessagingClientId(null);
+    }
+  };
 
   const stats = [
     { label: 'Active Clients', value: String(analytics.activeClients || recentClients.length), icon: 'group' as const, color: accent },
@@ -115,31 +170,30 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
         {/* Quick Actions */}
         <View style={tw`px-4 mt-8`}>
           <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: textPrimary }]}>Quick Actions</Text>
-          <View style={tw`flex-row gap-3`}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CoachClientList')}
-              style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
-            >
-              <MaterialIcons name="person-add" size={26} color={accent} style={tw`mb-2`} />
-              <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>Add Client</Text>
-              <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>Manage roster</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CoachWorkoutPlan')}
-              style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
-            >
-              <MaterialIcons name="fitness-center" size={26} color={accent} style={tw`mb-2`} />
-              <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>New Workout</Text>
-              <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>Create program</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CoachMealPlan')}
-              style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
-            >
-              <MaterialIcons name="restaurant-menu" size={26} color={accent} style={tw`mb-2`} />
-              <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>Meal Plan</Text>
-              <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>For client</Text>
-            </TouchableOpacity>
+          <View style={tw`flex-row flex-wrap gap-3`}>
+            {[
+              { label: 'Add Client', sub: 'Manage roster', icon: 'person-add' as const, onPress: () => navigation.navigate('CoachClientList'), featured: true },
+              { label: 'New Workout', sub: 'Create program', icon: 'fitness-center' as const, onPress: () => navigation.navigate('CoachWorkoutPlan'), featured: false },
+              { label: 'Meal Plan', sub: 'Assign to client', icon: 'restaurant-menu' as const, onPress: () => navigation.navigate('CoachMealPlan'), featured: false },
+              { label: 'Message', sub: 'Quick chat', icon: 'send' as const, onPress: () => setShowQuickMessage(true), featured: false },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                onPress={item.onPress}
+                style={[
+                  tw`w-[48%] rounded-2xl p-4`,
+                  item.featured
+                    ? { backgroundColor: accent + '18', borderWidth: 1.5, borderColor: accent + '40' }
+                    : { backgroundColor: cardBg, borderWidth: 1, borderColor },
+                ]}
+              >
+                <View style={[tw`w-11 h-11 rounded-xl items-center justify-center mb-3`, { backgroundColor: item.featured ? accent + '28' : accent + '14' }]}>
+                  <MaterialIcons name={item.icon} size={24} color={accent} />
+                </View>
+                <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{item.label}</Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{item.sub}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -184,6 +238,185 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           ))}
         </View>
 
+        {/* Client Activity Alerts */}
+        {inactiveClients.length > 0 && (
+          <View style={tw`px-4 mt-8`}>
+            <View style={tw`flex-row items-center gap-2 mb-4`}>
+              <MaterialIcons name="warning-amber" size={20} color="#f59e0b" />
+              <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: textPrimary }]}>
+                Needs Attention
+              </Text>
+              <View style={[tw`ml-1 px-2 py-0.5 rounded-full`, { backgroundColor: '#f59e0b20' }]}>
+                <Text style={tw`text-xs font-bold text-yellow-500`}>{inactiveClients.length}</Text>
+              </View>
+            </View>
+            <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+              {inactiveClients.map((client, i) => (
+                <TouchableOpacity
+                  key={client.id}
+                  onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, clientName: client.name })}
+                  style={[
+                    tw`flex-row items-center gap-3 px-4 py-3.5`,
+                    i < inactiveClients.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                  ]}
+                >
+                  <View style={[tw`w-10 h-10 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: '#f59e0b18' }]}>
+                    <MaterialIcons name="person" size={20} color="#f59e0b" />
+                  </View>
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{client.name}</Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>Last seen: {client.lastCheckin}</Text>
+                  </View>
+                  <View style={tw`flex-row items-center gap-1`}>
+                    <View style={[tw`w-2 h-2 rounded-full`, { backgroundColor: '#f59e0b' }]} />
+                    <Text style={[tw`text-xs font-bold`, { color: '#f59e0b' }]}>Inactive</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Roster Progress Snapshot */}
+        {allClients.length > 0 && (
+          <View style={tw`px-4 mt-8`}>
+            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: textPrimary }]}>
+              Roster Overview
+            </Text>
+            <View style={[tw`rounded-2xl p-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+              {/* Active vs Pending bar */}
+              <View style={tw`mb-4`}>
+                <View style={tw`flex-row items-center justify-between mb-2`}>
+                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: subtextColor }]}>Active vs Pending</Text>
+                  <Text style={[tw`text-xs font-black`, { color: textPrimary }]}>
+                    {analytics.activeClients} / {analytics.totalClients || allClients.length}
+                  </Text>
+                </View>
+                <View style={[tw`h-2.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
+                  <View
+                    style={[
+                      tw`h-full rounded-full`,
+                      {
+                        width: `${analytics.totalClients ? Math.round((analytics.activeClients / analytics.totalClients) * 100) : 0}%`,
+                        backgroundColor: accent,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Stat pills */}
+              <View style={tw`flex-row gap-2`}>
+                {[
+                  { label: 'Total', value: analytics.totalClients || allClients.length, color: accent },
+                  { label: 'Active', value: analytics.activeClients, color: '#10b981' },
+                  { label: 'Pending', value: analytics.pendingClients, color: '#f59e0b' },
+                  ...(analytics.totalSessions != null ? [{ label: 'Sessions', value: analytics.totalSessions, color: '#8b5cf6' }] : []),
+                ].map((s) => (
+                  <View
+                    key={s.label}
+                    style={[tw`flex-1 items-center py-3 rounded-xl`, { backgroundColor: s.color + '12' }]}
+                  >
+                    <Text style={[tw`text-base font-black`, { color: s.color }]}>{s.value}</Text>
+                    <Text style={[tw`text-[10px] font-bold uppercase tracking-wide mt-0.5`, { color: subtextColor }]}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Inactive warning pill */}
+              {inactiveClients.length > 0 && (
+                <View style={[tw`flex-row items-center gap-2 mt-3 px-3 py-2 rounded-xl`, { backgroundColor: '#f59e0b12' }]}>
+                  <MaterialIcons name="warning-amber" size={14} color="#f59e0b" />
+                  <Text style={[tw`text-xs font-semibold flex-1`, { color: '#f59e0b' }]}>
+                    {inactiveClients.length} client{inactiveClients.length > 1 ? 's' : ''} inactive for 3+ days
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Client Hydration Tracker */}
+        {allClients.filter(c => c.status === 'active').length > 0 && (
+          <View style={tw`px-4 mt-8`}>
+            <View style={tw`flex-row items-center gap-2 mb-4`}>
+              <MaterialIcons name="water-drop" size={20} color="#38bdf8" />
+              <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: textPrimary }]}>
+                Client Hydration
+              </Text>
+              <Text style={[tw`text-sm font-medium ml-1`, { color: subtextColor }]}>Today</Text>
+            </View>
+            <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+              {allClients.filter(c => c.status === 'active').map((client, i, arr) => {
+                const glasses = clientWater[client.id] ?? 0;
+                const goalMet = glasses >= WATER_TARGET;
+                return (
+                  <View
+                    key={client.id}
+                    style={[
+                      tw`px-4 py-3.5`,
+                      i < arr.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                    ]}
+                  >
+                    {/* Name row */}
+                    <View style={tw`flex-row items-center justify-between mb-2`}>
+                      <View style={tw`flex-row items-center gap-2`}>
+                        <View style={[tw`w-7 h-7 rounded-full items-center justify-center`, { backgroundColor: goalMet ? '#10b98120' : '#38bdf818' }]}>
+                          <MaterialIcons name="person" size={15} color={goalMet ? '#10b981' : '#38bdf8'} />
+                        </View>
+                        <Text style={[tw`text-sm font-semibold`, { color: textPrimary }]}>{client.name}</Text>
+                      </View>
+                      <View style={tw`flex-row items-center gap-1.5`}>
+                        {goalMet && <MaterialIcons name="check-circle" size={13} color="#10b981" />}
+                        <Text style={[tw`text-xs font-black`, { color: goalMet ? '#10b981' : '#38bdf8' }]}>
+                          {glasses}/{WATER_TARGET}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Progress dots + controls */}
+                    <View style={tw`flex-row items-center gap-2`}>
+                      <TouchableOpacity
+                        onPress={() => setClientGlasses(client.id, -1)}
+                        disabled={glasses === 0}
+                        style={[
+                          tw`w-7 h-7 rounded-full items-center justify-center flex-shrink-0`,
+                          { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', opacity: glasses === 0 ? 0.3 : 1 },
+                        ]}
+                      >
+                        <MaterialIcons name="remove" size={16} color={textPrimary} />
+                      </TouchableOpacity>
+
+                      <View style={tw`flex-1 flex-row gap-1`}>
+                        {Array.from({ length: WATER_TARGET }).map((_, idx) => (
+                          <View
+                            key={idx}
+                            style={[
+                              tw`flex-1 h-1.5 rounded-full`,
+                              { backgroundColor: idx < glasses ? (goalMet ? '#10b981' : '#38bdf8') : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                            ]}
+                          />
+                        ))}
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => setClientGlasses(client.id, 1)}
+                        disabled={glasses >= 16}
+                        style={[
+                          tw`w-7 h-7 rounded-full items-center justify-center flex-shrink-0`,
+                          { backgroundColor: '#38bdf818', opacity: glasses >= 16 ? 0.3 : 1 },
+                        ]}
+                      >
+                        <MaterialIcons name="add" size={16} color="#38bdf8" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* Hub */}
         <View style={tw`px-4 mt-8 mb-4`}>
           <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: textPrimary }]}>Manage</Text>
@@ -210,6 +443,70 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <CoachBottomNav activeId="dashboard" navigation={navigation} totalUnread={totalUnread} />
+
+      {/* Quick Message Modal */}
+      <Modal
+        visible={showQuickMessage}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowQuickMessage(false)}
+      >
+        <TouchableOpacity
+          style={[tw`flex-1`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          activeOpacity={1}
+          onPress={() => setShowQuickMessage(false)}
+        />
+        <View style={[tw`rounded-t-3xl px-4 pt-4 pb-8`, { backgroundColor: isDark ? '#111128' : '#ffffff', maxHeight: '70%' }]}>
+          {/* Handle */}
+          <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }]} />
+
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>Message a Client</Text>
+            <TouchableOpacity onPress={() => setShowQuickMessage(false)}>
+              <MaterialIcons name="close" size={22} color={subtextColor} />
+            </TouchableOpacity>
+          </View>
+
+          {allClients.length === 0 ? (
+            <View style={tw`items-center py-8`}>
+              <MaterialIcons name="group" size={36} color={subtextColor} />
+              <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No clients yet</Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {allClients.map((client, i) => {
+                const isSending = messagingClientId === client.id;
+                return (
+                  <TouchableOpacity
+                    key={client.id}
+                    onPress={() => !messagingClientId && startChat(client)}
+                    disabled={!!messagingClientId}
+                    style={[
+                      tw`flex-row items-center gap-3 py-3`,
+                      i < allClients.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <View style={[tw`w-10 h-10 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '20' }]}>
+                      <MaterialIcons name="person" size={20} color={accent} />
+                    </View>
+                    <View style={tw`flex-1`}>
+                      <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{client.name}</Text>
+                      <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{client.plan}</Text>
+                    </View>
+                    {isSending ? (
+                      <ActivityIndicator size="small" color={accent} />
+                    ) : (
+                      <View style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                        <MaterialIcons name="send" size={16} color={accent} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

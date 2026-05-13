@@ -73,6 +73,7 @@ import { CoachProgramTemplatesScreen } from './src/screens/coach/CoachProgramTem
 import { CoachBrowsingScreen } from './src/screens/coach/CoachBrowsingScreen';
 import { CoachProfileDetailScreen } from './src/screens/coach/CoachProfileDetailScreen';
 import { CoachAssignmentScreen } from './src/screens/coach/CoachAssignmentScreen';
+import { CoachSettingsScreen } from './src/screens/coach/CoachSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -166,6 +167,7 @@ function AppNavigator() {
       <Stack.Screen name="CoachEarnings" component={CoachEarningsScreen} />
       <Stack.Screen name="CoachReviewManagement" component={CoachReviewManagementScreen} />
       <Stack.Screen name="CoachProgramTemplates" component={CoachProgramTemplatesScreen} />
+      <Stack.Screen name="CoachSettings" component={CoachSettingsScreen} />
     </Stack.Navigator>
   );
 }

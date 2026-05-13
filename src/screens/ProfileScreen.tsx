@@ -7,12 +7,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
 import { TraineeBottomNav } from '../components/TraineeBottomNav';
+import { CoachBottomNav } from '../components/coach/CoachBottomNav';
 import * as workoutService from '../services/workoutService';
 import * as progressService from '../services/progressService';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
-  const { fullName, email, logout } = useUser();
+  const { fullName, email, logout, role } = useUser();
   const { totalUnread } = useNotifications();
   const displayName = fullName || 'Trainee';
 
@@ -212,7 +213,10 @@ export const ProfileScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <TraineeBottomNav activeId="profile" navigation={navigation} totalUnread={totalUnread} />
+      {role === 'coach'
+        ? <CoachBottomNav activeId="settings" navigation={navigation} totalUnread={totalUnread} />
+        : <TraineeBottomNav activeId="profile" navigation={navigation} totalUnread={totalUnread} />
+      }
     </SafeAreaView>
   );
 };

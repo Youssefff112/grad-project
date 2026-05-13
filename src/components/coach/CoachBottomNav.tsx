@@ -18,6 +18,7 @@ export const CoachBottomNav: React.FC<CoachBottomNavProps> = ({
     if (id === 'messages') navigation.navigate('Messages');
     if (id === 'schedule') navigation.navigate('CoachSchedule');
     if (id === 'profile') navigation.navigate('CoachProfileEdit');
+    if (id === 'settings') navigation.navigate('CoachSettings');
   };
 
   return (
@@ -30,6 +31,7 @@ export const CoachBottomNav: React.FC<CoachBottomNavProps> = ({
         { id: 'messages', icon: 'chat-bubble' as const, label: 'Messages', badge: totalUnread },
         { id: 'schedule', icon: 'calendar-today' as const, label: 'Schedule' },
         { id: 'profile', icon: 'person' as const, label: 'Profile' },
+        { id: 'settings', icon: 'settings' as const, label: 'Settings' },
       ]}
     />
   );
