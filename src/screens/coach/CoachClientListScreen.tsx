@@ -192,7 +192,13 @@ export const CoachClientListScreen = ({ navigation }: any) => {
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('Chat', { conversationName: client.name })}
+                  onPress={() =>
+                    navigation.navigate('Chat', {
+                      conversationName: client.name,
+                      receiverId: Number(client.userId),
+                      conversationId: null,
+                    })
+                  }
                   style={[tw`flex-1 py-2 rounded-lg items-center`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
                 >
                   <Text style={[tw`text-xs font-bold`, { color: accent }]}>Message</Text>

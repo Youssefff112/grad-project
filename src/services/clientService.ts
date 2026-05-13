@@ -14,6 +14,13 @@ export interface ClientProfile {
   medicalNotes?: string;
   createdAt: string;
   updatedAt: string;
+  /** Populated when GET /client/profile includes assigned coach user */
+  SelectedCoach?: {
+    id: number;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
 }
 
 export interface UpdateClientProfileRequest {

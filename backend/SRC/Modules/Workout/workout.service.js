@@ -3,6 +3,7 @@ import { WorkoutPlan, WorkoutLog } from './workout.model.js';
 import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+import { notificationService } from '../Notification/notification.service.js';
 
 export const workoutService = {
   // ─── AI INTEGRATION POINT ────────────────────────────────────────────────────
@@ -74,6 +75,11 @@ export const workoutService = {
       notes,
       rating,
       status: 'completed'
+    });
+
+    void notificationService.onWorkoutLogged(userId, {
+      day: workoutLog.day,
+      duration: workoutLog.duration,
     });
 
     return workoutLog;

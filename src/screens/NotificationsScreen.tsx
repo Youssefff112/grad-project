@@ -20,7 +20,6 @@ export const NotificationsScreen = ({ navigation }: any) => {
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
   const textSecondary = isDark ? '#94a3b8' : '#64748b';
   const textMuted = isDark ? '#64748b' : '#94a3b8';
-  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
   useFocusEffect(
     React.useCallback(() => {
@@ -84,7 +83,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
         {['all', 'unread'].map((tab) => (
           <TouchableOpacity
             key={tab}
-            onPress={() => setFilter(tab as any)}
+            onPress={() => setFilter(tab as 'all' | 'unread')}
             style={[
               tw`px-4 py-2 rounded-full`,
               {
@@ -161,7 +160,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
               No notifications
             </Text>
             <Text style={[tw`text-sm mt-2`, { color: textMuted }]}>
-              {filter === 'unread' ? 'You\'re all caught up!' : 'Check back soon'}
+              {filter === 'unread' ? "You're all caught up!" : 'Check back soon'}
             </Text>
           </View>
         )}

@@ -3,7 +3,16 @@ import { notificationService } from './notification.service.js';
 import { successResponse } from '../../Utils/successResponse.utils.js';
 
 export const notificationController = {
-  // GET /notifications — fetch all in-app notifications for current user
+  async registerExpoPushToken(req, res, next) {
+    try {
+      const { expoPushToken } = req.body || {};
+      const result = await notificationService.registerExpoPushToken(req.user.id, expoPushToken);
+      successResponse(res, 200, 'Push token registered', result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getUserNotifications(req, res, next) {
     try {
       const notifications = await notificationService.getUserNotifications(req.user.id);

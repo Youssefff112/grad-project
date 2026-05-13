@@ -109,7 +109,11 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     try {
       const msg = await messagingService.sendMessage(null, client.userId, '👋');
       setShowQuickMessage(false);
-      navigation.navigate('Chat', { conversationId: msg.conversationId, conversationName: client.name });
+      navigation.navigate('Chat', {
+        conversationId: msg.conversationId,
+        conversationName: client.name,
+        receiverId: client.userId,
+      });
     } catch {
       setShowQuickMessage(false);
       navigation.navigate('Messages');

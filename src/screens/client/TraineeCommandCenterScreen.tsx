@@ -15,8 +15,9 @@ import * as progressService from '../../services/progressService';
 import * as workoutService from '../../services/workoutService';
 import * as dietService from '../../services/dietService';
 import * as offlineService from '../../services/offlineService';
-import { getClientProfile } from '../../services/clientService';
+import { getClientProfile, getClientSubscriptionStatus } from '../../services/clientService';
 import { getCoaches } from '../../services/coachService';
+import { WATER_ML_PER_GLASS } from '../../utils/waterConversions';
 import type { WorkoutPlan, WorkoutDay } from '../../services/workoutService';
 
 const prettyLabel = (s?: string) =>
@@ -26,7 +27,6 @@ const prettyLabel = (s?: string) =>
     .trim();
 
 const WATER_TARGET_GLASSES = 8;
-const WATER_ML_PER_GLASS = 250;
 
 const getWorkoutImage = (focus?: string): string => {
   const f = (focus || '').toLowerCase().replace(/[\s_]+/g, '_');
@@ -62,7 +62,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [calorieTarget, setCalorieTarget] = useState(2000);
   const [waterGlasses, setWaterGlasses] = useState(0);
   const { isDark, accent } = useTheme();
-  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach } = useUser();
+  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach, setSubscriptionPlan } = useUser();
   const { totalUnread } = useNotifications();
   const { isOnline, syncInProgress, queuedCount } = useOffline();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
@@ -94,7 +94,10 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           try {
             const { coaches } = await getCoaches();
             const found = coaches?.find((c: any) => String(c.userId) === String(serverCoachId));
-            setCoach(String(serverCoachId), found?.name || found?.fullName || 'Coach');
+            const fromUser = found?.User
+              ? `${found.User.firstName || ''} ${found.User.lastName || ''}`.trim()
+              : '';
+            setCoach(String(serverCoachId), fromUser || coachName || 'Coach');
           } catch {
             setCoach(String(serverCoachId), coachName || 'Coach');
           }
@@ -110,21 +113,36 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     }
   }, [coachId, coachName, setCoach, clearCoach]);
 
+  const syncClientSubscription = useCallback(async () => {
+    try {
+      const { subscription } = await getClientSubscriptionStatus();
+      if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
+    } catch {
+      /* non-blocking */
+    }
+  }, [setSubscriptionPlan]);
+
   const loadDailyProgress = useCallback(async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const [cachedLog, { plan }] = await Promise.allSettled([
+      const [logResult, planResult] = await Promise.allSettled([
         offlineService.getCachedMealLog(today),
         dietService.getActiveDietPlan(),
-      ]).then(([logResult, planResult]) => [
-        logResult.status === 'fulfilled' ? logResult.value : null,
-        planResult.status === 'fulfilled' ? planResult.value : { plan: null },
       ]);
 
-      const log = cachedLog as offlineService.DailyMealLog | null;
-      setWaterGlasses(log?.waterGlasses ?? 0);
+      const cachedLog =
+        logResult.status === 'fulfilled' ? (logResult.value as offlineService.DailyMealLog | null) : null;
+      const plan: dietService.DietPlan | null =
+        planResult.status === 'fulfilled' && planResult.value ? planResult.value.plan ?? null : null;
 
-      const dietPlan = plan as dietService.DietPlan | null;
+      const log = cachedLog;
+      if (log?.waterMl != null && log.waterMl > 0) {
+        setWaterGlasses(Math.round(log.waterMl / WATER_ML_PER_GLASS));
+      } else {
+        setWaterGlasses(log?.waterGlasses ?? 0);
+      }
+
+      const dietPlan = plan;
       // Reset to default when there's no active diet plan, otherwise the
       // home page keeps showing the deleted plan's calorie target.
       setCalorieTarget(dietPlan?.dailyCalorieTarget ?? 2000);
@@ -133,9 +151,12 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       // Try to get today's consumed calories from diet history
       try {
         const { logs } = await dietService.getDietHistory(1, 5);
-        const todayLog = logs.find(l => l.date?.startsWith(today));
-        if (todayLog?.caloriesConsumed) {
+        const todayLog = logs.find((l) => l.date?.startsWith(today));
+        if (todayLog?.caloriesConsumed != null) {
           setCaloriesConsumed(todayLog.caloriesConsumed);
+        }
+        if (todayLog?.waterMl != null && todayLog.waterMl > 0) {
+          setWaterGlasses(Math.round(todayLog.waterMl / WATER_ML_PER_GLASS));
         }
       } catch {
         // no history yet
@@ -150,7 +171,8 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       loadDailyProgress();
       loadActivePlan();
       syncCoachInfo();
-    }, [loadDailyProgress, loadActivePlan, syncCoachInfo]),
+      syncClientSubscription();
+    }, [loadDailyProgress, loadActivePlan, syncCoachInfo, syncClientSubscription]),
   );
 
   // Get today's workout day from the active plan
@@ -323,10 +345,10 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
         {/* Coach Info Card — shows only when client has an assigned coach */}
         {!!coachId && (
-          <View style={tw`px-4 mb-2`}>
+          <View style={tw`px-4 mb-2 flex-row items-stretch gap-2`}>
             <TouchableOpacity
               onPress={() => navigation.navigate('CoachAssignment')}
-              style={[tw`flex-row items-center gap-3 p-3 rounded-xl`, { backgroundColor: accent + '12', borderWidth: 1, borderColor: accent + '28' }]}
+              style={[tw`flex-1 flex-row items-center gap-3 p-3 rounded-xl`, { backgroundColor: accent + '12', borderWidth: 1, borderColor: accent + '28' }]}
             >
               <View style={[tw`w-9 h-9 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
                 <MaterialIcons name="sports" size={18} color={accent} />
@@ -336,6 +358,19 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{coachName || 'Coach'}</Text>
               </View>
               <MaterialIcons name="chevron-right" size={18} color={accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('Chat', {
+                  conversationName: coachName || 'Coach',
+                  receiverId: Number(coachId),
+                  conversationId: null,
+                })
+              }
+              accessibilityLabel="Message your coach"
+              style={[tw`w-14 rounded-xl items-center justify-center`, { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '35' }]}
+            >
+              <MaterialIcons name="chat-bubble" size={22} color={accent} />
             </TouchableOpacity>
           </View>
         )}
@@ -584,7 +619,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               {(todayWorkoutDay.exercises || []).length > 0 && (
                 <View style={tw`mt-3 gap-2`}>
                   <Text style={[tw`text-xs font-semibold uppercase tracking-wider px-1 mb-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    Today's Exercises
+                    {"Today's Exercises"}
                   </Text>
                   {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => (
                     <TouchableOpacity

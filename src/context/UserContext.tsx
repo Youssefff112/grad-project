@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as tokenManager from '../utils/tokenManager';
 import authService from '../services/auth.service';
+import { getClientSubscriptionStatus, getClientProfile } from '../services/clientService';
+import { isClientPlan } from '../constants/plans';
 
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
 export type SubscriptionPlan = 'Free' | 'Standard' | 'Premium' | 'ProCoach' | 'Elite';
@@ -15,6 +17,8 @@ export interface NotificationSettings {
   weeklyReport: boolean;
   formAlerts: boolean;
   restTimer: boolean;
+  /** Push when daily water goal is reached */
+  hydrationReminders: boolean;
 }
 
 export type UserRole = 'client' | 'coach' | 'admin';
@@ -92,7 +96,8 @@ const UserContext = createContext<UserContextType>({
     coachMessages: true,
     weeklyReport: false,
     formAlerts: true,
-    restTimer: true
+    restTimer: true,
+    hydrationReminders: true,
   },
 
   // Authentication defaults
@@ -147,7 +152,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     coachMessages: true,
     weeklyReport: false,
     formAlerts: true,
-    restTimer: true
+    restTimer: true,
+    hydrationReminders: true,
   });
 
   // Authentication state
@@ -233,7 +239,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedReviewDate) setLastPlanReviewDateState(savedReviewDate);
         if (savedNotifs) {
           try {
-            setNotificationSettingsState(JSON.parse(savedNotifs));
+            const parsed = JSON.parse(savedNotifs) as Partial<NotificationSettings>;
+            setNotificationSettingsState({
+              workoutReminders: true,
+              mealReminders: true,
+              coachMessages: true,
+              weeklyReport: false,
+              formAlerts: true,
+              restTimer: true,
+              hydrationReminders: true,
+              ...parsed,
+            });
           } catch (e) {
             console.warn('[UserContext] Failed to parse notification settings:', e);
           }
@@ -259,6 +275,45 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     loadUserData();
   }, []);
+
+  // Keep client subscription tier in sync with the server so Premium ("Coach Plan") / Elite unlock coach UI after login or renewals.
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || role !== 'client') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { subscription } = await getClientSubscriptionStatus();
+        if (cancelled || !subscription?.planName) return;
+        const plan = subscription.planName as SubscriptionPlan;
+        if (isClientPlan(plan)) {
+          setSubscriptionPlanState(plan);
+          await AsyncStorage.setItem('user_subscription_plan', plan);
+        }
+      } catch {
+        /* offline / 401 — keep cached plan */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, isAuthenticated, role]);
+
+  // Register device for Expo push after auth (meal / workout / water goal notifications).
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('../services/pushNotificationSetup');
+        if (!cancelled) await mod.registerForPushAndSync();
+      } catch {
+        /* optional — simulators / denied permission */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, isAuthenticated]);
 
   const setNotificationSettings = useCallback((settings: NotificationSettings) => {
     setNotificationSettingsState(settings);
@@ -374,6 +429,37 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Failed to save user mode:', error)
     );
   }, []);
+
+  // Keep assigned coach in sync with the server (source of truth) so it survives restarts and multi-device use.
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || role !== 'client') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { profile } = await getClientProfile();
+        if (cancelled || !profile) return;
+        const sid = profile.selectedCoachId;
+        if (!sid) {
+          clearCoach();
+          return;
+        }
+        const sc = profile.SelectedCoach;
+        let name = sc
+          ? `${sc.firstName || ''} ${sc.lastName || ''}`.trim() || sc.email?.split('@')[0] || ''
+          : '';
+        if (!name && coachId && String(sid) === String(coachId)) {
+          name = coachName || '';
+        }
+        if (!name) name = 'Coach';
+        setCoach(String(sid), name);
+      } catch {
+        /* offline / 401 — keep cached coach */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, isAuthenticated, role, clearCoach, setCoach, coachId, coachName]);
 
   const setComputerVisionEnabled = useCallback((enabled: boolean) => {
     setCanUseComputerVisionState(enabled);

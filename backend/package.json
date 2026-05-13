@@ -21,6 +21,7 @@
   "scripts": {
     "dev": "node --watch index.js",
     "start": "node index.js",
+    "seed": "node seed.js",
     "tunnel": "ngrok http --log=stdout 5000"
   },
   "keywords": [],

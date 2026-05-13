@@ -75,10 +75,14 @@ export const getMessages = async (req, res, next) => {
       { where: { conversationId, senderId: { [Op.ne]: req.user.id }, read: false } }
     );
 
+    const rowsPlain = messages.rows.map((m) =>
+      typeof m.get === 'function' ? m.get({ plain: true }) : m
+    );
+
     res.status(200).json({
       success: true,
       data: {
-        messages: messages.rows,
+        messages: rowsPlain,
         pagination: {
           total: messages.count,
           page: parseInt(page),
@@ -93,8 +97,11 @@ export const getMessages = async (req, res, next) => {
 
 export const sendMessage = async (req, res, next) => {
   try {
-    const { conversationId } = req.params;
-    const { text, receiverId } = req.body;
+    const rawConvId = req.params.conversationId;
+    const conversationId =
+      rawConvId && rawConvId !== 'send' && rawConvId !== 'undefined' ? rawConvId : null;
+    const receiverId = req.body.receiverId != null ? parseInt(req.body.receiverId, 10) : null;
+    const text = typeof req.body.text === 'string' ? req.body.text : '';
     const senderId = req.user.id;
 
     if (!text || !text.trim()) {
@@ -108,49 +115,69 @@ export const sendMessage = async (req, res, next) => {
       if (!conversation) {
         return next(new AppError('Conversation not found', 404));
       }
-      // Verify sender is a participant in this conversation
       if (conversation.clientId !== senderId && conversation.coachId !== senderId) {
         return next(new AppError('Unauthorized access to this conversation', 403));
       }
-    } else if (receiverId) {
-      // Find or create conversation
-      const isClient = req.user.role === 'client';
-      const clientId = isClient ? senderId : receiverId;
-      const coachId = isClient ? receiverId : senderId;
+    } else if (receiverId && !Number.isNaN(receiverId)) {
+      const sender = await User.findByPk(senderId, { attributes: ['id', 'role'] });
+      const receiver = await User.findByPk(receiverId, { attributes: ['id', 'role'] });
+      if (!receiver) {
+        return next(new AppError('Recipient not found', 404));
+      }
+      if (senderId === receiverId) {
+        return next(new AppError('Cannot message yourself', 400));
+      }
+      const isClientToCoach = sender?.role === 'client' && receiver?.role === 'coach';
+      const isCoachToClient = sender?.role === 'coach' && receiver?.role === 'client';
+      if (!isClientToCoach && !isCoachToClient) {
+        return next(new AppError('Messages are only supported between clients and coaches', 400));
+      }
+
+      const clientId = isClientToCoach ? senderId : receiverId;
+      const coachId = isClientToCoach ? receiverId : senderId;
 
       [conversation] = await Conversation.findOrCreate({
-        where: { clientId, coachId }
+        where: { clientId, coachId },
+        defaults: { lastMessageAt: new Date() },
       });
     }
 
     if (!conversation) {
-      return next(new AppError('Conversation could not be identified or created', 400));
+      return next(
+        new AppError(
+          'Open a conversation from Messages, or start a chat with a valid coach/client.',
+          400
+        )
+      );
     }
 
     const message = await Message.create({
       conversationId: conversation.id,
       senderId,
-      text
+      text: text.trim()
     });
 
     await conversation.update({ lastMessageAt: new Date() });
 
-    // Emit socket event if accessible
+    const populatedMessage = await Message.findByPk(message.id, {
+      include: [{ model: User, as: 'sender', attributes: ['id', 'firstName', 'lastName'] }]
+    });
+
+    const messagePlain = populatedMessage
+      ? populatedMessage.get({ plain: true })
+      : message.get({ plain: true });
+
+    // Emit socket event — must be plain JSON (not Sequelize instance) for clients
     if (req.app.get('io')) {
       const io = req.app.get('io');
       const targetUserId = conversation.clientId === senderId ? conversation.coachId : conversation.clientId;
-      
-      const populatedMessage = await Message.findByPk(message.id, {
-        include: [{ model: User, as: 'sender', attributes: ['id', 'firstName', 'lastName'] }]
-      });
-
-      io.to(targetUserId.toString()).emit('new_message', populatedMessage);
+      io.to(targetUserId.toString()).emit('new_message', messagePlain);
     }
 
     res.status(201).json({
       success: true,
       message: 'Message sent successfully',
-      data: { message }
+      data: { message: messagePlain }
     });
   } catch (error) {
     next(error);

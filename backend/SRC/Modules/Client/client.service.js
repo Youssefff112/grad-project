@@ -7,7 +7,17 @@ import { AppError } from '../../Utils/appError.utils.js';
 
 export const clientService = {
   async getProfile(userId) {
-    let profile = await ClientProfile.findOne({ where: { userId } });
+    let profile = await ClientProfile.findOne({
+      where: { userId },
+      include: [
+        {
+          model: User,
+          as: 'SelectedCoach',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
+        }
+      ]
+    });
     if (!profile) {
       profile = await ClientProfile.create({ userId });
     }
@@ -22,7 +32,17 @@ export const clientService = {
     }
 
     await ClientProfile.update(updates, { where: { userId } });
-    return ClientProfile.findOne({ where: { userId } });
+    return ClientProfile.findOne({
+      where: { userId },
+      include: [
+        {
+          model: User,
+          as: 'SelectedCoach',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
+        }
+      ]
+    });
   },
 
   async selectCoach(userId, coachId) {
@@ -40,7 +60,14 @@ export const clientService = {
       throw new AppError('Coach is not approved yet', 403);
     }
 
-    await subscriptionService.requireActiveSubscription(userId, 'client');
+    const subscription = await subscriptionService.requireActiveSubscription(userId, 'client');
+    const coachPlans = ['Premium', 'Elite'];
+    if (!coachPlans.includes(subscription.planName)) {
+      throw new AppError(
+        'Your subscription does not include a personal coach. Upgrade to the Coach Plan (Premium) or Elite.',
+        403
+      );
+    }
 
     let profile = await ClientProfile.findOne({ where: { userId } });
     if (!profile) {
@@ -50,7 +77,17 @@ export const clientService = {
 
     profile.selectedCoachId = coachId;
     await profile.save();
-    return profile;
+    return ClientProfile.findOne({
+      where: { userId },
+      include: [
+        {
+          model: User,
+          as: 'SelectedCoach',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
+        }
+      ]
+    });
   },
 
   async removeCoach(userId) {
@@ -60,7 +97,17 @@ export const clientService = {
     }
     profile.selectedCoachId = null;
     await profile.save();
-    return profile;
+    return ClientProfile.findOne({
+      where: { userId },
+      include: [
+        {
+          model: User,
+          as: 'SelectedCoach',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
+        }
+      ]
+    });
   },
 
   async getSubscriptionStatus(userId) {

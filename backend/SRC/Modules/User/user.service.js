@@ -11,14 +11,6 @@ export const userService = {
     return user;
   },
 
-  async getCoaches() {
-    const coaches = await User.findAll({
-      where: { role: 'coach', isActive: true },
-      attributes: ['id', 'firstName', 'lastName', 'email', 'profile']
-    });
-    return coaches;
-  },
-
   async updateProfile(userId, updates) {
     const user = await User.findByPk(userId);
     if (!user) {

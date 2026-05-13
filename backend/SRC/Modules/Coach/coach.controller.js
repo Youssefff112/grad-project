@@ -23,15 +23,6 @@ async function resolveUserId(clientProfileId) {
 }
 
 export const coachController = {
-  async createCoach(req, res, next) {
-    try {
-      const coach = await coachService.createCoach(req.body);
-      successResponse(res, 201, 'Coach created successfully', { coach });
-    } catch (error) {
-      next(error);
-    }
-  },
-
   async getAllCoaches(req, res, next) {
     try {
       const specialty = req.query.specialty;
@@ -47,33 +38,6 @@ export const coachController = {
       });
 
       successResponse(res, 200, 'Coaches retrieved successfully', { coaches });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async getCoachById(req, res, next) {
-    try {
-      const coach = await coachService.getCoachById(req.params.id);
-      successResponse(res, 200, 'Coach retrieved successfully', { coach });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async updateCoach(req, res, next) {
-    try {
-      const coach = await coachService.updateCoach(req.params.id, req.body);
-      successResponse(res, 200, 'Coach updated successfully', { coach });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async deleteCoach(req, res, next) {
-    try {
-      const result = await coachService.deleteCoach(req.params.id);
-      successResponse(res, 200, result.message);
     } catch (error) {
       next(error);
     }
@@ -473,6 +437,19 @@ export const coachController = {
       const userId = await resolveUserId(Number(req.params.clientId));
       const { measurements } = await progressService.getMeasurements(userId);
       successResponse(res, 200, 'Client measurements retrieved', { measurements });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /** Diet logs (meals + water) and completed workouts for assigned client */
+  async getClientActivity(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(Number(req.params.clientId));
+      const days = parseInt(req.query.days, 10) || 14;
+      const snapshot = await coachService.getClientActivitySnapshot(req.user.id, userId, days);
+      successResponse(res, 200, 'Client activity retrieved', snapshot);
     } catch (error) {
       next(error);
     }

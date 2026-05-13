@@ -6,6 +6,7 @@ import { notificationController } from './notification.controller.js';
 const router = Router();
 
 // ─── User Routes (authenticated) ─────────────────────────────────────────────
+router.post('/push-token', authenticate, notificationController.registerExpoPushToken);
 router.get('/', authenticate, notificationController.getUserNotifications);
 router.patch('/mark-all-read', authenticate, notificationController.markAllAsRead);
 router.patch('/:id/read', authenticate, notificationController.markAsRead);

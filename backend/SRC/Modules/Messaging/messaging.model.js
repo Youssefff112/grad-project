@@ -35,6 +35,13 @@ Conversation.init({
   modelName: 'Conversation',
   tableName: 'conversations',
   timestamps: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['clientId', 'coachId'],
+      name: 'conversations_client_coach_unique',
+    },
+  ],
 });
 
 export class Message extends Model {}

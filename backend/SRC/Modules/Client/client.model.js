@@ -31,3 +31,6 @@ ClientProfile.init({
   timestamps: true
 });
 
+import('../User/user.model.js').then(({ User }) => {
+  ClientProfile.belongsTo(User, { foreignKey: 'selectedCoachId', as: 'SelectedCoach' });
+}).catch(() => {});

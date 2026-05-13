@@ -17,6 +17,7 @@ import { useExerciseManagement } from '../../context/ExerciseManagementContext';
 import * as offlineService from '../../services/offlineService';
 import * as dietService from '../../services/dietService';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
+import { WATER_ML_PER_GLASS } from '../../utils/waterConversions';
 
 const DEFAULT_TARGETS = {
   calories: 2400,
@@ -94,7 +95,12 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
     const today = new Date().toISOString().split('T')[0];
 
     // Always save to local cache
-    offlineService.cacheMealLog(today, { checkedMeals, waterGlasses, date: today });
+    offlineService.cacheMealLog(today, {
+      checkedMeals,
+      waterGlasses,
+      date: today,
+      waterMl: waterGlasses * WATER_ML_PER_GLASS,
+    });
 
     // Debounce backend save
     if (dietLogTimer.current) clearTimeout(dietLogTimer.current);
@@ -129,6 +135,7 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
           macrosConsumed: { protein: consumed.protein, carbs: consumed.carbs, fats: consumed.fats },
           status,
           dietPlanId: activeDietPlan.id,
+          waterMl: waterGlasses * WATER_ML_PER_GLASS,
         });
       } catch {
         // silently fail — local cache is the source of truth while offline

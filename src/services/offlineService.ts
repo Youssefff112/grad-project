@@ -12,6 +12,8 @@ export interface CachedWorkout {
 export interface DailyMealLog {
   checkedMeals: Record<string, boolean>;
   waterGlasses: number;
+  /** Total ml when set (e.g. from calculator); else infer from glasses × 250 */
+  waterMl?: number;
   date: string;
 }
 

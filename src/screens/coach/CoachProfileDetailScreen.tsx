@@ -1,36 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import { useUser } from '../../context/UserContext';
 import { CoachReviewCard } from '../../components/coach/CoachReviewCard';
 import { TransformationCarousel } from '../../components/TransformationCarousel';
 import { CertificationBadge } from '../../components/CertificationBadge';
 import { RatingStarPicker } from '../../components/RatingStarPicker';
 import { ReviewSubmissionModal } from '../../components/ReviewSubmissionModal';
 import * as coachService from '../../services/coachService';
+import * as clientService from '../../services/clientService';
 import type { CoachDetail, Review } from '../../services/coachService';
+import { canClientSelectPersonalCoach } from '../../utils/planUtils';
+import { coachDisplayName } from '../../utils/coachDisplayName';
+import { formatCoachRating, numericCoachRating } from '../../utils/coachRating';
 
 type CoachWithDisplay = CoachDetail & { displayName: string };
 
-const buildDisplayName = (coach: CoachDetail): string => {
-  const user = (coach as any).User;
-  if (user?.firstName) {
-    return `${user.firstName} ${user.lastName || ''}`.trim();
-  }
-  return (coach as any).name || `Coach #${coach.userId}`;
-};
-
 export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { isDark, accent } = useTheme();
+  const insets = useSafeAreaInsets();
   const { coachId, coachName: routeCoachName } = route?.params ?? {};
+  const { subscriptionPlan, coachId: myCoachId, setCoach } = useUser();
 
-  const [coach, setCoach] = useState<CoachWithDisplay | null>(null);
+  const [coach, setCoachState] = useState<CoachWithDisplay | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -55,8 +55,8 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
       ]);
 
       const coachData = coachRes.coach as CoachDetail;
-      const displayName = buildDisplayName(coachData) || routeCoachName || `Coach #${coachId}`;
-      setCoach({ ...coachData, displayName });
+      const displayName = coachDisplayName(coachData) || routeCoachName || 'Coach';
+      setCoachState({ ...coachData, displayName });
       setReviews(reviewsRes.reviews);
     } catch (err: any) {
       setError(err?.message || 'Failed to load coach profile');
@@ -122,8 +122,47 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
 
   const reviewStats = coach.reviewStats;
   const totalReviews = reviewStats?.totalReviews ?? reviews.length;
-  const averageRating = reviewStats?.averageRating ?? coach.rating ?? 0;
+  const averageRating = numericCoachRating(reviewStats?.averageRating ?? coach.rating ?? 0);
   const distribution = reviewStats?.distribution ?? { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+  const coachUserId = coach.userId;
+  const isMyCoach = !!(myCoachId && coachUserId && String(myCoachId) === String(coachUserId));
+  const showCoachActions = canClientSelectPersonalCoach(subscriptionPlan) && !!coachUserId;
+
+  const handleMessageCoach = () => {
+    if (!coachUserId) return;
+    navigation.navigate('Chat', {
+      conversationName: coach.displayName,
+      receiverId: coachUserId,
+      conversationId: null,
+    });
+  };
+
+  const handleAssignThisCoach = () => {
+    if (!coachUserId) return;
+    Alert.alert(
+      'Assign this coach?',
+      `${coach.displayName} will be able to view your progress and manage your workout and meal plans.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Assign',
+          onPress: async () => {
+            setAssigning(true);
+            try {
+              await clientService.selectCoach(coachUserId);
+              setCoach(String(coachUserId), coach.displayName);
+              Alert.alert('Success', `${coach.displayName} is now your coach.`);
+            } catch (err: any) {
+              Alert.alert('Could not assign', err?.response?.data?.message || err?.message || 'Please try again.');
+            } finally {
+              setAssigning(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -135,7 +174,7 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
         <View style={tw`w-8`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
+      <ScrollView style={tw`flex-1`} contentContainerStyle={showCoachActions ? tw`pb-28` : tw`pb-8`}>
         {/* Hero */}
         <View style={tw`items-center pt-8 pb-6 px-4`}>
           <View style={[tw`w-24 h-24 rounded-full overflow-hidden mb-4 items-center justify-center`, { backgroundColor: accent + '20' }]}>
@@ -157,7 +196,10 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
           )}
           <View style={tw`mt-4 items-center`}>
             <RatingStarPicker rating={averageRating} onRatingChange={() => {}} size={22} interactive={false} />
-            <Text style={[tw`text-xs mt-1`, { color: subtextColor }]}>Based on {totalReviews} reviews</Text>
+            <Text style={[tw`text-sm font-bold mt-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+              {formatCoachRating(averageRating)}
+            </Text>
+            <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>Based on {totalReviews} reviews</Text>
           </View>
         </View>
 
@@ -232,6 +274,61 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
           </View>
         </View>
       </ScrollView>
+
+      {showCoachActions && (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderColor,
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: Math.max(insets.bottom, 14),
+            backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
+          }}
+        >
+          <View style={tw`flex-row gap-3`}>
+            {!isMyCoach ? (
+              <TouchableOpacity
+                onPress={handleAssignThisCoach}
+                disabled={assigning}
+                style={[
+                  tw`flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-xl`,
+                  { backgroundColor: accent, opacity: assigning ? 0.7 : 1 },
+                ]}
+              >
+                {assigning ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <MaterialIcons name="person-add" size={20} color="white" />
+                    <Text style={tw`text-white font-bold`}>Choose coach</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View
+                style={[
+                  tw`flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-xl`,
+                  { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' },
+                ]}
+              >
+                <MaterialIcons name="verified" size={20} color={accent} />
+                <Text style={[tw`font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Your coach</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={handleMessageCoach}
+              style={[
+                tw`flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-xl`,
+                { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor },
+              ]}
+            >
+              <MaterialIcons name="chat-bubble" size={20} color={accent} />
+              <Text style={[tw`font-bold`, { color: accent }]}>Message</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <ReviewSubmissionModal
         visible={showReviewModal}

@@ -313,3 +313,36 @@ export const approveClientDietPlan = async (planId: number): Promise<{ plan: any
   const response = await apiPatch(`/coach/plans/diet/${planId}/approve`, {});
   return { plan: response.data?.plan };
 };
+
+export interface AdherenceSummary {
+  hydrationGoalMl: number;
+  trainingDayNames: string[];
+  todayPercent: number | null;
+  todayBreakdown: {
+    meals: number | null;
+    water: number | null;
+    workout: number | null;
+  };
+  last7Days: { date: string; percent: number | null }[];
+  rolling7DayAvgPercent: number | null;
+}
+
+export interface ClientActivitySnapshot {
+  dietLogs: any[];
+  workoutLogs: any[];
+  adherence?: AdherenceSummary | null;
+}
+
+/** Meals, water, completed workouts, and computed adherence for an assigned client (last N days). */
+export const getClientActivity = async (
+  clientId: number,
+  days = 14
+): Promise<ClientActivitySnapshot> => {
+  const response: any = await apiGet(`/coach/clients/${clientId}/activity?days=${days}`);
+  const data = response?.data ?? response;
+  return {
+    dietLogs: Array.isArray(data?.dietLogs) ? data.dietLogs : [],
+    workoutLogs: Array.isArray(data?.workoutLogs) ? data.workoutLogs : [],
+    adherence: data?.adherence ?? null,
+  };
+};

@@ -11,7 +11,6 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/profile', userController.getProfile);
-router.get('/coaches', userController.getCoaches);
 router.patch('/profile', validate(updateProfileSchema), userController.updateProfile);
 router.post('/onboarding', validate(completeOnboardingSchema), userController.completeOnboarding);
 router.delete('/account', userController.deleteAccount);

@@ -107,6 +107,11 @@ DietLog.init({
   status: {
     type: DataTypes.ENUM('followed', 'partial', 'missed'),
     defaultValue: 'partial'
+  },
+  /** Total water consumed that day (millilitres); client may log from glasses/cups/L */
+  waterMl: {
+    type: DataTypes.INTEGER,
+    allowNull: true
   }
 }, {
   sequelize,

@@ -9,8 +9,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', messagingController.getConversations);
+router.post('/send', messagingController.sendMessage);
 router.get('/:conversationId/messages', messagingController.getMessages);
 router.post('/:conversationId/messages', messagingController.sendMessage);
-router.post('/send', messagingController.sendMessage); // For sending without existing conversation ID
 
 export default router;

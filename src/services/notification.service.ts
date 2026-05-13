@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from './api';
+import { apiGet, apiPatch, apiPost } from './api';
 
 export interface AppNotification {
   id: number;
@@ -40,4 +40,9 @@ export const markAllNotificationsRead = async (): Promise<boolean> => {
     console.error('Failed to mark all notifications as read:', error);
     return false;
   }
+};
+
+/** Register this device for Expo push (server stores token on user.profile). */
+export const registerExpoPushTokenApi = async (expoPushToken: string): Promise<void> => {
+  await apiPost('/notifications/push-token', { expoPushToken });
 };

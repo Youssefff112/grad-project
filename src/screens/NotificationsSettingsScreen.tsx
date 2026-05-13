@@ -19,12 +19,13 @@ export const NotificationsSettingsScreen = ({ navigation }: any) => {
 
   const SECTIONS = [
     { title: 'Training', items: [
-      { key: 'workoutReminders' as const, icon: 'fitness-center', label: 'Workout Reminders', desc: 'Daily workout notifications' },
+      { key: 'workoutReminders' as const, icon: 'fitness-center', label: 'Workout Reminders', desc: 'When you log a completed workout (and scheduled reminders)' },
       { key: 'formAlerts' as const, icon: 'videocam', label: 'Form Alerts', desc: 'Real-time form correction alerts' },
       { key: 'restTimer' as const, icon: 'timer', label: 'Rest Timer', desc: 'Notify when rest period ends' },
     ]},
     { title: 'Nutrition', items: [
-      { key: 'mealReminders' as const, icon: 'restaurant', label: 'Meal Reminders', desc: 'Meal timing notifications' },
+      { key: 'mealReminders' as const, icon: 'restaurant', label: 'Meal Reminders', desc: 'Meal timing & “all meals logged” push' },
+      { key: 'hydrationReminders' as const, icon: 'water-drop', label: 'Hydration', desc: 'Push when you hit your water goal' },
     ]},
     { title: 'Communication', items: [
       { key: 'coachMessages' as const, icon: 'smart-toy', label: 'AI Coach Messages', desc: 'Tips and insights from your AI coach' },

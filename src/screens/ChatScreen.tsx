@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 import {
   View,
@@ -8,82 +8,112 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../config/environment';
-import { getMessages, sendMessage, ChatMessage } from '../services/messaging.service';
+import { getMessages, sendMessage, ChatMessage, normalizeChatMessage } from '../services/messaging.service';
 import tokenManager from '../utils/tokenManager';
 
 const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 
 export const ChatScreen = ({ navigation, route }: any) => {
-  const { conversationName = 'Chat', conversationId = null, receiverId = null } = route.params || {};
+  const { conversationName = 'Chat', conversationId: routeConvId = null, receiverId: routeReceiverId = null } =
+    route.params || {};
+  const conversationIdFromRoute =
+    routeConvId && routeConvId !== 'null' && routeConvId !== 'undefined' ? String(routeConvId) : null;
+  const receiverId =
+    routeReceiverId != null && routeReceiverId !== '' && !Number.isNaN(Number(routeReceiverId))
+      ? Number(routeReceiverId)
+      : null;
   const { isDark, accent } = useTheme();
   const { userId } = useUser();
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationId);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationIdFromRoute);
   const scrollViewRef = useRef<ScrollView>(null);
   const socketRef = useRef<Socket | null>(null);
-  // Use a ref so the socket message handler always reads the latest value without triggering re-runs
-  const activeConversationIdRef = useRef<string | null>(activeConversationId);
+  const activeConversationIdRef = useRef<string | null>(conversationIdFromRoute);
+
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
   }, [activeConversationId]);
 
-  // Initialize Socket and fetch messages — runs once on mount only
+  // Opening a thread from Inbox updates params — keep local conversation id in sync
   useEffect(() => {
-    const initData = async () => {
-      const convId = activeConversationIdRef.current;
-      if (convId) {
-        try {
-          const res = await getMessages(convId).catch(() => {
-            console.log('Chat API not available, returning empty state gracefully');
-            return { messages: [], pagination: {} };
-          });
-          setMessages(res.messages || []);
-        } catch (error) {
-          console.log('Error fetching messages caught gracefully:', error);
-          setMessages([]);
-        }
-      }
+    if (conversationIdFromRoute) {
+      setActiveConversationId(conversationIdFromRoute);
+      activeConversationIdRef.current = conversationIdFromRoute;
+    }
+  }, [conversationIdFromRoute]);
 
-      // Initialize Socket connection
+  const reloadMessages = useCallback(async (convId: string): Promise<boolean> => {
+    if (!convId || convId === 'undefined' || convId === 'null') return false;
+    try {
+      const res = await getMessages(convId);
+      setMessages(res.messages || []);
+      return true;
+    } catch (e) {
+      console.log('Chat: failed to load messages', e);
+      return false;
+    }
+  }, []);
+
+  // Refetch whenever this screen is focused and we have a thread id (fixes stale UI after backgrounding)
+  useFocusEffect(
+    useCallback(() => {
+      const id = activeConversationIdRef.current;
+      if (!id || id === 'undefined' || id === 'null') return;
+      reloadMessages(id);
+    }, [reloadMessages])
+  );
+
+  // Socket joins the user's room when auth context is ready (not only on first mount)
+  useEffect(() => {
+    if (!userId) return;
+
+    let cancelled = false;
+
+    const connect = async () => {
       const token = await tokenManager.getAccessToken();
-      const userIdStr = userId;
-      if (!userIdStr) return;
+      if (!token || cancelled) return;
 
-      socketRef.current = io(environment.BACKEND_URL, {
-        auth: { token }
+      socketRef.current?.disconnect();
+      const socket = io(environment.BACKEND_URL, {
+        auth: { token },
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        socket.emit('join_room', userId);
       });
 
-      socketRef.current.on('connect', () => {
-        socketRef.current?.emit('join_room', userIdStr);
-      });
-
-      socketRef.current.on('new_message', (msg: ChatMessage) => {
-        setMessages((prev) => [...prev, msg]);
-        if (!activeConversationIdRef.current) {
-          setActiveConversationId(msg.conversationId);
-          activeConversationIdRef.current = msg.conversationId;
-        }
+      socket.on('new_message', (raw: unknown) => {
+        const msg = normalizeChatMessage(raw);
+        const currentConv = activeConversationIdRef.current;
+        if (!msg.conversationId || !currentConv || msg.conversationId !== currentConv) return;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
       });
     };
 
-    initData();
+    connect();
 
     return () => {
-      if (socketRef.current) socketRef.current.disconnect();
+      cancelled = true;
+      socketRef.current?.disconnect();
+      socketRef.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -101,15 +131,30 @@ export const ChatScreen = ({ navigation, route }: any) => {
     if (!inputText.trim()) return;
 
     const textPayload = inputText.trim();
+    if (!activeConversationId && (!receiverId || receiverId <= 0)) {
+      Alert.alert(
+        'Cannot send',
+        'This conversation is not linked to a client or coach. Use Message from a client profile, your coach card, or start a new thread from Messages.'
+      );
+      return;
+    }
+
     setInputText('');
 
     try {
       const msg = await sendMessage(activeConversationId, receiverId, textPayload);
-      setMessages((prev) => [...prev, msg]);
-      if (!activeConversationId) setActiveConversationId(msg.conversationId);
-    } catch (error) {
+      const convId = String(msg.conversationId);
+      setActiveConversationId(convId);
+      activeConversationIdRef.current = convId;
+      const loaded = await reloadMessages(convId);
+      if (!loaded) {
+        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+      }
+    } catch (error: any) {
+      setInputText(textPayload);
+      const serverMsg = error?.response?.data?.message || error?.message || 'Failed to send message.';
       console.error('Failed to send message:', error);
-      Alert.alert('Error', 'Failed to send message.');
+      Alert.alert('Cannot send message', serverMsg);
     }
   };
 

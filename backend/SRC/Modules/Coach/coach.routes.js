@@ -40,6 +40,9 @@ router.post('/clients/:clientId/generate-diet', authenticate, restrictTo('coach'
 router.patch('/plans/workout/:planId', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.updateClientWorkoutPlan);
 router.patch('/plans/diet/:planId', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.updateClientDietPlan);
 
+// Coach reads a client's adherence (meals, water, workouts)
+router.get('/clients/:clientId/activity', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientActivity);
+
 // Coach reads a client's measurements
 router.get('/clients/:clientId/measurements', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientMeasurements);
 

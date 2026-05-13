@@ -146,13 +146,6 @@ export const completeOnboarding = async (profile: any): Promise<ProfileResponse>
   return apiPost<ProfileResponse>('/users/onboarding', { profile });
 };
 
-/**
- * Get available coaches
- */
-export const getCoaches = async (): Promise<{ success: boolean; data: { coaches: User[] } }> => {
-  return apiGet('/users/coaches');
-};
-
 export default {
   login,
   register,
@@ -160,5 +153,4 @@ export default {
   logout,
   updateProfile,
   completeOnboarding,
-  getCoaches,
 };

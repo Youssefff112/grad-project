@@ -19,6 +19,7 @@ import { Card } from '../components/Card';
 import { validateMockUser, MOCK_USERS, MockUser } from '../data/mockUsers';
 import * as authService from '../services/auth.service';
 import * as subscriptionService from '../services/subscriptionService';
+import { getClientSubscriptionStatus } from '../services/clientService';
 import { PLAN_FEATURES } from '../constants/plans';
 
 export const SignInScreen = ({ navigation }: any) => {
@@ -98,16 +99,30 @@ export const SignInScreen = ({ navigation }: any) => {
         setFullName(fullName);
         saveEmail(user.email);
 
-        setSubscriptionPlan((user as any).subscriptionPlan ?? 'Free');
-
         // Persist role to context + AsyncStorage
         setRole(user.role as any);
+
+        if (user.role === 'client') {
+          try {
+            const { subscription } = await getClientSubscriptionStatus();
+            if (subscription?.planName) {
+              setSubscriptionPlan(subscription.planName as any);
+            } else {
+              setSubscriptionPlan(((user as any).subscriptionPlan ?? 'Free') as any);
+            }
+          } catch {
+            setSubscriptionPlan(((user as any).subscriptionPlan ?? 'Free') as any);
+          }
+        } else if (user.role === 'coach') {
+          setSubscriptionPlan('ProCoach');
+        } else {
+          setSubscriptionPlan('Free');
+        }
 
         // Navigate based on role
         if (user.role === 'admin') {
           navigation.navigate('AdminDashboard');
         } else if (user.role === 'coach') {
-          setSubscriptionPlan('ProCoach');
           navigation.navigate('CoachCommandCenter');
         } else {
           navigation.navigate('TraineeCommandCenter');
@@ -240,7 +255,13 @@ export const SignInScreen = ({ navigation }: any) => {
                       setSubscriptionPlan('ProCoach');
                       navigation.navigate('CoachCommandCenter');
                     } else {
-                      setSubscriptionPlan(user.subscriptionPlan);
+                      try {
+                        const { subscription } = await getClientSubscriptionStatus();
+                        if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
+                        else setSubscriptionPlan(user.subscriptionPlan as any);
+                      } catch {
+                        setSubscriptionPlan(user.subscriptionPlan as any);
+                      }
                       navigation.navigate('TraineeCommandCenter');
                     }
                   }
@@ -272,7 +293,7 @@ export const SignInScreen = ({ navigation }: any) => {
                   user.role === 'admin'
                     ? 'Admin'
                     : user.role === 'coach'
-                      ? 'Coach'
+                      ? user.fullName.split(' ')[0] || 'Coach'
                       : PLAN_FEATURES[user.subscriptionPlan].name;
 
                 return (

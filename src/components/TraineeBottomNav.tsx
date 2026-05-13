@@ -1,6 +1,7 @@
 import React from 'react';
 import { useUser } from '../context/UserContext';
 import { BottomNav } from './BottomNav';
+import { canClientSelectPersonalCoach } from '../utils/planUtils';
 
 interface TraineeBottomNavProps {
   activeId: string;
@@ -31,7 +32,7 @@ export const TraineeBottomNav: React.FC<TraineeBottomNavProps> = ({ activeId, na
         { id: 'track', icon: 'trending-up' as const, label: 'Track' },
         { id: 'meals', icon: 'restaurant' as const, label: 'Meals' },
         { id: 'messages', icon: 'chat-bubble' as const, label: 'Messages', badge: totalUnread },
-        ...((subscriptionPlan === 'Premium' || subscriptionPlan === 'Elite') ? [{ id: 'coaches', icon: 'person-add' as const, label: 'Coaches' }] : []),
+        ...(canClientSelectPersonalCoach(subscriptionPlan) ? [{ id: 'coaches', icon: 'person-add' as const, label: 'Coaches' }] : []),
         { id: 'profile', icon: 'person' as const, label: 'Profile' },
       ]}
     />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,10 +10,11 @@ import { TraineeBottomNav } from '../components/TraineeBottomNav';
 import { CoachBottomNav } from '../components/coach/CoachBottomNav';
 import * as workoutService from '../services/workoutService';
 import * as progressService from '../services/progressService';
+import { canClientSelectPersonalCoach } from '../utils/planUtils';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
-  const { fullName, email, logout, role } = useUser();
+  const { fullName, email, logout, role, subscriptionPlan } = useUser();
   const { totalUnread } = useNotifications();
   const displayName = fullName || 'Trainee';
 
@@ -79,6 +80,9 @@ export const ProfileScreen = ({ navigation }: any) => {
       case 'subscription':
         navigation.navigate('SubscriptionPlans');
         break;
+      case 'coach-assignment':
+        navigation.navigate('CoachAssignment');
+        break;
       case 'help':
         Alert.alert('Help Center', 'Need assistance?\n\nEmail: support@apexai.com\nResponse time: < 24 hours', [{ text: 'OK' }]);
         break;
@@ -131,6 +135,17 @@ export const ProfileScreen = ({ navigation }: any) => {
       ] },
   ];
 
+  const menuSections = useMemo(() => {
+    const sections = MENU_SECTIONS.map((s) => ({ ...s, items: [...s.items] }));
+    if (role === 'client' && canClientSelectPersonalCoach(subscriptionPlan)) {
+      const account = sections.find((x) => x.title === 'Account');
+      if (account) {
+        account.items.splice(1, 0, { id: 'coach-assignment', icon: 'person-search', label: 'My coach' });
+      }
+    }
+    return sections;
+  }, [role, subscriptionPlan, isDark]);
+
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       {/* Header */}
@@ -169,7 +184,7 @@ export const ProfileScreen = ({ navigation }: any) => {
         </View>
 
         {/* Menu Sections */}
-        {MENU_SECTIONS.map((section) => (
+        {menuSections.map((section) => (
           <View key={section.title} style={tw`px-4 mb-5`}>
             <Text style={[tw`text-xs font-bold uppercase tracking-widest mb-2 px-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{section.title}</Text>
             <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>

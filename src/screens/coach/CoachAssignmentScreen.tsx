@@ -9,17 +9,20 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
 import { getCoaches, Coach } from '../../services/coachService';
-import { selectCoach, removeCoach, getClientProfile } from '../../services/clientService';
+import { selectCoach, removeCoach, getClientProfile, getClientSubscriptionStatus } from '../../services/clientService';
+import { canClientSelectPersonalCoach } from '../../utils/planUtils';
+import { coachDisplayName as formatCoachName } from '../../utils/coachDisplayName';
 
 export const CoachAssignmentScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { coachId, coachName, setCoach, clearCoach, subscriptionPlan } = useUser();
+  const { coachId, coachName, setCoach, clearCoach, subscriptionPlan, setSubscriptionPlan } = useUser();
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
   const [showCoachDetails, setShowCoachDetails] = useState(false);
   const [availableCoaches, setAvailableCoaches] = useState<Coach[]>([]);
@@ -27,16 +30,16 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [currentCoachUserId, setCurrentCoachUserId] = useState<number | null>(null);
 
-  const coachDisplayName = (coach: Coach) => {
-    if (coach.User?.firstName || coach.User?.lastName) {
-      return `${coach.User.firstName ?? ''} ${coach.User.lastName ?? ''}`.trim();
-    }
-    return coach.User?.email ?? `Coach #${coach.userId}`;
-  };
-
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      try {
+        const { subscription } = await getClientSubscriptionStatus();
+        if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
+      } catch {
+        /* keep cached plan */
+      }
+
       const [coachesResult, profileResult] = await Promise.all([
         getCoaches(),
         getClientProfile(),
@@ -50,7 +53,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
         // Sync the context if it's out of date
         const match = coachesResult.coaches.find((c) => c.userId === Number(assigned));
         if (match) {
-          const name = coachDisplayName(match);
+          const name = formatCoachName(match);
           setCoach(String(match.userId), name);
         }
       } else {
@@ -61,11 +64,13 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setCoach, setSubscriptionPlan]);
 
-  React.useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const handleSelectCoach = (coach: Coach) => {
     setSelectedCoach(coach);
@@ -73,10 +78,10 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
   };
 
   const handleConfirmCoach = async (coach: Coach) => {
-    if (subscriptionPlan === 'Free') {
+    if (!canClientSelectPersonalCoach(subscriptionPlan)) {
       Alert.alert(
         'Upgrade Required',
-        'To work with a coach, please upgrade to Pro Coach or Elite plan first.',
+        'The Coach Plan (Premium) or Elite includes a dedicated coach, messaging, and plan collaboration. Upgrade to unlock coach assignment.',
         [
           { text: 'View Plans', onPress: () => navigation.navigate('SubscriptionPlans') },
           { text: 'Cancel', style: 'cancel' },
@@ -85,7 +90,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
       return;
     }
 
-    const name = coachDisplayName(coach);
+    const name = formatCoachName(coach);
 
     Alert.alert(
       'Assign Coach',
@@ -138,7 +143,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
   };
 
   const assignedCoach = availableCoaches.find((c) => c.userId === currentCoachUserId);
-  const displayedCoachName = assignedCoach ? coachDisplayName(assignedCoach) : coachName;
+  const displayedCoachName = assignedCoach ? formatCoachName(assignedCoach) : coachName;
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -275,7 +280,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
               </View>
             ) : (
               availableCoaches.map((coach) => {
-                const name = coachDisplayName(coach);
+                const name = formatCoachName(coach);
                 const isCurrentCoach = coach.userId === currentCoachUserId;
                 return (
                   <TouchableOpacity
@@ -421,7 +426,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
 
           <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-5`}>
             {selectedCoach && (() => {
-              const name = coachDisplayName(selectedCoach);
+              const name = formatCoachName(selectedCoach);
               return (
                 <>
                   <View style={tw`items-center`}>
@@ -595,7 +600,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
                 title={
                   isAssigning
                     ? 'Assigning...'
-                    : `Assign ${selectedCoach ? coachDisplayName(selectedCoach) : ''}`
+                    : `Assign ${selectedCoach ? formatCoachName(selectedCoach) : ''}`
                 }
                 size="lg"
                 onPress={() => selectedCoach && handleConfirmCoach(selectedCoach)}

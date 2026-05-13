@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import * as coachService from '../../services/coachService';
+import type { ClientActivitySnapshot, AdherenceSummary } from '../../services/coachService';
 
 interface Measurement {
   date: string;
@@ -25,6 +27,21 @@ function capitalise(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : '';
 }
 
+function adherenceBarFill(pct: number | null, isDark: boolean): string {
+  if (pct == null) return isDark ? '#334155' : '#cbd5e1';
+  if (pct >= 80) return '#22c55e';
+  if (pct >= 50) return '#eab308';
+  return '#f97316';
+}
+
+function shortWeekdayFromYmd(ymd: string): string {
+  const parts = ymd.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return '';
+  const [y, m, d] = parts;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getUTCDay()] ?? '';
+}
+
 export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   const { clientId, userId: clientUserId, clientName = 'Client' } = route.params ?? {};
   // Use the actual User.id for API calls that query by userId (plans, etc.)
@@ -40,6 +57,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [plansLoading, setPlansLoading] = useState(false);
   const [approvingPlanId, setApprovingPlanId] = useState<number | null>(null);
+  const [clientActivity, setClientActivity] = useState<ClientActivitySnapshot | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -117,6 +136,25 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   useEffect(() => {
     if (activeTab === 'plans') loadPlans();
   }, [activeTab, loadPlans]);
+
+  const loadClientActivity = useCallback(async () => {
+    if (!planClientId) return;
+    setActivityLoading(true);
+    try {
+      const snap = await coachService.getClientActivity(Number(planClientId), 14);
+      setClientActivity(snap);
+    } catch {
+      setClientActivity(null);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, [planClientId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadClientActivity();
+    }, [loadClientActivity])
+  );
 
   const latestCheckin = measurements[0];
   const prevCheckin = measurements[1];
@@ -314,25 +352,42 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
         )}
 
         {/* Actions */}
-        <View style={[tw`flex-row gap-2 px-4 pb-4`]}>
+        <View style={[tw`flex-row flex-wrap gap-2 px-4 pb-4`]}>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('CoachMealPlan', {
+                clientId: planClientId,
+                clientName,
+                existingPlan: dietPlan,
+              })
+            }
+            style={[tw`flex-1 min-w-[30%] flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
+              backgroundColor: '#0ea5e914',
+              borderWidth: 1,
+              borderColor: '#0ea5e930',
+            }]}
+          >
+            <MaterialIcons name="list-alt" size={15} color="#0ea5e9" />
+            <Text style={[tw`text-xs font-bold`, { color: '#0ea5e9' }]}>Ingredients</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('CoachMealPlan', {
               clientId: planClientId,
               clientName,
               existingPlan: dietPlan,
             })}
-            style={[tw`flex-1 flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
+            style={[tw`flex-1 min-w-[30%] flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
               backgroundColor: '#10b98114',
               borderWidth: 1,
               borderColor: '#10b98128',
             }]}
           >
             <MaterialIcons name="edit" size={15} color="#10b981" />
-            <Text style={[tw`text-xs font-bold`, { color: '#10b981' }]}>Edit Plan</Text>
+            <Text style={[tw`text-xs font-bold`, { color: '#10b981' }]}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('CoachMealPlan', { clientId: planClientId, clientName })}
-            style={[tw`flex-1 flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
+            style={[tw`flex-1 min-w-[30%] flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
               backgroundColor: isDark ? '#1e1b4b' : '#ede9fe',
               borderWidth: 1,
               borderColor: isDark ? '#4f46e5' : '#a5b4fc',
@@ -376,6 +431,140 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
     );
   };
 
+  const renderAdherenceBody = () => {
+    if (activityLoading) {
+      return <ActivityIndicator size="small" color={accent} />;
+    }
+    if (!clientActivity) {
+      return (
+        <Text style={[tw`text-xs`, { color: subtextColor }]}>
+          Could not load activity. Tap refresh on the Plans tab.
+        </Text>
+      );
+    }
+
+    const adherence = clientActivity.adherence as AdherenceSummary | null | undefined;
+    const today = new Date().toISOString().split('T')[0];
+    const dlog = clientActivity.dietLogs.find((l: any) => {
+      const d = l.date ? new Date(l.date).toISOString().split('T')[0] : '';
+      return d === today;
+    });
+    const mealsDone = dlog?.mealsCompleted
+      ? Object.values(dlog.mealsCompleted).filter(Boolean).length
+      : 0;
+    const mealSlots = dlog?.mealsCompleted ? Object.keys(dlog.mealsCompleted).length : 0;
+    const goalMl = adherence?.hydrationGoalMl ?? 2500;
+    const waterL = dlog?.waterMl != null ? (Number(dlog.waterMl) / 1000).toFixed(1) : '—';
+    const goalL = (goalMl / 1000).toFixed(1);
+    const recentWo = (clientActivity.workoutLogs || []).slice(0, 3);
+
+    const bd = adherence?.todayBreakdown;
+    const pctBar = (label: string, pct: number | null, foot?: string) => (
+      <View key={label} style={tw`gap-1 mb-2`}>
+        <View style={tw`flex-row justify-between`}>
+          <Text style={[tw`text-xs`, { color: subtextColor }]}>{label}</Text>
+          <Text style={[tw`text-xs font-bold`, { color: textPrimary }]}>
+            {pct == null ? '—' : `${pct}%`}
+          </Text>
+        </View>
+        {foot ? (
+          <Text style={[tw`text-[10px] leading-tight`, { color: subtextColor }]}>{foot}</Text>
+        ) : null}
+        <View style={[tw`h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
+          <View
+            style={{
+              height: '100%',
+              width: pct == null ? '0%' : `${Math.min(100, pct)}%`,
+              borderRadius: 999,
+              backgroundColor: adherenceBarFill(pct, isDark),
+            }}
+          />
+        </View>
+      </View>
+    );
+
+    const trainHint =
+      adherence && adherence.trainingDayNames.length > 0
+        ? `Training days: ${adherence.trainingDayNames.map(capitalise).join(', ')}`
+        : 'No active workout plan — workout score only counts when the client has training days on their plan.';
+
+    return (
+      <View style={tw`gap-2`}>
+        {adherence && (
+          <View style={tw`mb-2`}>
+            <View style={tw`flex-row items-end justify-between mb-2`}>
+              <View>
+                <Text style={[tw`text-[10px] uppercase font-bold`, { color: subtextColor }]}>Today</Text>
+                <Text style={[tw`text-3xl font-black`, { color: textPrimary }]}>
+                  {adherence.todayPercent == null ? '—' : `${adherence.todayPercent}%`}
+                </Text>
+              </View>
+              <View style={tw`items-end`}>
+                <Text style={[tw`text-[10px] uppercase font-bold`, { color: subtextColor }]}>7-day avg</Text>
+                <Text style={[tw`text-lg font-bold`, { color: accent }]}>
+                  {adherence.rolling7DayAvgPercent == null ? '—' : `${adherence.rolling7DayAvgPercent}%`}
+                </Text>
+              </View>
+            </View>
+            <Text style={[tw`text-[10px] leading-relaxed mb-2`, { color: subtextColor }]}>
+              Combined score from whatever applies today: meal check-ins, water vs {goalL} L goal, and completed workout on scheduled training days.
+            </Text>
+            <View style={tw`flex-row justify-between gap-1`}>
+              {(adherence.last7Days || []).map((day) => (
+                <View key={day.date} style={tw`flex-1 items-center`}>
+                  <View
+                    style={[
+                      tw`w-full max-w-[36px] h-8 rounded-lg`,
+                      {
+                        backgroundColor: adherenceBarFill(day.percent, isDark),
+                        opacity: day.percent == null ? 0.35 : 1,
+                      },
+                    ]}
+                  />
+                  <Text style={[tw`text-[9px] mt-0.5`, { color: subtextColor }]} numberOfLines={1}>
+                    {shortWeekdayFromYmd(day.date)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={[tw`mt-3 pt-3`, { borderTopWidth: 1, borderColor }]}>
+              {pctBar('Meals (logged)', bd?.meals ?? null)}
+              {pctBar('Hydration (vs plan goal)', bd?.water ?? null, `Goal ${goalL} L from active meal plan`)}
+              {pctBar('Workout (scheduled day)', bd?.workout ?? null, trainHint)}
+            </View>
+          </View>
+        )}
+
+        <Text style={[tw`text-[10px] font-bold uppercase mt-1`, { color: subtextColor }]}>Raw logs</Text>
+        <View style={tw`flex-row justify-between`}>
+          <Text style={[tw`text-xs`, { color: subtextColor }]}>Meals logged</Text>
+          <Text style={[tw`text-xs font-bold`, { color: textPrimary }]}>
+            {mealSlots ? `${mealsDone}/${mealSlots} today` : dlog ? `${mealsDone} checked` : 'No meal log yet'}
+          </Text>
+        </View>
+        <View style={tw`flex-row justify-between`}>
+          <Text style={[tw`text-xs`, { color: subtextColor }]}>Water</Text>
+          <Text style={[tw`text-xs font-bold`, { color: textPrimary }]}>
+            {waterL === '—' ? '—' : `${waterL} / ${goalL} L`}
+          </Text>
+        </View>
+        <View style={tw`mt-1`}>
+          <Text style={[tw`text-xs`, { color: subtextColor }]}>Recent workouts</Text>
+          {recentWo.length === 0 ? (
+            <Text style={[tw`text-xs mt-1`, { color: textPrimary }]}>None in the last 2 weeks.</Text>
+          ) : (
+            recentWo.map((w: any) => (
+              <Text key={w.id} style={[tw`text-xs mt-1`, { color: textPrimary }]}>
+                {w.date ? new Date(w.date).toLocaleDateString() : '—'} · {w.duration != null ? `${w.duration} min` : 'completed'}
+                {w.day ? ` · ${capitalise(w.day)}` : ''}
+              </Text>
+            ))
+          )}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
       <View style={[tw`flex-row items-center px-4 py-3 justify-between`, { borderBottomWidth: 1, borderColor, backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
@@ -383,7 +572,15 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
           <MaterialIcons name="arrow-back" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
         </TouchableOpacity>
         <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>{clientName}</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Chat', { conversationName: clientName })}>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('Chat', {
+              conversationName: clientName,
+              receiverId: planClientId != null ? Number(planClientId) : undefined,
+              conversationId: null,
+            })
+          }
+        >
           <MaterialIcons name="chat-bubble" size={24} color={accent} />
         </TouchableOpacity>
       </View>
@@ -462,6 +659,12 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                 </View>
               )}
 
+              {/* Client adherence (from logged meals, water, workouts) */}
+              <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Today{"'"}s adherence</Text>
+              <View style={[tw`p-4 rounded-xl mb-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                {renderAdherenceBody()}
+              </View>
+
               {/* Quick actions */}
               <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Quick Actions</Text>
               <View style={tw`flex-row gap-3`}>
@@ -495,9 +698,23 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                 <>
                   <View style={tw`flex-row items-center justify-between mb-4`}>
                     <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Client Plans</Text>
-                    <TouchableOpacity onPress={loadPlans}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        loadPlans();
+                        loadClientActivity();
+                      }}
+                    >
                       <MaterialIcons name="refresh" size={20} color={subtextColor} />
                     </TouchableOpacity>
+                  </View>
+
+                  <View style={[tw`p-4 rounded-xl mb-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                    <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Client adherence (what they logged)</Text>
+                    <Text style={[tw`text-xs mb-3 leading-relaxed`, { color: subtextColor }]}>
+                      {"Adherence means how closely the client is following their plan in the app—not the plan document itself. "}
+                      Below you see today’s meal check-ins, water, and recent completed workouts so you can compare the written plan to what they actually did.
+                    </Text>
+                    {renderAdherenceBody()}
                   </View>
 
                   {/* Pending Coach Review Plans */}
@@ -536,29 +753,41 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                       ))}
 
                       {pendingDietPlans.map((plan: any) => (
-                        <View key={plan.id} style={[tw`flex-row items-center justify-between p-3 rounded-xl mb-2`, { backgroundColor: isDark ? '#111128' : '#fff', borderWidth: 1, borderColor }]}>
-                          <View style={tw`flex-1`}>
-                            <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                        <View key={plan.id} style={[tw`rounded-xl mb-2`, { backgroundColor: isDark ? '#111128' : '#fff', borderWidth: 1, borderColor }]}>
+                          <TouchableOpacity
+                            onPress={() =>
+                              navigation.navigate('CoachMealPlan', {
+                                clientId: planClientId,
+                                clientName,
+                                existingPlan: plan,
+                              })
+                            }
+                            style={tw`p-3`}
+                          >
+                            <Text style={[tw`text-xs font-bold`, { color: '#0ea5e9' }]}>Review ingredients & meals →</Text>
+                            <Text style={[tw`text-sm font-bold mt-1`, { color: textPrimary }]}>
                               {plan.planName || 'Meal Plan'}
                             </Text>
                             <Text style={[tw`text-xs`, { color: subtextColor }]}>
                               Meal Plan · {plan.dailyCalorieTarget} kcal/day · {capitalise(plan.goal || '')}
                             </Text>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => handleApproveDietPlan(plan.id)}
-                            disabled={approvingPlanId === plan.id}
-                            style={[tw`ml-2 px-3 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#10b98120', borderWidth: 1, borderColor: '#10b98130' }]}
-                          >
-                            {approvingPlanId === plan.id ? (
-                              <ActivityIndicator size="small" color="#10b981" />
-                            ) : (
-                              <>
-                                <MaterialIcons name="check-circle" size={14} color="#10b981" />
-                                <Text style={tw`text-xs font-bold text-green-500`}>Approve</Text>
-                              </>
-                            )}
                           </TouchableOpacity>
+                          <View style={[tw`flex-row justify-end px-3 pb-3`]}>
+                            <TouchableOpacity
+                              onPress={() => handleApproveDietPlan(plan.id)}
+                              disabled={approvingPlanId === plan.id}
+                              style={[tw`px-3 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#10b98120', borderWidth: 1, borderColor: '#10b98130' }]}
+                            >
+                              {approvingPlanId === plan.id ? (
+                                <ActivityIndicator size="small" color="#10b981" />
+                              ) : (
+                                <>
+                                  <MaterialIcons name="check-circle" size={14} color="#10b981" />
+                                  <Text style={tw`text-xs font-bold text-green-500`}>Approve</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       ))}
                     </View>

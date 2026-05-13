@@ -3,6 +3,7 @@ import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { Op } from 'sequelize';
+import { notificationService } from '../Notification/notification.service.js';
 
 export const dietService = {
   // ─── AI INTEGRATION POINT ────────────────────────────────────────────────────
@@ -58,6 +59,15 @@ export const dietService = {
     return { deleted: updated[0] > 0 };
   },
 
+  _normalizeDietLogStatus(status) {
+    if (!status) return undefined;
+    const s = String(status).toLowerCase();
+    if (s === 'full' || s === 'followed') return 'followed';
+    if (s === 'partial') return 'partial';
+    if (s === 'missed') return 'missed';
+    return 'partial';
+  },
+
   async logDietDay(userId, data) {
     const {
       date,
@@ -66,8 +76,11 @@ export const dietService = {
       macrosConsumed,
       notes,
       status,
-      dietPlanId
+      dietPlanId,
+      waterMl
     } = data || {};
+
+    const normalizedStatus = this._normalizeDietLogStatus(status);
 
     const activePlan = dietPlanId
       ? await DietPlan.findOne({ where: { id: dietPlanId, userId } })
@@ -90,16 +103,34 @@ export const dietService = {
       }
     });
 
+    const prevStatus = existingLog?.status ?? null;
+    const prevWaterMl = existingLog?.waterMl != null ? existingLog.waterMl : null;
+
     if (existingLog) {
       existingLog.mealsCompleted = mealsCompleted ?? existingLog.mealsCompleted;
       if (caloriesConsumed !== undefined) existingLog.caloriesConsumed = caloriesConsumed;
       if (macrosConsumed !== undefined) existingLog.macrosConsumed = macrosConsumed;
       if (notes !== undefined) existingLog.notes = notes;
-      if (status !== undefined) existingLog.status = status;
+      if (normalizedStatus !== undefined) existingLog.status = normalizedStatus;
+      if (waterMl !== undefined && waterMl !== null) {
+        const w = parseInt(waterMl, 10);
+        if (!Number.isNaN(w)) existingLog.waterMl = Math.max(0, Math.min(w, 20000));
+      }
       existingLog.dietPlanId = activePlan.id;
       await existingLog.save();
+      void notificationService.onDietDayLogged(userId, {
+        status: existingLog.status,
+        prevStatus,
+        waterMl: existingLog.waterMl,
+        prevWaterMl,
+        hydrationGoalMl: activePlan.hydrationGoal,
+      });
       return existingLog;
     }
+
+    const wCreate = waterMl !== undefined && waterMl !== null ? parseInt(waterMl, 10) : null;
+    const waterMlSafe =
+      wCreate != null && !Number.isNaN(wCreate) ? Math.max(0, Math.min(wCreate, 20000)) : null;
 
     const log = await DietLog.create({
       userId,
@@ -109,7 +140,16 @@ export const dietService = {
       caloriesConsumed,
       macrosConsumed: macrosConsumed || {},
       notes,
-      status: status || 'partial'
+      status: normalizedStatus || 'partial',
+      waterMl: waterMlSafe
+    });
+
+    void notificationService.onDietDayLogged(userId, {
+      status: log.status,
+      prevStatus,
+      waterMl: log.waterMl,
+      prevWaterMl,
+      hydrationGoalMl: activePlan.hydrationGoal,
     });
 
     return log;

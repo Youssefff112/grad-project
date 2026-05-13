@@ -1,4 +1,8 @@
 // src/Modules/Coach/coach.model.js
+//
+// Coach identity lives in `users` (role: 'coach'). Extended data and approval
+// live in `coach_profiles` (CoachProfile.userId → users.id). Marketplace and
+// assignments use CoachProfile + User — not a separate legacy `coaches` table.
 import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '../../../DB/connection.js';
 
@@ -73,25 +77,3 @@ import('../User/user.model.js').then(({ User }) => {
   CoachProfile.belongsTo(User, { foreignKey: 'userId', as: 'User' });
   User.hasOne(CoachProfile, { foreignKey: 'userId', as: 'CoachProfile' });
 }).catch(() => {});
-
-export class Coach extends Model {}
-
-Coach.init({
-  name: {
-    type: DataTypes.STRING(120),
-    allowNull: false
-  },
-  age: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  },
-  trainingLocation: {
-    type: DataTypes.STRING(200),
-    allowNull: false
-  }
-}, {
-  sequelize,
-  modelName: 'Coach',
-  tableName: 'coaches',
-  timestamps: true
-});

@@ -73,16 +73,74 @@ const SEED_USERS = [
     subscription: { role: 'client', planName: 'Elite', price: 49.99 },
   },
 
-  // ── Coach ─────────────────────────────────────────────
+  // ── Coaches (accounts live in users + coach_profiles) ─────────────────────
   {
-    firstName: 'Coach',
-    lastName: 'Charlie',
+    firstName: 'Charlie',
+    lastName: 'Morgan',
     email: 'charlie@coach.com',
     password: 'password123',
     role: 'coach',
     userType: 'onsite',
     profile: { experienceLevel: 'advanced' },
     subscription: { role: 'coach', planName: 'ProCoach', price: 19.99 },
+    coachProfile: {
+      bio: 'Strength and conditioning specialist focused on sustainable muscle gain and confident lifting technique.',
+      specialties: ['Strength Training', 'Muscle Gain', 'Fat Loss'],
+      experienceYears: 6,
+      rating: 4.8,
+      ratingCount: 24,
+    },
+  },
+  {
+    firstName: 'Marcus',
+    lastName: 'Thorne',
+    email: 'marcus.thorne@fitdemo.app',
+    password: 'password123',
+    role: 'coach',
+    userType: 'onsite',
+    profile: { experienceLevel: 'advanced' },
+    subscription: { role: 'coach', planName: 'ProCoach', price: 19.99 },
+    coachProfile: {
+      bio: 'Former competitive powerlifter. I help busy professionals build strength with efficient, evidence-based programming.',
+      specialties: ['Strength Training', 'Hypertrophy', 'Athletic Performance'],
+      experienceYears: 9,
+      rating: 4.9,
+      ratingCount: 41,
+    },
+  },
+  {
+    firstName: 'Elena',
+    lastName: 'Vasquez',
+    email: 'elena.vasquez@fitdemo.app',
+    password: 'password123',
+    role: 'coach',
+    userType: 'onsite',
+    profile: { experienceLevel: 'advanced' },
+    subscription: { role: 'coach', planName: 'ProCoach', price: 19.99 },
+    coachProfile: {
+      bio: 'Nutrition-forward coaching for fat loss and energy. Hybrid training blending HIIT, mobility, and habit design.',
+      specialties: ['Weight Loss', 'Nutrition', 'HIIT', 'Flexibility'],
+      experienceYears: 7,
+      rating: 4.85,
+      ratingCount: 33,
+    },
+  },
+  {
+    firstName: 'Jordan',
+    lastName: 'Reeves',
+    email: 'jordan.reeves@fitdemo.app',
+    password: 'password123',
+    role: 'coach',
+    userType: 'onsite',
+    profile: { experienceLevel: 'intermediate' },
+    subscription: { role: 'coach', planName: 'ProCoach', price: 19.99 },
+    coachProfile: {
+      bio: 'Mindful movement and long-term consistency. Great for beginners building confidence and routine.',
+      specialties: ['Yoga', 'Flexibility', 'Weight Loss', 'CrossFit'],
+      experienceYears: 4,
+      rating: 4.7,
+      ratingCount: 19,
+    },
   },
 
   // ── Admin ─────────────────────────────────────────────
@@ -120,16 +178,26 @@ async function ensureSubscription(user, subData) {
 
 async function ensureProfile(user, userData) {
   if (user.role === 'coach') {
+    const coachDefaults = {
+      userId: user.id,
+      isApproved: true,
+      bio: 'Experienced personal trainer specialising in strength and conditioning.',
+      specialties: ['Strength Training', 'Muscle Gain', 'Fat Loss'],
+      experienceYears: 5,
+      rating: 0,
+      ratingCount: 0,
+      ...(userData.coachProfile || {}),
+    };
     await CoachProfile.findOrCreate({
       where: { userId: user.id },
-      defaults: {
-        userId: user.id,
-        isApproved: true,
-        bio: 'Experienced personal trainer specialising in strength and conditioning.',
-        specialties: ['Strength Training', 'Muscle Gain', 'Fat Loss'],
-        experienceYears: 5,
-      },
+      defaults: coachDefaults,
     });
+    if (userData.coachProfile) {
+      await CoachProfile.update(
+        { ...userData.coachProfile },
+        { where: { userId: user.id } }
+      );
+    }
   } else if (user.role === 'client') {
     await ClientProfile.findOrCreate({
       where: { userId: user.id },
@@ -139,6 +207,19 @@ async function ensureProfile(user, userData) {
       },
     });
   }
+}
+
+async function syncUserFromSeed(existing, userData) {
+  const mergedProfile = {
+    ...(existing.profile && typeof existing.profile === 'object' ? existing.profile : {}),
+    ...(userData.profile && typeof userData.profile === 'object' ? userData.profile : {}),
+  };
+  await existing.update({
+    firstName: userData.firstName,
+    lastName: userData.lastName,
+    userType: userData.userType,
+    profile: mergedProfile,
+  });
 }
 
 async function seed() {
@@ -155,6 +236,7 @@ async function seed() {
       });
 
       if (existing) {
+        await syncUserFromSeed(existing, userData);
         // Still ensure their profile and subscription rows exist (handles partial-seed failures)
         await ensureProfile(existing, userData);
         await ensureSubscription(existing, userData.subscription);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -13,6 +13,7 @@ interface Meal {
   protein: number;
   carbs: number;
   fat: number;
+  ingredients: string[];
 }
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
@@ -50,13 +51,21 @@ function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; 
     (dayEntry.meals || []).forEach((meal: any, i: number) => {
       const typeKey = mealTypeLabel(meal.type || meal.mealType || '');
       const nutrition = meal.nutrition || meal.macros || {};
+      const rawIng = meal.ingredients;
+      const ingredients = Array.isArray(rawIng)
+        ? rawIng.map((x: any) => String(x).trim()).filter(Boolean)
+        : typeof rawIng === 'string' && rawIng.trim()
+          ? [rawIng.trim()]
+          : [];
+      const name = meal.name || meal.description || 'Meal';
       const item: Meal = {
         id: `${label}-${typeKey}-${i}`,
-        name: meal.name || meal.description || 'Meal',
+        name,
         calories: nutrition.calories || meal.calories || 0,
         protein: nutrition.protein || meal.protein || 0,
         carbs: nutrition.carbs || nutrition.carbohydrates || meal.carbs || 0,
         fat: nutrition.fats || nutrition.fat || meal.fat || 0,
+        ingredients: ingredients.length > 0 ? ingredients : [name],
       };
       if (!groupMap[typeKey]) groupMap[typeKey] = [];
       groupMap[typeKey].push(item);
@@ -78,8 +87,14 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   const [showFoodPicker, setShowFoodPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [ingredientModal, setIngredientModal] = useState<{
+    itemIndex: number;
+    ingredientIndex: number;
+    draft: string;
+  } | null>(null);
 
   const editingPlanId: number | null = existingPlan?.id ?? null;
+  const saveLocked = !!existingPlan?.pendingCoachReview;
 
   useEffect(() => {
     if (existingPlan) {
@@ -104,7 +119,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
       total + group.items.reduce((t, item) => t + item.calories, 0), 0);
 
   const addFoodToDay = (food: typeof MOCK_FOOD_SUGGESTIONS[0]) => {
-    const mealItem: Meal = { ...food };
+    const mealItem: Meal = { ...food, ingredients: [food.name] };
     setDayPlans(prev => {
       const dayData = prev[selectedDay] || [];
       const existing = dayData.find(g => g.type === selectedMealType);
@@ -142,7 +157,42 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     }
   };
 
+  const updateMealIngredients = (
+    day: string,
+    mealType: string,
+    itemIndex: number,
+    updater: (ingredients: string[]) => string[]
+  ) => {
+    setDayPlans((prev) => {
+      const dayData = [...(prev[day] || [])];
+      const gi = dayData.findIndex((g) => g.type === mealType);
+      if (gi === -1) return prev;
+      const g = dayData[gi];
+      const items = [...g.items];
+      const item = { ...items[itemIndex] };
+      item.ingredients = updater([...(item.ingredients || [])]);
+      items[itemIndex] = item;
+      dayData[gi] = { ...g, items };
+      return { ...prev, [day]: dayData };
+    });
+  };
+
+  const saveIngredientFromModal = () => {
+    if (!ingredientModal) return;
+    const { itemIndex, ingredientIndex, draft } = ingredientModal;
+    updateMealIngredients(selectedDay, selectedMealType, itemIndex, (ings) => {
+      const next = [...ings];
+      next[ingredientIndex] = draft.trim() || next[ingredientIndex];
+      return next;
+    });
+    setIngredientModal(null);
+  };
+
   const handleSave = async () => {
+    if (saveLocked) {
+      Alert.alert('Plan pending approval', 'Approve this meal plan from the client screen before saving edits.');
+      return;
+    }
     if (!planName.trim()) {
       Alert.alert('Missing Info', 'Please enter a plan name.');
       return;
@@ -156,7 +206,9 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
             type: group.type.toLowerCase() as any,
             name: item.name,
             description: item.name,
-            ingredients: [item.name],
+            ingredients: (item.ingredients || []).filter((s) => String(s).trim().length > 0).length
+              ? (item.ingredients || []).map((s) => String(s).trim()).filter(Boolean)
+              : [item.name],
             nutrition: { calories: item.calories, protein: item.protein, carbs: item.carbs, fats: item.fat },
             preparationTime: 15,
           }))
@@ -206,8 +258,13 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
             {editingPlanId ? 'Edit Meal Plan' : 'Meal Plan Builder'}
           </Text>
           {clientName && <Text style={[tw`text-xs`, { color: subtextColor }]}>for {clientName}</Text>}
+        {saveLocked && (
+          <Text style={[tw`text-[10px] text-center mt-1 px-2`, { color: '#f59e0b' }]}>
+            Approve this plan from the client screen before saving edits.
+          </Text>
+        )}
         </View>
-        <TouchableOpacity onPress={handleSave} disabled={isSaving} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: isSaving ? accent + '80' : accent }]}>
+        <TouchableOpacity onPress={handleSave} disabled={isSaving || saveLocked} style={[tw`px-4 py-2 rounded-xl`, { backgroundColor: isSaving || saveLocked ? accent + '80' : accent }]}>
           <Text style={tw`text-sm text-white font-bold`}>{isSaving ? '...' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
@@ -317,23 +374,48 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
                 </View>
               )}
               {meals.map((item, i) => (
-                <View key={i} style={[tw`flex-row items-center p-3 rounded-xl`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
-                  <View style={tw`flex-1`}>
-                    <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{item.name}</Text>
-                    <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
-                      {item.calories} kcal · P:{item.protein}g · C:{item.carbs}g · F:{item.fat}g
-                    </Text>
+                <View key={item.id} style={[tw`p-3 rounded-xl mb-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                  <View style={tw`flex-row items-start`}>
+                    <View style={tw`flex-1 pr-2`}>
+                      <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{item.name}</Text>
+                      <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
+                        {item.calories} kcal · P:{item.protein}g · C:{item.carbs}g · F:{item.fat}g
+                      </Text>
+                      <Text style={[tw`text-xs font-bold mt-2 mb-1`, { color: subtextColor }]}>INGREDIENTS</Text>
+                      {(item.ingredients || []).map((ing, j) => (
+                        <TouchableOpacity
+                          key={`${item.id}-ing-${j}`}
+                          onPress={() => setIngredientModal({ itemIndex: i, ingredientIndex: j, draft: ing })}
+                          style={[tw`flex-row items-center py-1.5 border-b`, { borderColor }]}
+                        >
+                          <MaterialIcons name="edit-note" size={16} color={accent} style={tw`mr-2`} />
+                          <Text style={[tw`text-xs flex-1`, { color: textPrimary }]}>{ing}</Text>
+                          <MaterialIcons name="swap-horiz" size={16} color={subtextColor} />
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity
+                        onPress={() =>
+                          updateMealIngredients(selectedDay, selectedMealType, i, (ings) => [...ings, 'Tap to describe ingredient'])
+                        }
+                        style={tw`flex-row items-center gap-1 mt-2`}
+                      >
+                        <MaterialIcons name="add-circle-outline" size={16} color="#10b981" />
+                        <Text style={[tw`text-xs font-bold`, { color: '#10b981' }]}>Add ingredient line</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setDayPlans((prev) => ({
+                          ...prev,
+                          [selectedDay]: (prev[selectedDay] || []).map((g) =>
+                            g.type === selectedMealType ? { ...g, items: g.items.filter((_, idx) => idx !== i) } : g
+                          ),
+                        }));
+                      }}
+                    >
+                      <MaterialIcons name="remove-circle-outline" size={22} color="#ef4444" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => {
-                    setDayPlans(prev => ({
-                      ...prev,
-                      [selectedDay]: (prev[selectedDay] || []).map(g =>
-                        g.type === selectedMealType ? { ...g, items: g.items.filter((_, idx) => idx !== i) } : g
-                      ),
-                    }));
-                  }}>
-                    <MaterialIcons name="remove-circle-outline" size={20} color="#ef4444" />
-                  </TouchableOpacity>
                 </View>
               ))}
             </View>
@@ -368,6 +450,55 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={!!ingredientModal} transparent animationType="fade" onRequestClose={() => setIngredientModal(null)}>
+        <View style={tw`flex-1 justify-end`}>
+          <Pressable style={[tw`flex-1`, { backgroundColor: 'rgba(0,0,0,0.45)' }]} onPress={() => setIngredientModal(null)} />
+          <View style={[tw`rounded-t-3xl px-5 pt-4 pb-8`, { backgroundColor: cardBg, borderTopWidth: 1, borderColor }]}>
+            <Text style={[tw`text-base font-bold mb-1`, { color: textPrimary }]}>Substitute ingredient</Text>
+            <Text style={[tw`text-xs mb-3`, { color: subtextColor }]}>
+              Replace with another food or portion (e.g. swap rice for quinoa).
+            </Text>
+            <TextInput
+              value={ingredientModal?.draft ?? ''}
+              onChangeText={(t) => setIngredientModal((m) => (m ? { ...m, draft: t } : null))}
+              multiline
+              placeholder="Ingredient description"
+              placeholderTextColor={subtextColor}
+              style={[
+                tw`rounded-xl px-4 py-3 mb-4 min-h-[88px]`,
+                { borderWidth: 1, borderColor, color: textPrimary, textAlignVertical: 'top' },
+              ]}
+            />
+            <View style={tw`flex-row gap-3`}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!ingredientModal) return;
+                  updateMealIngredients(selectedDay, selectedMealType, ingredientModal.itemIndex, (ings) =>
+                    ings.filter((_, idx) => idx !== ingredientModal.ingredientIndex)
+                  );
+                  setIngredientModal(null);
+                }}
+                style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: '#ef444414', borderWidth: 1, borderColor: '#ef444430' }]}
+              >
+                <Text style={[tw`font-bold text-xs`, { color: '#ef4444' }]}>Remove line</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setIngredientModal(null)}
+                style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}
+              >
+                <Text style={[tw`font-bold text-xs`, { color: subtextColor }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={saveIngredientFromModal}
+                style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: '#10b981' }]}
+              >
+                <Text style={[tw`font-bold text-xs text-white`]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

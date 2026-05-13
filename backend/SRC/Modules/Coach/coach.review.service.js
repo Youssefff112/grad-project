@@ -2,23 +2,26 @@
 import { CoachReview } from '../../Models/CoachReview.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { CoachProfile } from './coach.model.js';
+import { User } from '../User/user.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
-import { Op } from 'sequelize';
 
 export const coachReviewService = {
-  async submitReview(coachId, clientId, reviewData) {
-    // Check if client has/had this coach assigned
+  async submitReview(coachProfileId, clientId, reviewData) {
+    const coachProfile = await CoachProfile.findByPk(coachProfileId);
+    if (!coachProfile) {
+      throw new AppError('Coach not found', 404);
+    }
+
     const clientProfile = await ClientProfile.findOne({
       where: { userId: clientId }
     });
 
-    if (!clientProfile || clientProfile.selectedCoachId !== coachId) {
+    if (!clientProfile || clientProfile.selectedCoachId !== coachProfile.userId) {
       throw new AppError('You can only review coaches you have been assigned to', 403);
     }
 
-    // Create the review
     const review = await CoachReview.create({
-      coachId,
+      coachId: coachProfileId,
       clientId,
       rating: reviewData.rating,
       comment: reviewData.comment,
@@ -26,21 +29,22 @@ export const coachReviewService = {
     });
 
     // Update coach's average rating
-    await this.updateCoachRating(coachId);
+    await this.updateCoachRating(coachProfileId);
 
     return review;
   },
 
-  async updateCoachRating(coachId) {
+  /** @param coachProfileId Primary key of coach_profiles (same as CoachReview.coachId) */
+  async updateCoachRating(coachProfileId) {
     const reviews = await CoachReview.findAll({
-      where: { coachId },
+      where: { coachId: coachProfileId },
       attributes: ['rating']
     });
 
     if (reviews.length === 0) {
       await CoachProfile.update(
         { rating: 0, ratingCount: 0 },
-        { where: { userId: coachId } }
+        { where: { id: coachProfileId } }
       );
       return;
     }
@@ -50,7 +54,7 @@ export const coachReviewService = {
 
     await CoachProfile.update(
       { rating: averageRating, ratingCount: reviews.length },
-      { where: { userId: coachId } }
+      { where: { id: coachProfileId } }
     );
   },
 
@@ -102,21 +106,21 @@ export const coachReviewService = {
     return { message: 'Review deleted successfully' };
   },
 
-  async checkReviewEligibility(coachId, clientId) {
+  async checkReviewEligibility(coachProfileId, clientId) {
+    const coachProfile = await CoachProfile.findByPk(coachProfileId);
     const clientProfile = await ClientProfile.findOne({
       where: { userId: clientId }
     });
 
-    if (!clientProfile || clientProfile.selectedCoachId !== coachId) {
+    if (!coachProfile || !clientProfile || clientProfile.selectedCoachId !== coachProfile.userId) {
       return {
         eligible: false,
         reason: 'You can only review coaches you have been or are currently assigned to'
       };
     }
 
-    // Check if already reviewed
     const existingReview = await CoachReview.findOne({
-      where: { coachId, clientId }
+      where: { coachId: coachProfileId, clientId }
     });
 
     if (existingReview) {
@@ -131,17 +135,31 @@ export const coachReviewService = {
   },
 
   async getCoachDetail(coachId) {
-    const coach = await CoachProfile.findByPk(coachId);
+    const coach = await CoachProfile.findByPk(coachId, {
+      include: [{ model: User, as: 'User', attributes: ['id', 'firstName', 'lastName', 'email'] }]
+    });
 
     if (!coach) {
       throw new AppError('Coach not found', 404);
     }
 
-    // Get review stats
     const reviews = await CoachReview.findAll({
       where: { coachId },
       attributes: ['rating']
     });
+
+    const totalReviews = reviews.length;
+    const avgFromReviews =
+      totalReviews > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+        : null;
+    const storedRating = Number(coach.rating);
+    const displayAverage =
+      avgFromReviews != null && Number.isFinite(avgFromReviews)
+        ? Math.round(avgFromReviews * 100) / 100
+        : Number.isFinite(storedRating)
+          ? Math.round(storedRating * 100) / 100
+          : 0;
 
     const ratingDistribution = {
       5: reviews.filter(r => r.rating === 5).length,
@@ -154,8 +172,8 @@ export const coachReviewService = {
     return {
       ...coach.toJSON(),
       reviewStats: {
-        totalReviews: reviews.length,
-        averageRating: coach.rating,
+        totalReviews,
+        averageRating: displayAverage,
         distribution: ratingDistribution
       }
     };

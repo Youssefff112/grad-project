@@ -27,6 +27,7 @@ interface UIConversation {
   unread: number;
   isAI: boolean;
   category: 'coaches' | 'people' | 'groups' | 'ai';
+  otherUserId: number | null;
 }
 
 export const MessagesScreen = ({ navigation }: any) => {
@@ -68,6 +69,7 @@ export const MessagesScreen = ({ navigation }: any) => {
             // Determine if the *other* party in this conversation is a coach or client
             const isMeCoach = String(userId) === String(conv.coachId);
             const otherParty = isMeCoach ? conv.client : conv.coach;
+            const otherUserId = isMeCoach ? conv.clientId : conv.coachId;
             
             const otherName = otherParty ? `${otherParty.firstName} ${otherParty.lastName}`.trim() : 'Unknown User';
             
@@ -93,7 +95,8 @@ export const MessagesScreen = ({ navigation }: any) => {
               time: timeStr,
               unread: unreadCount,
               isAI: false,
-              category: 'coaches'
+              category: 'coaches',
+              otherUserId: otherUserId != null ? Number(otherUserId) : null,
             };
           });
 
@@ -136,7 +139,11 @@ export const MessagesScreen = ({ navigation }: any) => {
   }, [filter, searchText]);
 
   const handleOpenChat = (conversation: UIConversation) => {
-    navigation.navigate('Chat', { conversationId: conversation.id, conversationName: conversation.name });
+    navigation.navigate('Chat', {
+      conversationId: conversation.id,
+      conversationName: conversation.name,
+      ...(conversation.otherUserId != null ? { receiverId: conversation.otherUserId } : {}),
+    });
   };
 
   const closeNewMessage = () => {
@@ -175,7 +182,11 @@ export const MessagesScreen = ({ navigation }: any) => {
       const msg = await sendMessage(null, selectedRecipient.id, newMessageText.trim());
       closeNewMessage();
       const recipientName = `${selectedRecipient.firstName} ${selectedRecipient.lastName}`.trim();
-      navigation.navigate('Chat', { conversationId: msg.conversationId, conversationName: recipientName });
+      navigation.navigate('Chat', {
+        conversationId: msg.conversationId,
+        conversationName: recipientName,
+        receiverId: selectedRecipient.id,
+      });
     } catch (e: any) {
       Alert.alert('Failed to send', e?.message || 'Something went wrong. Please try again.');
     } finally {

@@ -1,17 +1,139 @@
 // src/Modules/Coach/coach.service.js
 import { Op, fn, col } from 'sequelize';
-import { CoachProfile, Coach } from './coach.model.js';
+import { CoachProfile } from './coach.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { User } from '../User/user.model.js';
 import { WorkoutLog } from '../Workout/workout.model.js';
 import { WorkoutAccuracy } from '../Progress/progress.model.js';
+import { DietLog, DietPlan } from '../Diet/diet.model.js';
+import { WorkoutPlan } from '../Workout/workout.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 
-export const coachService = {
-  async createCoach(data) {
-    return Coach.create(data);
-  },
+const UTC_DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
+function ymdUTC(isoOrDate) {
+  const t = new Date(isoOrDate).getTime();
+  if (Number.isNaN(t)) return null;
+  return new Date(isoOrDate).toISOString().slice(0, 10);
+}
+
+function utcDayNameForYmd(ymd) {
+  if (!ymd || typeof ymd !== 'string') return null;
+  const parts = ymd.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [y, m, d] = parts;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return UTC_DAY_NAMES[dt.getUTCDay()];
+}
+
+function todayYmdUTC() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function lastNYmdUTC(n) {
+  const out = [];
+  for (let i = 0; i < n; i += 1) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function averageIgnoreNull(values) {
+  const nums = values.filter((v) => typeof v === 'number' && !Number.isNaN(v));
+  if (!nums.length) return null;
+  return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+}
+
+function mealScoreFromDlog(dlog) {
+  if (!dlog) return null;
+  const mc = dlog.mealsCompleted && typeof dlog.mealsCompleted === 'object' ? dlog.mealsCompleted : {};
+  const keys = Object.keys(mc);
+  if (keys.length > 0) {
+    const done = keys.filter((k) => mc[k]).length;
+    return Math.round((done / keys.length) * 100);
+  }
+  if (dlog.status === 'followed') return 100;
+  if (dlog.status === 'partial') return 50;
+  if (dlog.status === 'missed') return 0;
+  return null;
+}
+
+function waterScoreFromDlog(dlog, goalMl) {
+  if (!dlog || dlog.waterMl == null || goalMl == null || goalMl <= 0) return null;
+  const w = Number(dlog.waterMl) || 0;
+  return Math.min(100, Math.round((w / Number(goalMl)) * 100));
+}
+
+function trainingDayKeysFromSchedule(weeklySchedule) {
+  if (!Array.isArray(weeklySchedule)) return [];
+  return weeklySchedule
+    .filter((day) => day && !day.isRestDay && day.day)
+    .map((day) => String(day.day).toLowerCase());
+}
+
+/**
+ * Adherence = how closely logged behaviour matches the active plan (meals checked, water vs goal, workout on training days).
+ */
+function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingDayKeys) {
+  const goal = hydrationGoalMl != null && hydrationGoalMl > 0 ? Number(hydrationGoalMl) : 2500;
+  const trainSet = new Set((trainingDayKeys || []).map((k) => String(k).toLowerCase()));
+
+  const dietByYmd = new Map();
+  for (const row of dietLogs) {
+    const y = ymdUTC(row.date);
+    if (y) dietByYmd.set(y, typeof row.get === 'function' ? row.get({ plain: true }) : row);
+  }
+
+  const woByYmd = new Map();
+  for (const w of workoutLogs) {
+    const y = ymdUTC(w.date);
+    if (!y) continue;
+    if (!woByYmd.has(y)) woByYmd.set(y, []);
+    woByYmd.get(y).push(typeof w.get === 'function' ? w.get({ plain: true }) : w);
+  }
+
+  const scoreDay = (ymd) => {
+    const dlog = dietByYmd.get(ymd) || null;
+    const meal = mealScoreFromDlog(dlog);
+    const water = waterScoreFromDlog(dlog, goal);
+    const dayName = utcDayNameForYmd(ymd);
+    let workout = null;
+    if (dayName && trainSet.size > 0 && trainSet.has(dayName)) {
+      const logs = woByYmd.get(ymd) || [];
+      workout = logs.length > 0 ? 100 : 0;
+    }
+    const combined = averageIgnoreNull([meal, water, workout]);
+    return { meal, water, workout, combined };
+  };
+
+  const today = todayYmdUTC();
+  const todayScores = scoreDay(today);
+  const last7Days = lastNYmdUTC(7).map((ymd) => ({
+    date: ymd,
+    percent: scoreDay(ymd).combined,
+  }));
+  const weekPercents = last7Days.map((x) => x.percent).filter((p) => p != null);
+  const rolling7DayAvgPercent = weekPercents.length
+    ? Math.round(weekPercents.reduce((a, b) => a + b, 0) / weekPercents.length)
+    : null;
+
+  return {
+    hydrationGoalMl: goal,
+    trainingDayNames: [...trainSet],
+    todayPercent: todayScores.combined,
+    todayBreakdown: {
+      meals: todayScores.meal,
+      water: todayScores.water,
+      workout: todayScores.workout,
+    },
+    last7Days,
+    rolling7DayAvgPercent,
+  };
+}
+
+export const coachService = {
   async getAllCoaches(filters = {}) {
     const { specialty, minRating, page = 1, limit = 20 } = filters;
     const offset = (page - 1) * limit;
@@ -34,38 +156,20 @@ export const coachService = {
 
     // Filter by specialty (since it's JSONB, we need to do it in JS if not using raw SQL)
     if (specialty) {
+      const needle = specialty.toLowerCase();
       coaches = coaches.filter(coach =>
-        coach.specialties && coach.specialties.includes(specialty)
+        coach.specialties?.some(tag => tag.toLowerCase().includes(needle))
       );
     }
 
-    return coaches;
-  },
-
-  async getCoachById(id) {
-    const coach = await Coach.findByPk(id);
-    if (!coach) {
-      throw new AppError('Coach not found', 404);
-    }
-    return coach;
-  },
-
-  async updateCoach(id, updates) {
-    await Coach.update(updates, { where: { id } });
-    const coach = await Coach.findByPk(id);
-    if (!coach) {
-      throw new AppError('Coach not found', 404);
-    }
-    return coach;
-  },
-
-  async deleteCoach(id) {
-    const coach = await Coach.findByPk(id);
-    if (!coach) {
-      throw new AppError('Coach not found', 404);
-    }
-    await coach.destroy();
-    return { message: 'Coach deleted successfully' };
+    return coaches.map((c) => {
+      const plain = typeof c.toJSON === 'function' ? c.toJSON() : { ...c };
+      return {
+        ...plain,
+        rating: Number(plain.rating) || 0,
+        ratingCount: Number(plain.ratingCount) || 0,
+      };
+    });
   },
 
   async getProfile(userId) {
@@ -175,6 +279,75 @@ export const coachService = {
       throw new AppError('Coach profile is not approved yet', 403);
     }
     return profile;
-  }
+  },
+
+  /** Ensures the client user is assigned to this coach (by User.id). */
+  async ensureCoachOwnsClient(coachUserId, clientUserId) {
+    const profile = await ClientProfile.findOne({ where: { userId: clientUserId } });
+    if (!profile || profile.selectedCoachId !== coachUserId) {
+      throw new AppError('This client is not assigned to you', 403);
+    }
+    return profile;
+  },
+
+  /**
+   * Recent diet + workout adherence for coach dashboard (client User.id).
+   */
+  async getClientActivitySnapshot(coachUserId, clientUserId, days = 14) {
+    await this.ensureCoachOwnsClient(coachUserId, clientUserId);
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - Math.max(1, Math.min(parseInt(days, 10) || 14, 60)));
+
+    const dietLogs = await DietLog.findAll({
+      where: {
+        userId: clientUserId,
+        date: { [Op.gte]: since },
+      },
+      order: [['date', 'DESC']],
+      limit: 60,
+    });
+
+    const workoutLogs = await WorkoutLog.findAll({
+      where: {
+        userId: clientUserId,
+        status: 'completed',
+        date: { [Op.gte]: since },
+      },
+      order: [['date', 'DESC']],
+      limit: 60,
+    });
+
+    const [activeDiet, activeWorkout] = await Promise.all([
+      DietPlan.findOne({
+        where: { userId: clientUserId, isActive: true },
+        order: [['updatedAt', 'DESC']],
+        attributes: ['hydrationGoal'],
+      }),
+      WorkoutPlan.findOne({
+        where: { userId: clientUserId, isActive: true },
+        order: [['updatedAt', 'DESC']],
+        attributes: ['weeklySchedule'],
+      }),
+    ]);
+
+    const hydrationGoalMl =
+      activeDiet?.hydrationGoal != null ? Number(activeDiet.hydrationGoal) : 2500;
+    const trainingDayKeys = trainingDayKeysFromSchedule(activeWorkout?.weeklySchedule);
+
+    const toPlain = (rows) =>
+      rows.map((r) => (typeof r.get === 'function' ? r.get({ plain: true }) : r));
+
+    const plainDiet = toPlain(dietLogs);
+    const plainWo = toPlain(workoutLogs);
+
+    const adherence = buildAdherenceSummary(plainDiet, plainWo, hydrationGoalMl, trainingDayKeys);
+
+    return {
+      dietLogs: plainDiet,
+      workoutLogs: plainWo,
+      adherence,
+    };
+  },
 };
 

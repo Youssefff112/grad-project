@@ -2,6 +2,7 @@ import { WorkoutPlan } from '../Workout/workout.model.js';
 import { User } from '../User/user.model.js';
 import { Notification } from './notification.model.js';
 import { sendEmail, sendWorkoutReminderEmail } from '../../Utils/Emails/sendEmail.utils.js';
+import { sendExpoPushBatch } from '../../Utils/expoPush.utils.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { Op } from 'sequelize';
 
@@ -139,5 +140,83 @@ export const notificationService = {
     }
 
     return { processed: due.length };
-  }
+  },
+
+  /**
+   * Store Expo push token on user.profile (deduped, last 6 devices).
+   */
+  async registerExpoPushToken(userId, expoPushToken) {
+    const t = String(expoPushToken || '').trim();
+    if (!/^Expo(nent)?PushToken\[/i.test(t)) {
+      throw new AppError('Invalid Expo push token', 400);
+    }
+    const user = await User.findByPk(userId);
+    if (!user) throw new AppError('User not found', 404);
+    const profile = { ...(user.profile || {}) };
+    const existing = Array.isArray(profile.expoPushTokens) ? profile.expoPushTokens : [];
+    const next = [...new Set([...existing, t])].slice(-6);
+    profile.expoPushTokens = next;
+    user.profile = profile;
+    await user.save();
+    return { tokens: next.length };
+  },
+
+  _pushAllowed(settings, prefsKey) {
+    if (!prefsKey) return true;
+    return settings[prefsKey] !== false;
+  },
+
+  async sendExpoPushIfEnabled(userId, prefsKey, title, body, data = {}) {
+    const user = await User.findByPk(userId, { attributes: ['profile'] });
+    if (!user?.profile) return;
+    const settings = user.profile.notificationSettings || {};
+    if (!this._pushAllowed(settings, prefsKey)) return;
+    const tokens = user.profile.expoPushTokens;
+    if (!Array.isArray(tokens) || !tokens.length) return;
+    const msgs = tokens.map((to) => ({ to, title, body, data }));
+    await sendExpoPushBatch(msgs);
+  },
+
+  async onDietDayLogged(userId, { status, prevStatus, waterMl, prevWaterMl, hydrationGoalMl }) {
+    try {
+      if (status === 'followed' && prevStatus !== 'followed') {
+        await this.sendExpoPushIfEnabled(
+          userId,
+          'mealReminders',
+          'All meals logged',
+          "You completed today's meal plan. Great work!",
+          { type: 'meal_plan_complete' }
+        );
+      }
+      const goal = Math.max(500, Math.min(parseInt(hydrationGoalMl, 10) || 2000, 8000));
+      const prev = prevWaterMl != null ? Number(prevWaterMl) : 0;
+      const now = waterMl != null ? Number(waterMl) : 0;
+      if (now >= goal && prev < goal) {
+        await this.sendExpoPushIfEnabled(
+          userId,
+          'hydrationReminders',
+          'Hydration goal reached',
+          `You hit about ${(goal / 1000).toFixed(1)} L today. Nice!`,
+          { type: 'water_goal' }
+        );
+      }
+    } catch (e) {
+      console.warn('[onDietDayLogged push]', e?.message || e);
+    }
+  },
+
+  async onWorkoutLogged(userId, { day, duration } = {}) {
+    try {
+      const dayLabel = day ? String(day) : 'your session';
+      const mins = duration != null ? `${duration} min` : '';
+      const body = mins
+        ? `Logged ${mins} for ${dayLabel}.`
+        : `Workout saved for ${dayLabel}.`;
+      await this.sendExpoPushIfEnabled(userId, 'workoutReminders', 'Workout logged', body, {
+        type: 'workout_logged',
+      });
+    } catch (e) {
+      console.warn('[onWorkoutLogged push]', e?.message || e);
+    }
+  },
 };

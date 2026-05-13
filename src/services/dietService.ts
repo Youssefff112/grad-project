@@ -61,7 +61,9 @@ export interface DietLog {
   caloriesConsumed?: number;
   macrosConsumed?: MacroNutrients;
   notes?: string;
-  status: 'full' | 'partial' | 'missed';
+  status: 'full' | 'partial' | 'missed' | 'followed';
+  /** Millilitres logged for the day */
+  waterMl?: number | null;
 }
 
 export interface DietLogRequest {
@@ -72,6 +74,8 @@ export interface DietLogRequest {
   notes?: string;
   status?: 'full' | 'partial' | 'missed';
   dietPlanId?: number;
+  /** Total water that day in millilitres */
+  waterMl?: number;
 }
 
 /**

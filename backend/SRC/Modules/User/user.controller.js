@@ -12,15 +12,6 @@ export const userController = {
     }
   },
 
-  async getCoaches(req, res, next) {
-    try {
-      const coaches = await userService.getCoaches();
-      successResponse(res, 200, 'Coaches retrieved successfully', { coaches });
-    } catch (error) {
-      next(error);
-    }
-  },
-
   async updateProfile(req, res, next) {
     try {
       const user = await userService.updateProfile(req.user.id, req.body);

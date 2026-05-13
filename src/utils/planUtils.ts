@@ -1,4 +1,4 @@
-import { SubscriptionPlan, PLAN_FEATURES } from '../constants/plans';
+import { SubscriptionPlan, PLAN_FEATURES, isClientPlan } from '../constants/plans';
 
 /**
  * Check if a user with a specific plan has access to a feature
@@ -56,13 +56,13 @@ export function getFeatureAccessMessage(plan: SubscriptionPlan, featureName: str
  */
 export function getUpgradeRecommendations(plan: SubscriptionPlan, featureName: string): string {
   const featureMap: Partial<Record<string, SubscriptionPlan[]>> = {
-    'AI Chat': ['Premium', 'Elite'],
-    'AI Workout Generation': ['Premium', 'Elite'],
-    'AI Meal Generation': ['Premium', 'Elite'],
-    'Computer Vision': ['Premium', 'ProCoach', 'Elite'],
-    'Coach Chat': ['ProCoach', 'Elite'],
-    'Shared Dashboard': ['ProCoach', 'Elite'],
-    'Progress Tracking': ['ProCoach', 'Elite'],
+    'AI Chat': ['Standard', 'Elite'],
+    'AI Workout Generation': ['Standard', 'Elite'],
+    'AI Meal Generation': ['Standard', 'Elite'],
+    'Computer Vision': ['Standard', 'Premium', 'Elite'],
+    'Coach Chat': ['Premium', 'Elite'],
+    'Shared Dashboard': ['Premium', 'Elite'],
+    'Progress Tracking': ['Premium', 'Elite'],
   };
 
   const recommendedPlans = featureMap[featureName] || [];
@@ -79,10 +79,19 @@ export function isAIPlan(plan: SubscriptionPlan): boolean {
 }
 
 /**
- * Check if plan has coaching features
+ * Client tiers that can browse, assign, and message a human coach (Premium = "Coach Plan", Elite).
+ * Uses plan metadata — not hardcoded strings scattered across the app.
+ */
+export function canClientSelectPersonalCoach(plan: SubscriptionPlan): boolean {
+  if (!isClientPlan(plan)) return false;
+  return !!(PLAN_FEATURES[plan]?.hasCoachChat);
+}
+
+/**
+ * Coach platform account OR any tier that includes human-coach features.
  */
 export function hasCoachingFeatures(plan: SubscriptionPlan): boolean {
-  return plan === 'ProCoach' || plan === 'Elite';
+  return plan === 'ProCoach' || canClientSelectPersonalCoach(plan);
 }
 
 /**
