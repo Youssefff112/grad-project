@@ -1,4 +1,5 @@
 // src/Modules/Workout/workout.service.js
+import { Op } from 'sequelize';
 import { WorkoutPlan, WorkoutLog } from './workout.model.js';
 import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
@@ -58,8 +59,13 @@ export const workoutService = {
 
   async deleteActiveWorkoutPlan(userId) {
     const updated = await WorkoutPlan.update(
-      { isActive: false },
-      { where: { userId, isActive: true } }
+      { isActive: false, pendingCoachReview: false },
+      {
+        where: {
+          userId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+      }
     );
     return { deleted: updated[0] > 0 };
   },

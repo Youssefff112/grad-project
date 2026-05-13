@@ -262,44 +262,25 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
   };
 
   const handleApproveWorkout = () => {
-    if (!generatedWorkout) return;
+    // Plan is already saved and active on the backend — just navigate away.
+    setShowPreview(false);
+    setGeneratedWorkout(null);
     Alert.alert('Workout Plan Saved!', 'Your workout plan has been added to your routine.', [
       {
         text: 'View Workouts',
-        onPress: () => {
-          setShowPreview(false);
-          setGeneratedWorkout(null);
-          navigation.navigate('VisionAnalysisLab');
-        },
+        onPress: () => navigation.navigate('VisionAnalysisLab'),
       },
-      {
-        text: 'Generate Another',
-        onPress: () => {
-          setShowPreview(false);
-          setGeneratedWorkout(null);
-          handleOpenQuestionnaire();
-        },
-      },
+      { text: 'Stay Here' },
     ]);
   };
 
+  // Plan was already saved as pendingCoachReview=true when generated.
+  // This button just closes the preview — the coach-review banner is shown on the list.
   const handleSubmitForApproval = () => {
-    if (!generatedWorkout) return;
-    Alert.alert(
-      'Submit for Coach Review',
-      `Your workout will be reviewed by ${coachName || 'your coach'} within 24 hours.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit',
-          onPress: () => {
-            Alert.alert('Submitted', 'Your coach will review this workout shortly.');
-            setShowPreview(false);
-            setGeneratedWorkout(null);
-          },
-        },
-      ],
-    );
+    setShowPreview(false);
+    setGeneratedWorkout(null);
+    // Reload so the "Awaiting Coach Review" banner appears immediately
+    loadActivePlan();
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -984,21 +965,24 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
           >
             {userMode === 'CoachAssisted' ? (
               <>
+                {/* Plan is already saved with pendingCoachReview=true — just dismiss */}
+                <View
+                  style={[tw`rounded-xl p-4 flex-row items-start gap-3 mb-1`, { backgroundColor: '#f59e0b14', borderWidth: 1, borderColor: '#f59e0b30' }]}
+                >
+                  <MaterialIcons name="pending-actions" size={18} color="#f59e0b" style={{ marginTop: 1 }} />
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`text-xs font-bold`, { color: '#f59e0b' }]}>Submitted for Coach Review</Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                      {`${coachName || 'Your coach'} will review and activate this plan. You'll be notified when it's approved.`}
+                    </Text>
+                  </View>
+                </View>
                 <Button
-                  title={`Submit to ${coachName} for Review`}
+                  title="Done"
                   size="lg"
                   onPress={handleSubmitForApproval}
                   icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
                 />
-                <TouchableOpacity
-                  style={tw`items-center py-3`}
-                  onPress={() => {
-                    setShowPreview(false);
-                    setGeneratedWorkout(null);
-                  }}
-                >
-                  <Text style={[tw`font-bold text-base`, { color: accent }]}>Cancel</Text>
-                </TouchableOpacity>
               </>
             ) : (
               <>

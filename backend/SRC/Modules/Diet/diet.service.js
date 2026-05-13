@@ -55,8 +55,13 @@ export const dietService = {
 
   async deleteActiveDietPlan(userId) {
     const updated = await DietPlan.update(
-      { isActive: false },
-      { where: { userId, isActive: true } }
+      { isActive: false, pendingCoachReview: false },
+      {
+        where: {
+          userId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+      }
     );
     return { deleted: updated[0] > 0 };
   },

@@ -220,44 +220,24 @@ export const MealGenerationScreen = ({ navigation }: any) => {
   };
 
   const handleApproveMealPlan = () => {
-    if (!generatedMeal) return;
+    // Plan is already saved and active on the backend — just navigate away.
+    setShowPreview(false);
+    setGeneratedMeal(null);
     Alert.alert('Meal Plan Saved!', 'Your meal plan has been added to your routine.', [
       {
         text: 'View Meals',
-        onPress: () => {
-          setShowPreview(false);
-          setGeneratedMeal(null);
-          navigation.navigate('Meals');
-        },
+        onPress: () => navigation.navigate('Meals'),
       },
-      {
-        text: 'Generate Another',
-        onPress: () => {
-          setShowPreview(false);
-          setGeneratedMeal(null);
-          handleGenerateMealPlan();
-        },
-      },
+      { text: 'Stay Here' },
     ]);
   };
 
+  // Plan was already saved as pendingCoachReview=true when generated.
+  // Just close the preview — the awaiting-review banner shows on the list.
   const handleSubmitForApproval = () => {
-    if (!generatedMeal) return;
-    Alert.alert(
-      'Submit for Coach Review',
-      `Your meal plan will be reviewed by ${coachName || 'your coach'} within 24 hours.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Submit',
-          onPress: () => {
-            Alert.alert('Submitted', 'Your coach will review this meal plan shortly.');
-            setShowPreview(false);
-            setGeneratedMeal(null);
-          },
-        },
-      ]
-    );
+    setShowPreview(false);
+    setGeneratedMeal(null);
+    loadActivePlan();
   };
 
   return (
@@ -681,15 +661,22 @@ export const MealGenerationScreen = ({ navigation }: any) => {
           <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
             {userMode === 'CoachAssisted' ? (
               <>
+                {/* Plan is already saved with pendingCoachReview=true — just dismiss */}
+                <View style={[tw`rounded-xl p-4 flex-row items-start gap-3 mb-1`, { backgroundColor: '#f59e0b14', borderWidth: 1, borderColor: '#f59e0b30' }]}>
+                  <MaterialIcons name="pending-actions" size={18} color="#f59e0b" style={{ marginTop: 1 }} />
+                  <View style={tw`flex-1`}>
+                    <Text style={[tw`text-xs font-bold`, { color: '#f59e0b' }]}>Submitted for Coach Review</Text>
+                    <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                      {`${coachName || 'Your coach'} will review and activate this plan. You'll be notified when it's approved.`}
+                    </Text>
+                  </View>
+                </View>
                 <Button
-                  title={`Submit to ${coachName} for Review`}
+                  title="Done"
                   size="lg"
                   onPress={handleSubmitForApproval}
                   icon={<MaterialIcons name="check" size={20} color="white" style={tw`mr-2`} />}
                 />
-                <TouchableOpacity style={tw`items-center py-3`} onPress={() => { setShowPreview(false); setGeneratedMeal(null); }}>
-                  <Text style={[tw`font-bold text-base`, { color: accent }]}>Cancel</Text>
-                </TouchableOpacity>
               </>
             ) : (
               <>
