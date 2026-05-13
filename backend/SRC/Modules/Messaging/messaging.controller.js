@@ -49,6 +49,11 @@ export const getThreadWithUser = async (req, res, next) => {
       include: [{ model: User, as: 'sender', attributes: ['id', 'firstName', 'lastName'] }],
     });
 
+    await Message.update(
+      { read: true },
+      { where: { conversationId: conversation.id, senderId: { [Op.ne]: senderId }, read: false } }
+    );
+
     const convPlain = typeof conversation.get === 'function' ? conversation.get({ plain: true }) : conversation;
     const rowsPlain = messages.map((m) => (typeof m.get === 'function' ? m.get({ plain: true }) : m));
 
@@ -91,10 +96,24 @@ export const getConversations = async (req, res, next) => {
       order: [['lastMessageAt', 'DESC']]
     });
 
+    const conversationsWithUnread = await Promise.all(
+      conversations.map(async (conv) => {
+        const json = typeof conv.toJSON === 'function' ? conv.toJSON() : conv.get({ plain: true });
+        const unreadCount = await Message.count({
+          where: {
+            conversationId: conv.id,
+            senderId: { [Op.ne]: userId },
+            read: false,
+          },
+        });
+        return { ...json, unreadCount };
+      })
+    );
+
     res.status(200).json({
       success: true,
       message: 'Conversations retrieved successfully',
-      data: { conversations }
+      data: { conversations: conversationsWithUnread }
     });
   } catch (error) {
     next(error);

@@ -32,7 +32,7 @@ interface UIConversation {
 
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { totalUnread } = useNotifications();
+  const { totalUnread, syncUnreadFromServer } = useNotifications();
   const { userId, userMode, isCoach, coachId, coachName } = useUser();
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<UIConversation[]>([]);
@@ -84,8 +84,7 @@ export const MessagesScreen = ({ navigation }: any) => {
               ? conv.messages[0].text 
               : 'New conversation started';
 
-            // Determine read status if checking backend counts, defaulting to 0 for now as we haven't implemented unread counters on the backend
-            const unreadCount = 0; 
+            const unreadCount = Math.max(0, Math.floor(Number(conv.unreadCount)) || 0);
 
             return {
               id: conv.id,
@@ -100,6 +99,12 @@ export const MessagesScreen = ({ navigation }: any) => {
             };
           });
 
+          const syncPayload: Record<string, number> = {};
+          mapped.forEach((c) => {
+            syncPayload[String(c.id)] = c.unread;
+          });
+          syncUnreadFromServer(syncPayload);
+
           setConversations(mapped);
         } catch (error) {
           console.log('Error fetching conversations gracefully caught:', error);
@@ -110,7 +115,7 @@ export const MessagesScreen = ({ navigation }: any) => {
       };
       
       fetchConversations();
-    }, [userId])
+    }, [userId, syncUnreadFromServer])
   );
 
   // Filter conversations
@@ -316,7 +321,19 @@ export const MessagesScreen = ({ navigation }: any) => {
                 <View style={tw`flex-1`}>
                   <View style={tw`flex-row items-center justify-between mb-1`}>
                     <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>{conversation.name}</Text>
-                    <Text style={[tw`text-xs`, { color: textMuted }]}>{conversation.time}</Text>
+                    <View style={tw`items-end`}>
+                      <Text style={[tw`text-xs`, { color: textMuted }]}>{conversation.time}</Text>
+                      {conversation.unread > 0 && (
+                        <Text
+                          style={[
+                            tw`text-[10px] font-bold mt-0.5`,
+                            { color: '#ef4444' },
+                          ]}
+                        >
+                          {conversation.unread > 99 ? '99+ unread' : `${conversation.unread} unread`}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                   <Text
                     style={[tw`text-sm`, { color: textSecondary }]}
@@ -326,20 +343,6 @@ export const MessagesScreen = ({ navigation }: any) => {
                     {conversation.lastMessage}
                   </Text>
                 </View>
-
-                {/* Unread Badge */}
-                {conversation.unread > 0 && (
-                  <View
-                    style={[
-                      tw`w-6 h-6 rounded-full items-center justify-center flex-shrink-0`,
-                      { backgroundColor: accent },
-                    ]}
-                  >
-                    <Text style={tw`text-white text-xs font-bold`}>
-                      {conversation.unread > 99 ? '99+' : conversation.unread}
-                    </Text>
-                  </View>
-                )}
               </TouchableOpacity>
             ))
           ) : (

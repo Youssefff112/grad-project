@@ -8,6 +8,8 @@ interface NotificationContextType {
   markAsUnread: (conversationId: string, count: number) => void;
   addNotification: (conversationId: string) => void;
   clearAllNotifications: () => void;
+  /** Replace per-thread counts from server (e.g. inbox fetch) */
+  syncUnreadFromServer: (countsByConversationId: Record<string, number>) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -99,6 +101,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
   }, [persistNotifications]);
 
+  const syncUnreadFromServer = useCallback(
+    (countsByConversationId: Record<string, number>) => {
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        for (const [id, raw] of Object.entries(countsByConversationId)) {
+          const n = Math.max(0, Math.floor(Number(raw)) || 0);
+          newMap.set(String(id), n);
+        }
+        persistNotifications(newMap);
+        return newMap;
+      });
+    },
+    [persistNotifications]
+  );
+
   // Make unread count real-time using Socket
   useEffect(() => {
     let socket: any = null;
@@ -139,6 +156,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAsUnread,
         addNotification,
         clearAllNotifications,
+        syncUnreadFromServer,
       }}
     >
       {children}

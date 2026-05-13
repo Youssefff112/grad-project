@@ -52,6 +52,8 @@ export interface Conversation {
   clientId: number;
   coachId: number;
   lastMessageAt: string;
+  /** Messages from the other party not yet read (from GET /messages) */
+  unreadCount?: number;
   coach?: {
     id: number;
     firstName: string;

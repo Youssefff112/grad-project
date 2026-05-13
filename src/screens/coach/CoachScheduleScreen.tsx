@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -18,6 +19,7 @@ const MOCK_UPCOMING = [
 
 export const CoachScheduleScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const { totalUnread } = useNotifications();
   const [selectedDay, setSelectedDay] = useState('Mon');
   const [availability, setAvailability] = useState<Record<string, string[]>>({
     Mon: ['9:00 AM', '10:00 AM', '11:00 AM', '4:00 PM', '5:00 PM'],
@@ -147,7 +149,7 @@ export const CoachScheduleScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <CoachBottomNav activeId="schedule" navigation={navigation} />
+      <CoachBottomNav activeId="schedule" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

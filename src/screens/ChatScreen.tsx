@@ -16,6 +16,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../config/environment';
 import {
@@ -40,6 +41,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
       : null;
   const { isDark, accent } = useTheme();
   const { userId } = useUser();
+  const { markAsRead } = useNotifications();
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -65,12 +67,13 @@ export const ChatScreen = ({ navigation, route }: any) => {
     try {
       const res = await getMessages(convId);
       setMessages(res.messages || []);
+      markAsRead(convId);
       return true;
     } catch (e) {
       console.log('Chat: failed to load messages', e);
       return false;
     }
-  }, []);
+  }, [markAsRead]);
 
   // Refetch whenever this screen is focused and we have a thread id (fixes stale UI after backgrounding)
   useFocusEffect(
@@ -104,6 +107,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
         if (convId) {
           setActiveConversationId(convId);
           activeConversationIdRef.current = convId;
+          markAsRead(convId);
         }
         setMessages(Array.isArray(threadMessages) ? threadMessages : []);
       } catch (e) {
@@ -115,7 +119,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
     return () => {
       cancelled = true;
     };
-  }, [receiverId, conversationIdFromRoute, reloadMessages]);
+  }, [receiverId, conversationIdFromRoute, reloadMessages, markAsRead]);
 
   // Socket joins the user's room when auth context is ready (not only on first mount)
   useEffect(() => {

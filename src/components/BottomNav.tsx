@@ -82,37 +82,29 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: isActive ? accent + '22' : 'transparent',
-                marginBottom: 3,
+                marginBottom: 2,
               }}
             >
-              <View style={{ position: 'relative' }}>
-                <MaterialIcons
-                  name={item.icon}
-                  size={isCompact ? 21 : 24}
-                  color={isActive ? accent : inactiveColor}
-                />
-                {!!item.badge && item.badge > 0 && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -4,
-                      right: -6,
-                      backgroundColor: '#ef4444',
-                      borderRadius: 8,
-                      minWidth: 16,
-                      height: 16,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingHorizontal: 3,
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>
-                      {item.badge > 99 ? '99+' : item.badge}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <MaterialIcons
+                name={item.icon}
+                size={isCompact ? 21 : 24}
+                color={isActive ? accent : inactiveColor}
+              />
             </View>
+
+            {!!item.badge && item.badge > 0 && (
+              <Text
+                style={{
+                  fontSize: isCompact ? 10 : 11,
+                  fontWeight: '800',
+                  color: '#ef4444',
+                  marginBottom: 1,
+                  lineHeight: isCompact ? 12 : 14,
+                }}
+              >
+                {item.badge > 99 ? '99+' : item.badge}
+              </Text>
+            )}
 
             {/* Label */}
             <Text

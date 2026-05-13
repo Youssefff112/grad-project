@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 import * as coachService from '../../services/coachService';
 
@@ -31,6 +32,7 @@ const STATUS_CONFIG: Record<ClientStatus, { label: string; bg: string; text: str
 
 export const CoachClientListScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const { totalUnread } = useNotifications();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ClientStatus | 'all'>('all');
   const [clients, setClients] = useState<Client[]>([]);
@@ -215,7 +217,7 @@ export const CoachClientListScreen = ({ navigation }: any) => {
         })}
       </ScrollView>
 
-      <CoachBottomNav activeId="clients" navigation={navigation} />
+      <CoachBottomNav activeId="clients" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };
