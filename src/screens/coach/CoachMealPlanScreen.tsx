@@ -65,7 +65,7 @@ function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; 
 }
 
 export const CoachMealPlanScreen = ({ navigation, route }: any) => {
-  const { clientId, clientName, existingPlan } = route?.params ?? {};
+  const { clientId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
   const { isDark, accent } = useTheme();
 
   const [planName, setPlanName] = useState('');
@@ -98,6 +98,12 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
       }
       const mapped = mapMealPlanToUI(existingPlan.weeklyMealPlan || []);
       setDayPlans(mapped);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (autoGenerate && clientId && !existingPlan) {
+      handleGenerateWithAI();
     }
   }, []);
 

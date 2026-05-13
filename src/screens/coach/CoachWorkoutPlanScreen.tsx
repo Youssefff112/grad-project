@@ -55,7 +55,7 @@ function mapScheduleToUI(weeklySchedule: any[]): Record<string, Exercise[]> {
 }
 
 export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
-  const { clientId, clientName, existingPlan } = route?.params ?? {};
+  const { clientId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
   const { isDark, accent } = useTheme();
 
   const [planName, setPlanName] = useState('');
@@ -65,7 +65,6 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // If opened for editing an existing plan, pre-load it
   const editingPlanId: number | null = existingPlan?.id ?? null;
 
   useEffect(() => {
@@ -73,6 +72,12 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
       setPlanName(existingPlan.planName || `${existingPlan.goal || 'Workout'} Plan`);
       const mapped = mapScheduleToUI(existingPlan.weeklySchedule || []);
       setDayExercises(mapped);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (autoGenerate && clientId && !existingPlan) {
+      handleGenerateWithAI();
     }
   }, []);
 

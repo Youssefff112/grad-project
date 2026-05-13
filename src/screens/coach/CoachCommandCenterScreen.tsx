@@ -33,6 +33,23 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const [showQuickMessage, setShowQuickMessage] = useState(false);
   const [messagingClientId, setMessagingClientId] = useState<string | null>(null);
 
+  type PlanType = 'workout' | 'meal';
+  const [planPicker, setPlanPicker] = useState<{ type: PlanType; step: 'client' | 'method'; client: ClientRow | null } | null>(null);
+
+  const openPlanPicker = (type: PlanType) =>
+    setPlanPicker({ type, step: 'client', client: null });
+
+  const selectPlanClient = (client: ClientRow) =>
+    setPlanPicker((p) => p ? { ...p, step: 'method', client } : null);
+
+  const launchPlan = (method: 'manual' | 'ai') => {
+    if (!planPicker?.client) return;
+    const { type, client } = planPicker;
+    setPlanPicker(null);
+    const params = { clientId: client.id, clientName: client.name, autoGenerate: method === 'ai' };
+    navigation.navigate(type === 'workout' ? 'CoachWorkoutPlan' : 'CoachMealPlan', params);
+  };
+
   const mapClient = (c: coachService.CoachClient): ClientRow => ({
     id: String(c.id),
     userId: c.userId,
@@ -156,8 +173,8 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           <View style={tw`flex-row flex-wrap gap-3`}>
             {[
               { label: 'Add Client', sub: 'Manage roster', icon: 'person-add' as const, onPress: () => navigation.navigate('CoachClientList'), featured: true },
-              { label: 'New Workout', sub: 'Create program', icon: 'fitness-center' as const, onPress: () => navigation.navigate('CoachWorkoutPlan'), featured: false },
-              { label: 'Meal Plan', sub: 'Assign to client', icon: 'restaurant-menu' as const, onPress: () => navigation.navigate('CoachMealPlan'), featured: false },
+              { label: 'New Workout', sub: 'Create program', icon: 'fitness-center' as const, onPress: () => openPlanPicker('workout'), featured: false },
+              { label: 'Meal Plan', sub: 'Assign to client', icon: 'restaurant-menu' as const, onPress: () => openPlanPicker('meal'), featured: false },
               { label: 'Message', sub: 'Quick chat', icon: 'send' as const, onPress: () => setShowQuickMessage(true), featured: false },
             ].map((item) => (
               <TouchableOpacity
@@ -421,6 +438,147 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
                 );
               })}
             </ScrollView>
+          )}
+        </View>
+      </Modal>
+      {/* Plan Picker Modal */}
+      <Modal
+        visible={!!planPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPlanPicker(null)}
+      >
+        <TouchableOpacity
+          style={[tw`flex-1`, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          activeOpacity={1}
+          onPress={() => setPlanPicker(null)}
+        />
+        <View style={[tw`rounded-t-3xl px-4 pt-4 pb-10`, { backgroundColor: isDark ? '#111128' : '#ffffff', maxHeight: '75%' }]}>
+          {/* Handle */}
+          <View style={[tw`w-10 h-1 rounded-full self-center mb-4`, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }]} />
+
+          {planPicker?.step === 'client' ? (
+            <>
+              <View style={tw`flex-row items-center justify-between mb-1`}>
+                <View>
+                  <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
+                    {planPicker.type === 'workout' ? 'New Workout Plan' : 'New Meal Plan'}
+                  </Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>Choose a client</Text>
+                </View>
+                <TouchableOpacity onPress={() => setPlanPicker(null)}>
+                  <MaterialIcons name="close" size={22} color={subtextColor} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={[tw`flex-row items-center gap-2 my-3 px-3 py-2 rounded-xl`, { backgroundColor: planPicker.type === 'workout' ? accent + '12' : '#10b98112' }]}>
+                <MaterialIcons
+                  name={planPicker.type === 'workout' ? 'fitness-center' : 'restaurant-menu'}
+                  size={15}
+                  color={planPicker.type === 'workout' ? accent : '#10b981'}
+                />
+                <Text style={[tw`text-xs font-semibold`, { color: planPicker.type === 'workout' ? accent : '#10b981' }]}>
+                  {planPicker.type === 'workout' ? 'Workout plan will be assigned to the selected client' : 'Meal plan will be assigned to the selected client'}
+                </Text>
+              </View>
+
+              {allClients.length === 0 ? (
+                <View style={tw`items-center py-8`}>
+                  <MaterialIcons name="group" size={36} color={subtextColor} />
+                  <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No clients yet</Text>
+                </View>
+              ) : (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {allClients.map((client, i) => (
+                    <TouchableOpacity
+                      key={client.id}
+                      onPress={() => selectPlanClient(client)}
+                      style={[
+                        tw`flex-row items-center gap-3 py-3.5`,
+                        i < allClients.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+                      ]}
+                    >
+                      <View style={[tw`w-10 h-10 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '20' }]}>
+                        <MaterialIcons name="person" size={20} color={accent} />
+                      </View>
+                      <View style={tw`flex-1`}>
+                        <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{client.name}</Text>
+                        <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{client.plan}</Text>
+                      </View>
+                      <View style={[tw`w-7 h-7 rounded-full items-center justify-center`, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                        <MaterialIcons name="chevron-right" size={18} color={subtextColor} />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          ) : (
+            <>
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <TouchableOpacity
+                  onPress={() => setPlanPicker((p) => p ? { ...p, step: 'client' } : null)}
+                  style={tw`flex-row items-center gap-1`}
+                >
+                  <MaterialIcons name="arrow-back" size={18} color={accent} />
+                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setPlanPicker(null)}>
+                  <MaterialIcons name="close" size={22} color={subtextColor} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Selected client summary */}
+              <View style={[tw`flex-row items-center gap-3 p-3 rounded-2xl mb-6`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                <View style={[tw`w-11 h-11 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
+                  <MaterialIcons name="person" size={22} color={accent} />
+                </View>
+                <View>
+                  <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{planPicker?.client?.name}</Text>
+                  <Text style={[tw`text-xs`, { color: subtextColor }]}>{planPicker?.client?.plan}</Text>
+                </View>
+              </View>
+
+              <Text style={[tw`text-base font-bold mb-4`, { color: textPrimary }]}>How do you want to create this plan?</Text>
+
+              {/* Manual */}
+              <TouchableOpacity
+                onPress={() => launchPlan('manual')}
+                style={[tw`flex-row items-center gap-4 p-4 rounded-2xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}
+              >
+                <View style={[tw`w-12 h-12 rounded-2xl items-center justify-center`, { backgroundColor: accent + '14' }]}>
+                  <MaterialIcons name={planPicker?.type === 'workout' ? 'fitness-center' : 'restaurant-menu'} size={24} color={accent} />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Build Manually</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
+                    {planPicker?.type === 'workout'
+                      ? 'Add exercises day-by-day at your own pace'
+                      : 'Add meals and macros day-by-day at your own pace'}
+                  </Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={22} color={subtextColor} />
+              </TouchableOpacity>
+
+              {/* AI Generate */}
+              <TouchableOpacity
+                onPress={() => launchPlan('ai')}
+                style={[tw`flex-row items-center gap-4 p-4 rounded-2xl`, { backgroundColor: isDark ? '#1e1b4b' : '#ede9fe', borderWidth: 1.5, borderColor: isDark ? '#4f46e5' : '#a5b4fc' }]}
+              >
+                <View style={[tw`w-12 h-12 rounded-2xl items-center justify-center`, { backgroundColor: '#6366f118' }]}>
+                  <MaterialIcons name="auto-awesome" size={24} color="#6366f1" />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`text-sm font-bold`, { color: '#6366f1' }]}>Generate with AI</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#a5b4fc' : '#6366f1aa' }]}>
+                    {planPicker?.type === 'workout'
+                      ? "Auto-build a personalised program from the client's profile"
+                      : "Auto-build a personalised diet from the client's profile"}
+                  </Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={22} color="#6366f1" />
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </Modal>
