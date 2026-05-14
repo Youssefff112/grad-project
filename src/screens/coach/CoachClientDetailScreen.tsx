@@ -6,7 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import * as coachService from '../../services/coachService';
-import type { ClientActivitySnapshot, AdherenceSummary } from '../../services/coachService';
+import type { ClientActivitySnapshot, AdherenceSummary, DetailedDietLog } from '../../services/coachService';
 
 interface Measurement {
   date: string;
@@ -59,6 +59,9 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   const [approvingPlanId, setApprovingPlanId] = useState<number | null>(null);
   const [clientActivity, setClientActivity] = useState<ClientActivitySnapshot | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [mealLogs, setMealLogs] = useState<DetailedDietLog[]>([]);
+  const [mealLogsLoading, setMealLogsLoading] = useState(false);
+  const [mealLogsExpanded, setMealLogsExpanded] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -150,10 +153,27 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
     }
   }, [planClientId]);
 
+  const loadMealLogs = useCallback(async () => {
+    if (!planClientId) return;
+    setMealLogsLoading(true);
+    try {
+      const { logs } = await coachService.getClientDietLogs(Number(planClientId), 14);
+      setMealLogs(logs);
+    } catch {
+      setMealLogs([]);
+    } finally {
+      setMealLogsLoading(false);
+    }
+  }, [planClientId]);
+
   useFocusEffect(
     useCallback(() => {
       loadClientActivity();
-    }, [loadClientActivity])
+      loadMealLogs();
+      if (planClientId) {
+        loadPlans();
+      }
+    }, [loadClientActivity, loadMealLogs, loadPlans, planClientId]),
   );
 
   const latestCheckin = measurements[0];
@@ -246,7 +266,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
         <View style={[tw`flex-row gap-2 px-4 pb-4`]}>
           <TouchableOpacity
             onPress={() => navigation.navigate('CoachWorkoutPlan', {
-              clientId: planClientId,
+              userId: Number(planClientId),
+              clientId: Number(planClientId),
               clientName,
               existingPlan: workoutPlan,
             })}
@@ -260,7 +281,11 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
             <Text style={[tw`text-xs font-bold`, { color: accent }]}>Edit Plan</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => navigation.navigate('CoachWorkoutPlan', { clientId: planClientId, clientName })}
+            onPress={() => navigation.navigate('CoachWorkoutPlan', {
+              userId: Number(planClientId),
+              clientId: Number(planClientId),
+              clientName,
+            })}
             style={[tw`flex-1 flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
               backgroundColor: isDark ? '#1e1b4b' : '#ede9fe',
               borderWidth: 1,
@@ -356,7 +381,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
           <TouchableOpacity
             onPress={() =>
               navigation.navigate('CoachMealPlan', {
-                clientId: planClientId,
+                userId: Number(planClientId),
+                clientId: Number(planClientId),
                 clientName,
                 existingPlan: dietPlan,
               })
@@ -372,7 +398,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('CoachMealPlan', {
-              clientId: planClientId,
+              userId: Number(planClientId),
+              clientId: Number(planClientId),
               clientName,
               existingPlan: dietPlan,
             })}
@@ -386,7 +413,11 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
             <Text style={[tw`text-xs font-bold`, { color: '#10b981' }]}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => navigation.navigate('CoachMealPlan', { clientId: planClientId, clientName })}
+            onPress={() => navigation.navigate('CoachMealPlan', {
+              userId: Number(planClientId),
+              clientId: Number(planClientId),
+              clientName,
+            })}
             style={[tw`flex-1 min-w-[30%] flex-row items-center justify-center gap-1 py-2.5 rounded-xl`, {
               backgroundColor: isDark ? '#1e1b4b' : '#ede9fe',
               borderWidth: 1,
@@ -407,7 +438,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
     const route = isWorkout ? 'CoachWorkoutPlan' : 'CoachMealPlan';
     return (
       <TouchableOpacity
-        onPress={() => navigation.navigate(route, { clientId: planClientId, clientName })}
+        onPress={() => navigation.navigate(route, { userId: Number(planClientId), clientId: Number(planClientId), clientName })}
         style={[tw`p-5 rounded-2xl items-center mb-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor, borderStyle: 'dashed' }]}
       >
         <View style={[tw`w-12 h-12 rounded-full items-center justify-center mb-3`, { backgroundColor: color + '14' }]}>
@@ -669,8 +700,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
               <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Quick Actions</Text>
               <View style={tw`flex-row gap-3`}>
                 {[
-                  { label: 'Create Meal Plan', icon: 'restaurant-menu' as const, route: 'CoachMealPlan', params: { clientId: planClientId, clientName } },
-                  { label: 'Create Workout', icon: 'fitness-center' as const, route: 'CoachWorkoutPlan', params: { clientId: planClientId, clientName } },
+                  { label: 'Create Meal Plan', icon: 'restaurant-menu' as const, route: 'CoachMealPlan', params: { userId: Number(planClientId), clientId: Number(planClientId), clientName } },
+                  { label: 'Create Workout', icon: 'fitness-center' as const, route: 'CoachWorkoutPlan', params: { userId: Number(planClientId), clientId: Number(planClientId), clientName } },
                 ].map(a => (
                   <TouchableOpacity
                     key={a.label}
@@ -702,6 +733,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                       onPress={() => {
                         loadPlans();
                         loadClientActivity();
+                        loadMealLogs();
                       }}
                     >
                       <MaterialIcons name="refresh" size={20} color={subtextColor} />
@@ -715,6 +747,129 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                       Below you see today’s meal check-ins, water, and recent completed workouts so you can compare the written plan to what they actually did.
                     </Text>
                     {renderAdherenceBody()}
+                  </View>
+
+                  {/* ── Meal Completion History ─────────────────────────── */}
+                  <View style={[tw`rounded-xl mb-4 overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                    <TouchableOpacity
+                      onPress={() => setMealLogsExpanded((v) => !v)}
+                      style={tw`flex-row items-center justify-between p-4`}
+                    >
+                      <View style={tw`flex-row items-center gap-2`}>
+                        <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: '#10b98114' }]}>
+                          <MaterialIcons name="restaurant-menu" size={18} color="#10b981" />
+                        </View>
+                        <View>
+                          <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Meal Completion History</Text>
+                          <Text style={[tw`text-xs`, { color: subtextColor }]}>Last 14 days · tap to expand</Text>
+                        </View>
+                      </View>
+                      {mealLogsLoading
+                        ? <ActivityIndicator size="small" color={accent} />
+                        : <MaterialIcons
+                            name={mealLogsExpanded ? 'expand-less' : 'expand-more'}
+                            size={22}
+                            color={subtextColor}
+                          />
+                      }
+                    </TouchableOpacity>
+
+                    {mealLogsExpanded && (
+                      <View style={[tw`pb-3 px-4`, { borderTopWidth: 1, borderColor }]}>
+                        {mealLogs.length === 0 && !mealLogsLoading && (
+                          <Text style={[tw`text-xs py-4 text-center`, { color: subtextColor }]}>
+                            No meal logs recorded in the last 14 days.
+                          </Text>
+                        )}
+
+                        {mealLogs.map((log) => {
+                          const dateLabel = (() => {
+                            const datePart = String(log.date).split('T')[0];
+                            const parts = datePart.split('-').map(Number);
+                            if (parts.length !== 3) return datePart;
+                            const [y, m, d] = parts;
+                            return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+                              weekday: 'short', month: 'short', day: 'numeric',
+                            });
+                          })();
+
+                          const pct = log.summary.pct;
+                          const barColor = pct == null ? '#94a3b8'
+                            : pct >= 80 ? '#22c55e'
+                            : pct >= 40 ? '#eab308'
+                            : '#f97316';
+
+                          const STATUS_LABELS: Record<string, string> = {
+                            followed: 'Followed', partial: 'Partial', missed: 'Missed',
+                          };
+
+                          return (
+                            <View
+                              key={log.id}
+                              style={[tw`mt-3 p-3 rounded-xl`, {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                                borderWidth: 1, borderColor,
+                              }]}
+                            >
+                              <View style={tw`flex-row items-center justify-between mb-2`}>
+                                <Text style={[tw`text-xs font-bold`, { color: textPrimary }]}>{dateLabel}</Text>
+                                <View style={tw`flex-row items-center gap-2`}>
+                                  {log.waterMl != null && (
+                                    <View style={tw`flex-row items-center gap-0.5`}>
+                                      <MaterialIcons name="water-drop" size={11} color="#38bdf8" />
+                                      <Text style={[tw`text-[10px] font-bold`, { color: '#38bdf8' }]}>
+                                        {(log.waterMl / 1000).toFixed(1)}L
+                                      </Text>
+                                    </View>
+                                  )}
+                                  <View style={[tw`px-2 py-0.5 rounded-full`, { backgroundColor: barColor + '20' }]}>
+                                    <Text style={[tw`text-[10px] font-bold`, { color: barColor }]}>
+                                      {STATUS_LABELS[log.status] ?? log.status}
+                                    </Text>
+                                  </View>
+                                </View>
+                              </View>
+
+                              <View style={tw`flex-row items-center gap-2 mb-2`}>
+                                <View style={[tw`flex-1 h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
+                                  <View style={{ height: '100%', width: `${pct ?? 0}%`, borderRadius: 999, backgroundColor: barColor }} />
+                                </View>
+                                <Text style={[tw`text-[10px] font-bold w-14 text-right`, { color: barColor }]}>
+                                  {log.summary.completed}/{log.summary.total} meals
+                                </Text>
+                              </View>
+
+                              {log.namedMeals.length > 0 ? (
+                                <View style={tw`gap-1`}>
+                                  {log.namedMeals.map((meal) => (
+                                    <View key={meal.id} style={tw`flex-row items-center gap-2`}>
+                                      <MaterialIcons
+                                        name={meal.completed ? 'check-circle' : 'radio-button-unchecked'}
+                                        size={14}
+                                        color={meal.completed ? '#22c55e' : isDark ? '#475569' : '#cbd5e1'}
+                                      />
+                                      <Text
+                                        style={[tw`text-xs flex-1`, { color: meal.completed ? textPrimary : subtextColor }]}
+                                        numberOfLines={1}
+                                      >
+                                        {meal.name}
+                                      </Text>
+                                      <Text style={[tw`text-[10px]`, { color: meal.completed ? '#22c55e' : subtextColor }]}>
+                                        {meal.completed ? '✓ eaten' : 'skipped'}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              ) : (
+                                <Text style={[tw`text-xs`, { color: subtextColor }]}>
+                                  {log.status === 'followed' ? 'All meals completed' : 'No individual meal details recorded'}
+                                </Text>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
 
                   {/* Pending Coach Review Plans */}
@@ -757,7 +912,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                           <TouchableOpacity
                             onPress={() =>
                               navigation.navigate('CoachMealPlan', {
-                                clientId: planClientId,
+                                userId: Number(planClientId),
+                                clientId: Number(planClientId),
                                 clientName,
                                 existingPlan: plan,
                               })

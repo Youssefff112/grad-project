@@ -42,9 +42,11 @@ export const CoachClientListScreen = ({ navigation }: any) => {
     setLoading(true);
     try {
       const { clients: raw } = await coachService.getMyClients();
-      const mapped: Client[] = raw.map((c) => ({
+      const mapped: Client[] = raw.map((c) => {
+        const uid = c.userId != null ? Number(c.userId) : NaN;
+        return {
         id: String(c.id),
-        userId: String(c.userId || c.id),
+        userId: String(Number.isFinite(uid) ? uid : c.id),
         name: c.User
           ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}`
           : `Client #${c.id}`,
@@ -55,7 +57,8 @@ export const CoachClientListScreen = ({ navigation }: any) => {
         lastActivity: c.lastActivity || 'Recently',
         progress: 0,
         weight: null,
-      }));
+      };
+      });
       setClients(mapped);
     } catch {
       setClients([]);

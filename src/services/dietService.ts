@@ -112,6 +112,16 @@ export const logDietDay = async (data: DietLogRequest): Promise<{ log: DietLog }
 };
 
 /**
+ * Fetch the diet log for a specific calendar date (YYYY-MM-DD).
+ * Returns null if no log exists for that date yet.
+ * Used by MealsScreen to restore per-day completion state.
+ */
+export const getDietLog = async (date: string): Promise<{ log: DietLog | null }> => {
+  const response: any = await apiGet(`/diet/log?date=${encodeURIComponent(date)}`);
+  return { log: response.data?.log ?? null };
+};
+
+/**
  * Get diet tracking history with pagination.
  */
 export const getDietHistory = async (
@@ -129,5 +139,6 @@ export default {
   generateDietPlan,
   getActiveDietPlan,
   logDietDay,
+  getDietLog,
   getDietHistory,
 };

@@ -55,7 +55,8 @@ function mapScheduleToUI(weeklySchedule: any[]): Record<string, Exercise[]> {
 }
 
 export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
-  const { clientId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
+  const { clientId, userId: clientUserId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
+  const apiClientId = Number(clientUserId ?? clientId);
   const { isDark, accent } = useTheme();
 
   const [planName, setPlanName] = useState('');
@@ -76,7 +77,7 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
   }, []);
 
   useEffect(() => {
-    if (autoGenerate && clientId && !existingPlan) {
+    if (autoGenerate && Number.isFinite(apiClientId) && apiClientId > 0 && !existingPlan) {
       handleGenerateWithAI();
     }
   }, []);
@@ -106,20 +107,25 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
   };
 
   const handleGenerateWithAI = async () => {
-    if (!clientId) {
+    if (!Number.isFinite(apiClientId) || apiClientId <= 0) {
       Alert.alert('No Client', 'Select a client first to generate a plan.');
       return;
     }
     setIsGenerating(true);
     try {
-      const { plan } = await coachService.generateWorkoutForClient(Number(clientId));
+      const { plan } = await coachService.generateWorkoutForClient(apiClientId);
       if (plan) {
         setPlanName(plan.planName || `${plan.goal || 'Workout'} Plan`);
         setDayExercises(mapScheduleToUI(plan.weeklySchedule || []));
         Alert.alert('Plan Generated', 'The AI plan has been loaded. You can review and edit it before saving.');
       }
     } catch (err: any) {
-      Alert.alert('Generation Failed', err?.message || 'Could not generate a plan. Make sure the client has completed their profile.');
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Could not generate a plan. The client must be assigned to you and have a complete profile with a goal.';
+      Alert.alert('Generation Failed', String(msg));
     } finally {
       setIsGenerating(false);
     }
@@ -156,9 +162,9 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
         Alert.alert('Plan Updated', `Workout plan "${planName}" has been updated.`, [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
-      } else if (clientId) {
+      } else if (Number.isFinite(apiClientId) && apiClientId > 0) {
         // Assign new plan manually
-        await coachService.assignWorkoutToClient(Number(clientId), { planName, days: buildWeeklySchedule() });
+        await coachService.assignWorkoutToClient(apiClientId, { planName, days: buildWeeklySchedule() });
         Alert.alert('Plan Assigned', `Workout plan "${planName}" has been assigned to ${clientName}.`, [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -193,7 +199,7 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
         {/* AI Generate banner */}
-        {clientId && (
+        {Number.isFinite(apiClientId) && apiClientId > 0 && (
           <TouchableOpacity
             onPress={handleGenerateWithAI}
             disabled={isGenerating}

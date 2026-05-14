@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,15 +20,7 @@ import {
   mlFromUsCups,
 } from '../../utils/waterConversions';
 
-// Default meal templates if no custom meals exist
-const DEFAULT_MEALS = [
-  { id: 'breakfast', meal: 'Breakfast', time: '7:30 AM', icon: 'wb-sunny' as const, items: ['4 Egg Whites + 1 Whole', 'Oatmeal (80g)', 'Blueberries (100g)'], calories: 420, protein: 35, carbs: 52, fats: 12 },
-  { id: 'lunch', meal: 'Lunch', time: '12:30 PM', icon: 'restaurant' as const, items: ['Grilled Chicken (200g)', 'Brown Rice (150g)', 'Broccoli & Spinach'], calories: 620, protein: 52, carbs: 65, fats: 14 },
-  { id: 'preworkout', meal: 'Pre-Workout', time: '4:00 PM', icon: 'bolt' as const, items: ['Banana', 'Whey Protein Shake', 'Rice Cakes (2)'], calories: 310, protein: 28, carbs: 48, fats: 4 },
-  { id: 'dinner', meal: 'Dinner', time: '7:30 PM', icon: 'nightlight-round' as const, items: ['Salmon Fillet (180g)', 'Sweet Potato (200g)', 'Mixed Greens Salad'], calories: 580, protein: 42, carbs: 45, fats: 22 },
-];
-
-const DEFAULT_DAILY_TARGET = { calories: 2400, protein: 160, carbs: 220, fats: 65 };
+const DEFAULT_DAILY_TARGET = { calories: 2000, protein: 150, carbs: 200, fats: 65 };
 
 const MEAL_TIME_MAP: Record<string, string> = {
   breakfast: '7:30 AM',
@@ -49,6 +41,16 @@ export const MealsScreen = ({ navigation }: any) => {
   const { totalUnread } = useNotifications();
   const { customMeals } = useFoodManagement();
 
+  // Week day navigation (Mon–Sun).  0 = Monday … 6 = Sunday
+  const todayIndex = (() => {
+    const d = new Date().getDay(); // 0=Sun
+    return d === 0 ? 6 : d - 1;   // convert to Mon=0
+  })();
+  const [selectedDayIndex, setSelectedDayIndex] = useState(todayIndex);
+
+  const DAY_LABELS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({});
   const [waterGlasses, setWaterGlasses] = useState(3);
   /** Exact ml when user uses the calculator; otherwise derived from glasses × 250 */
@@ -60,15 +62,31 @@ export const MealsScreen = ({ navigation }: any) => {
   const [activePlan, setActivePlan] = useState<dietService.DietPlan | null>(null);
   const [dailyTarget, setDailyTarget] = useState(DEFAULT_DAILY_TARGET);
   const [planLoading, setPlanLoading] = useState(true);
+  const [logLoading, setLogLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const logTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Build display meals: prefer active backend plan → custom meals → defaults
+  /** Today's calendar date string YYYY-MM-DD — stable for the lifetime of this render cycle */
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  /** Calendar date string for the currently selected week-day index */
+  const selectedDateStr = useMemo(() => {
+    const d = new Date();
+    const todayDow = d.getDay() === 0 ? 6 : d.getDay() - 1; // Mon=0…Sun=6
+    const diff = selectedDayIndex - todayDow;
+    const target = new Date(d);
+    target.setDate(d.getDate() + diff);
+    return target.toISOString().split('T')[0];
+  }, [selectedDayIndex]);
+
+  // Build display meals: prefer active backend plan → custom meals → empty
   const mealsToDisplay = (() => {
     if (activePlan) {
-      const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      const selectedDayName = DAY_FULL_NAMES[selectedDayIndex];
       const dayPlan = activePlan.weeklyMealPlan.find(
-        (d) => d.day.toLowerCase() === today.toLowerCase()
-      ) || activePlan.weeklyMealPlan[0];
+        (d) => d.day.toLowerCase() === selectedDayName.toLowerCase()
+      ) || activePlan.weeklyMealPlan[selectedDayIndex] || activePlan.weeklyMealPlan[0];
       if (dayPlan) {
         return dayPlan.meals.map((m, idx) => ({
           id: `${m.type}-${idx}`,
@@ -97,7 +115,7 @@ export const MealsScreen = ({ navigation }: any) => {
         fats: meal.totalMacros.fats,
       }));
     }
-    return DEFAULT_MEALS;
+    return [];
   })();
 
   // Load active diet plan; re-runs on every focus so deletes/regenerations
@@ -133,43 +151,76 @@ export const MealsScreen = ({ navigation }: any) => {
     }, [loadDietPlan]),
   );
 
-  // Initialize checkedMeals when meals list changes
+  /**
+   * Load completion state for the currently selected day.
+   * Priority: server log → local cache (today only) → all unchecked.
+   * Fires whenever the selected day or the active plan changes.
+   */
   useEffect(() => {
-    const initialChecked: Record<string, boolean> = {};
-    mealsToDisplay.forEach((meal) => {
-      initialChecked[meal.id] = false;
-    });
-    setCheckedMeals(initialChecked);
-  }, [activePlan]);
+    if (!activePlan) {
+      setCheckedMeals({});
+      return;
+    }
 
-  // Load cached meal data on mount
-  useEffect(() => {
-    const loadCachedMeals = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const cached = await offlineService.getCachedMealLog(today);
-      if (cached) {
-        setCheckedMeals(cached.checkedMeals);
-        setWaterGlasses(cached.waterGlasses);
-        const w = (cached as { waterMl?: number }).waterMl;
-        if (typeof w === 'number' && w > 0) setWaterMlOverride(w);
-        else setWaterMlOverride(null);
+    let cancelled = false;
+    setLogLoading(true);
+
+    const load = async () => {
+      try {
+        const { log } = await dietService.getDietLog(selectedDateStr);
+        if (cancelled) return;
+        if (log?.mealsCompleted && Object.keys(log.mealsCompleted).length > 0) {
+          setCheckedMeals(log.mealsCompleted as Record<string, boolean>);
+          // Restore water intake only for today's log
+          if (selectedDateStr === todayStr && log.waterMl != null && log.waterMl > 0) {
+            setWaterMlOverride(log.waterMl);
+            setWaterGlasses(Math.min(24, Math.round(log.waterMl / WATER_ML_PER_GLASS)));
+          }
+          return;
+        }
+      } catch {
+        // network error — fall through to local cache
       }
-    };
-    loadCachedMeals();
-  }, []);
 
-  // Cache locally + debounce backend save whenever meal state changes
+      if (cancelled) return;
+
+      if (selectedDateStr === todayStr) {
+        // Fall back to local offline cache for today
+        const cached = await offlineService.getCachedMealLog(selectedDateStr);
+        if (!cancelled && cached) {
+          setCheckedMeals(cached.checkedMeals);
+          setWaterGlasses(cached.waterGlasses);
+          const w = (cached as { waterMl?: number }).waterMl;
+          if (typeof w === 'number' && w > 0) setWaterMlOverride(w);
+          else setWaterMlOverride(null);
+          return;
+        }
+      }
+
+      // No log found — reset to unchecked
+      if (!cancelled) setCheckedMeals({});
+    };
+
+    load().finally(() => { if (!cancelled) setLogLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedDayIndex, activePlan?.id, selectedDateStr, todayStr]);
+
+  // Cache locally + debounce backend save whenever TODAY's meal/water state changes.
+  // This effect intentionally skips saving when viewing past/future days — those logs
+  // are read-only and we never want to overwrite them with the displayed (stale) state.
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    if (selectedDayIndex !== todayIndex) return;
+
     const waterMlEffective = waterMlOverride ?? waterGlasses * WATER_ML_PER_GLASS;
 
-    offlineService.cacheMealLog(today, {
+    offlineService.cacheMealLog(todayStr, {
       checkedMeals,
       waterGlasses,
-      date: today,
+      date: todayStr,
       waterMl: waterMlEffective,
     });
 
+    setSaveStatus('saving');
     if (logTimer.current) clearTimeout(logTimer.current);
     logTimer.current = setTimeout(async () => {
       try {
@@ -185,10 +236,10 @@ export const MealsScreen = ({ navigation }: any) => {
           },
           { calories: 0, protein: 0, carbs: 0, fats: 0 },
         );
-        const allChecked = mealsToDisplay.every((m) => checkedMeals[m.id]);
+        const allChecked = mealsToDisplay.length > 0 && mealsToDisplay.every((m) => checkedMeals[m.id]);
         const anyChecked = mealsToDisplay.some((m) => checkedMeals[m.id]);
         await dietService.logDietDay({
-          date: today,
+          date: todayStr,
           mealsCompleted: checkedMeals,
           caloriesConsumed: consumed.calories,
           macrosConsumed: { protein: consumed.protein, carbs: consumed.carbs, fats: consumed.fats },
@@ -196,12 +247,19 @@ export const MealsScreen = ({ navigation }: any) => {
           waterMl: waterMlEffective,
           ...(activePlan ? { dietPlanId: activePlan.id } : {}),
         });
+        setSaveStatus('saved');
+        if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+        saveStatusTimer.current = setTimeout(() => setSaveStatus('idle'), 2500);
       } catch {
-        // silent – cached locally already
+        setSaveStatus('idle');
+        // silent – data cached locally
       }
     }, 2000);
-    return () => { if (logTimer.current) clearTimeout(logTimer.current); };
-  }, [checkedMeals, waterGlasses, waterMlOverride, activePlan?.id]);
+    return () => {
+      if (logTimer.current) clearTimeout(logTimer.current);
+      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+    };
+  }, [checkedMeals, waterGlasses, waterMlOverride, activePlan?.id, selectedDayIndex]);
 
   const toggleMeal = (id: string) => {
     setCheckedMeals((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -281,9 +339,21 @@ export const MealsScreen = ({ navigation }: any) => {
           {planLoading ? (
             <ActivityIndicator size="small" color={accent} style={tw`mt-1 self-start`} />
           ) : (
-            <Text style={[tw`text-sm mt-1`, { color: textSecondary }]}>
-              {activePlan ? 'AI plan active · ' : ''}{checkedCount} of {mealsToDisplay.length} meals logged today
-            </Text>
+            <View style={tw`flex-row items-center gap-2 mt-1`}>
+              <Text style={[tw`text-sm`, { color: textSecondary }]}>
+                {activePlan ? 'AI plan active · ' : ''}{checkedCount} of {mealsToDisplay.length} meals logged
+              </Text>
+              {logLoading && <ActivityIndicator size="small" color={accent} />}
+              {!logLoading && saveStatus === 'saving' && selectedDayIndex === todayIndex && (
+                <Text style={[tw`text-xs`, { color: accent }]}>Saving…</Text>
+              )}
+              {!logLoading && saveStatus === 'saved' && selectedDayIndex === todayIndex && (
+                <View style={tw`flex-row items-center gap-0.5`}>
+                  <MaterialIcons name="check-circle" size={13} color="#4ade80" />
+                  <Text style={[tw`text-xs font-bold`, { color: '#4ade80' }]}>Saved</Text>
+                </View>
+              )}
+            </View>
           )}
         </View>
 
@@ -343,6 +413,51 @@ export const MealsScreen = ({ navigation }: any) => {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Week day selector — only shown when an active plan exists */}
+        {activePlan && !planLoading && (
+          <View style={tw`mt-4`}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={tw`px-5 gap-2`}
+            >
+              {DAY_LABELS_SHORT.map((label, idx) => {
+                const isToday = idx === todayIndex;
+                const isSelected = idx === selectedDayIndex;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    onPress={() => setSelectedDayIndex(idx)}
+                    style={[
+                      tw`items-center px-3 py-2 rounded-2xl min-w-[52px]`,
+                      {
+                        backgroundColor: isSelected ? accent : isDark ? '#111128' : '#ffffff',
+                        borderWidth: 1,
+                        borderColor: isSelected ? accent : isToday ? accent + '40' : cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[tw`text-xs font-bold`, { color: isSelected ? '#fff' : textPrimary }]}>
+                      {label}
+                    </Text>
+                    {isToday && (
+                      <View style={[tw`w-1.5 h-1.5 rounded-full mt-0.5`, { backgroundColor: isSelected ? 'rgba(255,255,255,0.7)' : accent }]} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {selectedDayIndex !== todayIndex && (
+              <View style={[tw`mx-5 mt-2 px-3 py-1.5 rounded-lg flex-row items-center gap-1.5`, { backgroundColor: '#f59e0b14' }]}>
+                <MaterialIcons name="info-outline" size={14} color="#f59e0b" />
+                <Text style={[tw`text-xs`, { color: '#f59e0b' }]}>
+                  Viewing {DAY_LABELS_SHORT[selectedDayIndex]} — tap today ({DAY_LABELS_SHORT[todayIndex]}) to log meals
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Calorie Ring + Macros Section */}
         <View
@@ -461,16 +576,44 @@ export const MealsScreen = ({ navigation }: any) => {
         {/* Meal Cards */}
         <View style={tw`px-5 mt-6`}>
           <Text style={[tw`text-lg font-black mb-3`, { color: textPrimary }]}>
-            {"Today's Meals"}
+            {selectedDayIndex === todayIndex ? "Today's Meals" : `${DAY_LABELS_SHORT[selectedDayIndex]}'s Meals`}
           </Text>
+
+          {/* Empty state — no plan and no custom meals */}
+          {!planLoading && mealsToDisplay.length === 0 && (
+            <View style={[tw`rounded-2xl p-8 items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
+              <View style={[tw`w-16 h-16 rounded-full items-center justify-center mb-4`, { backgroundColor: accent + '14' }]}>
+                <MaterialIcons name="restaurant" size={32} color={accent} />
+              </View>
+              <Text style={[tw`text-base font-bold mb-1 text-center`, { color: textPrimary }]}>No meals yet</Text>
+              <Text style={[tw`text-sm text-center mb-5`, { color: textSecondary }]}>
+                Generate an AI meal plan or build a custom meal to see your daily meals here.
+              </Text>
+              <View style={tw`flex-row gap-3`}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('MealGeneration')}
+                  style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: accent }]}
+                >
+                  <Text style={tw`text-sm font-bold text-white`}>Generate Plan</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('MealBuilder')}
+                  style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: accent + '18', borderWidth: 1, borderColor: accent + '30' }]}
+                >
+                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>Build Custom</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {mealsToDisplay.map((meal) => {
             const isChecked = checkedMeals[meal.id];
+            const isViewingToday = selectedDayIndex === todayIndex;
             return (
               <TouchableOpacity
                 key={meal.id}
-                activeOpacity={0.7}
-                onPress={() => toggleMeal(meal.id)}
+                activeOpacity={isViewingToday ? 0.7 : 1}
+                onPress={() => isViewingToday && toggleMeal(meal.id)}
                 style={[
                   tw`rounded-2xl p-4 mb-3`,
                   {

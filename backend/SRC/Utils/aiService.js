@@ -220,26 +220,85 @@ export async function generateAiDietPlan(user) {
   };
 }
 
+const MEAL_TYPE_ORDER = ['breakfast', 'lunch', 'dinner', 'snack'];
+const PREP_TIME_BY_TYPE = { breakfast: 10, lunch: 20, dinner: 25, snack: 5 };
+
+/**
+ * Detect whether a meal object came from the Python AI generator.
+ * Python AI uses calories_target / protein_g / meal_number / suggestions.
+ * Other AI / manual entries use meal_type / nutrition / ingredients.
+ */
+function _isPythonAiMeal(meal) {
+  return meal.calories_target !== undefined || meal.meal_number !== undefined || meal.protein_g !== undefined;
+}
+
+/**
+ * Map a single Python-AI meal to the unified Meal schema used by the Node backend.
+ */
+function _mapPythonAiMeal(meal, index, totalMeals) {
+  // Assign meal type by position (breakfast → lunch → dinner → snack)
+  const typeIdx = totalMeals <= 3
+    ? Math.min(index, 2)               // 3 meals: B / L / D (no snack)
+    : index < MEAL_TYPE_ORDER.length
+      ? index
+      : MEAL_TYPE_ORDER.length - 1;    // 5+ meals: clamp to snack
+  const mealType = MEAL_TYPE_ORDER[typeIdx] || 'snack';
+
+  // Use first suggestion as name, all suggestions as ingredient list
+  const suggestions = Array.isArray(meal.suggestions) && meal.suggestions.length > 0
+    ? meal.suggestions
+    : null;
+  const name = suggestions
+    ? suggestions[0]
+    : `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Meal`;
+
+  // Build a proper ingredient list with measurements where possible
+  const ingredients = suggestions || [name];
+
+  return {
+    type: mealType,
+    name,
+    description: name,
+    servingSize: '1 serving',
+    ingredients,
+    nutrition: {
+      calories: Math.round(meal.calories_target || 0),
+      protein:  Math.round(meal.protein_g  || 0),
+      carbs:    Math.round(meal.carbs_g    || 0),
+      fats:     Math.round(meal.fat_g      || 0),
+    },
+    preparationTime: PREP_TIME_BY_TYPE[mealType] || 15,
+  };
+}
+
 function buildWeeklyMealPlan(mealPlan, macros) {
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  // mealPlan from Python AI is a list of meal objects; repeat for the week
+  const meals = Array.isArray(mealPlan) ? mealPlan : [];
+  const total = meals.length || 1;
+
   return days.map((day) => ({
     day,
-    meals: Array.isArray(mealPlan)
-      ? mealPlan.map((meal) => ({
-          type: meal.meal_type || meal.name || 'meal',
-          name: meal.name || meal.description || 'Meal',
-          description: meal.description || '',
-          ingredients: meal.ingredients || [],
-          nutrition: meal.nutrition || {
-            calories: Math.round((macros.protein * 4 + macros.carbs * 4 + macros.fats * 9) / 4),
-            protein: Math.round(macros.protein / 4),
-            carbs: Math.round(macros.carbs / 4),
-            fats: Math.round(macros.fats / 4),
-          },
-          preparationTime: meal.prep_time || 15,
-        }))
-      : [],
+    meals: meals.map((meal, i) => {
+      // Python AI format
+      if (_isPythonAiMeal(meal)) return _mapPythonAiMeal(meal, i, total);
+
+      // Generic / other AI format — use fields as-is
+      const mealType = meal.meal_type || MEAL_TYPE_ORDER[Math.min(i, MEAL_TYPE_ORDER.length - 1)] || 'meal';
+      return {
+        type: mealType,
+        name: meal.name || meal.description || `${mealType} Meal`,
+        description: meal.description || '',
+        servingSize: meal.servingSize || '1 serving',
+        ingredients: Array.isArray(meal.ingredients) ? meal.ingredients : [],
+        nutrition: meal.nutrition || {
+          calories: Math.round((macros.protein * 4 + macros.carbs * 4 + macros.fats * 9) / total),
+          protein:  Math.round(macros.protein / total),
+          carbs:    Math.round(macros.carbs   / total),
+          fats:     Math.round(macros.fats    / total),
+        },
+        preparationTime: meal.prep_time || PREP_TIME_BY_TYPE[mealType] || 15,
+      };
+    }),
   }));
 }
 

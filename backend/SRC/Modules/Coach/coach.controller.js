@@ -11,13 +11,20 @@ import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 
-// Resolve the User.id from what might be a ClientProfile.id or a raw User.id.
-// The frontend sends ClientProfile.id (from /coach/clients), so we look it up first.
-async function resolveUserId(clientProfileId) {
-  const profile = await ClientProfile.findByPk(clientProfileId);
-  if (profile) return profile.userId;
-  // Fallback: treat the id as a direct userId
-  const user = await User.findByPk(clientProfileId);
+// Resolve the client's User.id from either a raw User.id or a ClientProfile.id.
+// IMPORTANT: try `userId` match BEFORE `findByPk`, otherwise a client's User.id
+// can collide with another row's ClientProfile.id (separate auto-increment sequences)
+// and we would resolve the wrong client → 403 "not assigned to you".
+async function resolveUserId(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) {
+    throw new AppError('Invalid client id', 400);
+  }
+  const byUserId = await ClientProfile.findOne({ where: { userId: n } });
+  if (byUserId) return n;
+  const byProfilePk = await ClientProfile.findByPk(n);
+  if (byProfilePk) return byProfilePk.userId;
+  const user = await User.findByPk(n);
   if (user && user.role === 'client') return user.id;
   throw new AppError('Client not found', 404);
 }
@@ -395,7 +402,9 @@ export const coachController = {
 
   async getClientPendingWorkoutPlans(req, res, next) {
     try {
+      await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(Number(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const plans = await workoutService.getPendingCoachReviewPlans(userId);
       successResponse(res, 200, 'Pending workout plans retrieved', { plans });
     } catch (error) {
@@ -415,7 +424,9 @@ export const coachController = {
 
   async getClientPendingDietPlans(req, res, next) {
     try {
+      await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(Number(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const plans = await dietService.getPendingCoachReviewDietPlans(userId);
       successResponse(res, 200, 'Pending diet plans retrieved', { plans });
     } catch (error) {
@@ -452,6 +463,19 @@ export const coachController = {
       const days = parseInt(req.query.days, 10) || 14;
       const snapshot = await coachService.getClientActivitySnapshot(req.user.id, userId, days);
       successResponse(res, 200, 'Client activity retrieved', snapshot);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /** Per-day meal completion history with named meals — for the coach's client detail view */
+  async getClientDietLogs(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(Number(req.params.clientId));
+      const days = parseInt(req.query.days, 10) || 14;
+      const logs = await coachService.getClientDietLogsDetailed(req.user.id, userId, days);
+      successResponse(res, 200, 'Client diet logs retrieved', { logs });
     } catch (error) {
       next(error);
     }

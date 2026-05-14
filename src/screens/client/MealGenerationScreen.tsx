@@ -70,6 +70,7 @@ interface MealItem {
   carbs: number;
   fat: number;
   serving: string;
+  preparationTime?: number;
   ingredients?: string[];
 }
 
@@ -79,6 +80,7 @@ interface GeneratedMealPlan {
   dayCount: number;
   totalCalories: number;
   dietType: string;
+  macronutrients?: { protein: number; carbs: number; fats: number };
   meals: Array<{
     time: string;
     items: MealItem[];
@@ -97,6 +99,7 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status?: 'pending' | 'app
     dayCount: plan.weeklyMealPlan?.length || 7,
     totalCalories: plan.dailyCalorieTarget,
     dietType: prettyLabel(plan.dietaryPreference) || 'Balanced',
+    macronutrients: plan.macronutrients,
     meals: (firstDay?.meals || []).map(m => ({
       time: m.type.charAt(0).toUpperCase() + m.type.slice(1),
       totalCalories: m.nutrition.calories,
@@ -107,6 +110,7 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status?: 'pending' | 'app
         carbs: m.nutrition.carbs,
         fat: m.nutrition.fats ?? (m.nutrition as any).fat ?? 0,
         serving: (m as any).servingSize || '1 serving',
+        preparationTime: (m as any).preparationTime,
         ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
       }],
     })),
@@ -525,76 +529,142 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   </View>
                 </View>
 
+                {/* Daily macro summary */}
+                {generatedMeal.macronutrients && (
+                  <View style={[tw`rounded-xl p-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
+                    <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: textSecondary }]}>
+                      Daily Macros
+                    </Text>
+                    <View style={tw`flex-row gap-2`}>
+                      {[
+                        { label: 'Protein', value: generatedMeal.macronutrients.protein, unit: 'g', color: '#3b82f6' },
+                        { label: 'Carbs', value: generatedMeal.macronutrients.carbs, unit: 'g', color: '#f59e0b' },
+                        { label: 'Fats', value: generatedMeal.macronutrients.fats, unit: 'g', color: '#10b981' },
+                      ].map((macro) => (
+                        <View key={macro.label} style={[tw`flex-1 items-center rounded-xl py-3`, { backgroundColor: macro.color + '14' }]}>
+                          <Text style={[tw`text-lg font-black`, { color: macro.color }]}>{macro.value}{macro.unit}</Text>
+                          <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>{macro.label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
                 <View>
                   <View style={tw`flex-row items-center justify-between mb-3`}>
                     <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
-                      Sample Day
+                      Sample Day — Day 1
                     </Text>
                     <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                      Tap substitute to change
+                      Tap Sub to swap a meal
                     </Text>
                   </View>
-                  <View style={tw`gap-3`}>
+                  <View style={tw`gap-4`}>
                     {generatedMeal?.meals && Array.isArray(generatedMeal.meals)
                       ? generatedMeal.meals.map((meal, mealIdx) => (
                           <View
                             key={mealIdx}
                             style={[
-                              tw`rounded-xl p-4`,
+                              tw`rounded-2xl overflow-hidden`,
                               { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
                             ]}
                           >
-                            <View style={tw`flex-row items-center justify-between mb-3`}>
-                              <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>
-                                {meal.time}
-                              </Text>
-                              <Text style={[tw`text-xs font-bold`, { color: accent }]}>
-                                {meal.totalCalories} cal
-                              </Text>
+                            {/* Meal type header */}
+                            <View style={[tw`flex-row items-center justify-between px-4 py-3`, { backgroundColor: accent + '14' }]}>
+                              <View style={tw`flex-row items-center gap-2`}>
+                                <MaterialIcons
+                                  name={
+                                    meal.time.toLowerCase() === 'breakfast' ? 'wb-sunny' :
+                                    meal.time.toLowerCase() === 'lunch' ? 'wb-cloudy' :
+                                    meal.time.toLowerCase() === 'dinner' ? 'nights-stay' : 'apple'
+                                  }
+                                  size={18}
+                                  color={accent}
+                                />
+                                <Text style={[tw`font-bold text-base`, { color: accent }]}>
+                                  {meal.time}
+                                </Text>
+                              </View>
+                              <View style={[tw`px-2 py-1 rounded-full`, { backgroundColor: accent + '28' }]}>
+                                <Text style={[tw`text-xs font-black`, { color: accent }]}>
+                                  {meal.totalCalories} kcal
+                                </Text>
+                              </View>
                             </View>
-                            <View style={tw`gap-2`}>
+
+                            {/* Meal items */}
+                            <View style={tw`p-4 gap-4`}>
                               {meal?.items && Array.isArray(meal.items)
                                 ? meal.items.map((item, itemIdx) => (
                                     <View key={itemIdx}>
-                                      <View style={tw`flex-row items-start justify-between`}>
-                                        <View style={tw`flex-1 mr-2`}>
-                                          <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
-                                            {item.name}
-                                          </Text>
-                                          <Text style={[tw`text-xs mt-0.5 font-bold`, { color: accent }]}>
-                                            {item.serving}
-                                          </Text>
-                                          <View style={tw`flex-row gap-3 mt-1`}>
-                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>P:{item.protein}g</Text>
-                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>C:{item.carbs}g</Text>
-                                            <Text style={[tw`text-xs`, { color: '#94a3b8' }]}>F:{item.fat}g</Text>
-                                          </View>
-                                          {/* Ingredient measurements */}
-                                          {item.ingredients && item.ingredients.length > 0 && (
-                                            <View style={[tw`mt-2 p-2 rounded-lg gap-0.5`, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }]}>
-                                              <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mb-1`, { color: textSecondary }]}>
-                                                Ingredients
-                                              </Text>
-                                              {item.ingredients.map((ing, ii) => (
-                                                <View key={ii} style={tw`flex-row items-start gap-1`}>
-                                                  <Text style={[tw`text-[10px]`, { color: accent }]}>•</Text>
-                                                  <Text style={[tw`text-[10px] flex-1`, { color: textSecondary }]}>{ing}</Text>
-                                                </View>
-                                              ))}
-                                            </View>
-                                          )}
-                                        </View>
+                                      {/* Name + substitute button */}
+                                      <View style={tw`flex-row items-start justify-between mb-2`}>
+                                        <Text style={[tw`text-base font-bold flex-1 mr-3`, { color: textPrimary }]}>
+                                          {item.name}
+                                        </Text>
                                         <TouchableOpacity
                                           onPress={() => setSubstituteTarget({ mealIdx, itemIdx })}
                                           style={[
-                                            tw`px-2 py-1 rounded-lg flex-row items-center gap-1 mt-1`,
+                                            tw`px-3 py-1.5 rounded-lg flex-row items-center gap-1`,
                                             { backgroundColor: accent + '18' },
                                           ]}
                                         >
-                                          <MaterialIcons name="swap-horiz" size={13} color={accent} />
+                                          <MaterialIcons name="swap-horiz" size={14} color={accent} />
                                           <Text style={[tw`text-xs font-bold`, { color: accent }]}>Sub</Text>
                                         </TouchableOpacity>
                                       </View>
+
+                                      {/* Serving + prep time row */}
+                                      <View style={tw`flex-row items-center gap-4 mb-3`}>
+                                        <View style={tw`flex-row items-center gap-1`}>
+                                          <MaterialIcons name="restaurant" size={14} color={textSecondary} />
+                                          <Text style={[tw`text-sm font-semibold`, { color: textSecondary }]}>
+                                            {item.serving}
+                                          </Text>
+                                        </View>
+                                        {item.preparationTime != null && item.preparationTime > 0 && (
+                                          <View style={tw`flex-row items-center gap-1`}>
+                                            <MaterialIcons name="timer" size={14} color={textSecondary} />
+                                            <Text style={[tw`text-sm`, { color: textSecondary }]}>
+                                              {item.preparationTime} min
+                                            </Text>
+                                          </View>
+                                        )}
+                                      </View>
+
+                                      {/* Macro pills */}
+                                      <View style={tw`flex-row gap-2 mb-3`}>
+                                        {[
+                                          { label: 'Protein', value: item.protein, color: '#3b82f6' },
+                                          { label: 'Carbs', value: item.carbs, color: '#f59e0b' },
+                                          { label: 'Fat', value: item.fat, color: '#10b981' },
+                                        ].map((m) => (
+                                          <View key={m.label} style={[tw`flex-row items-center gap-1 px-2 py-1 rounded-lg`, { backgroundColor: m.color + '14' }]}>
+                                            <Text style={[tw`text-xs font-bold`, { color: m.color }]}>{m.value}g</Text>
+                                            <Text style={[tw`text-xs`, { color: textSecondary }]}>{m.label}</Text>
+                                          </View>
+                                        ))}
+                                      </View>
+
+                                      {/* Ingredients with measurements */}
+                                      {item.ingredients && item.ingredients.length > 0 && (
+                                        <View style={[tw`rounded-xl p-3`, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                                          <View style={tw`flex-row items-center gap-2 mb-2`}>
+                                            <MaterialIcons name="list-alt" size={15} color={accent} />
+                                            <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>
+                                              Ingredients & Measurements
+                                            </Text>
+                                          </View>
+                                          {item.ingredients.map((ing, ii) => (
+                                            <View key={ii} style={[tw`flex-row items-start gap-2 py-1.5`, ii < item.ingredients!.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                                              <View style={[tw`w-5 h-5 rounded-full items-center justify-center mt-0.5 shrink-0`, { backgroundColor: accent + '22' }]}>
+                                                <Text style={[tw`text-[10px] font-bold`, { color: accent }]}>{ii + 1}</Text>
+                                              </View>
+                                              <Text style={[tw`text-sm flex-1 leading-5`, { color: textPrimary }]}>{ing}</Text>
+                                            </View>
+                                          ))}
+                                        </View>
+                                      )}
                                     </View>
                                   ))
                                 : null}

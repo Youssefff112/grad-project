@@ -347,3 +347,32 @@ export const getClientActivity = async (
     adherence: data?.adherence ?? null,
   };
 };
+
+export interface NamedMealEntry {
+  id: string;
+  name: string;
+  completed: boolean;
+}
+
+export interface DetailedDietLog {
+  id: number;
+  date: string;
+  status: string;
+  waterMl: number | null;
+  caloriesConsumed: number | null;
+  mealsCompleted: Record<string, boolean>;
+  namedMeals: NamedMealEntry[];
+  summary: { total: number; completed: number; pct: number | null };
+}
+
+/**
+ * Per-day meal completion history with named meals for the coach's client detail view.
+ * Returns the last `days` diet logs for the given client.
+ */
+export const getClientDietLogs = async (
+  clientId: number,
+  days = 14
+): Promise<{ logs: DetailedDietLog[] }> => {
+  const response: any = await apiGet(`/coach/clients/${clientId}/diet-logs?days=${days}`);
+  return { logs: Array.isArray(response.data?.logs) ? response.data.logs : [] };
+};

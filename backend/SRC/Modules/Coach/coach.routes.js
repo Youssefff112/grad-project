@@ -42,6 +42,8 @@ router.patch('/plans/diet/:planId', authenticate, restrictTo('coach'), requireAc
 
 // Coach reads a client's adherence (meals, water, workouts)
 router.get('/clients/:clientId/activity', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientActivity);
+// Coach reads per-day meal completion history with named meals
+router.get('/clients/:clientId/diet-logs', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientDietLogs);
 
 // Coach reads a client's measurements
 router.get('/clients/:clientId/measurements', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientMeasurements);

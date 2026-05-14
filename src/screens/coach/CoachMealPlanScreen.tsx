@@ -13,6 +13,8 @@ interface Meal {
   protein: number;
   carbs: number;
   fat: number;
+  servingSize?: string;
+  preparationTime?: number;
   ingredients: string[];
 }
 
@@ -54,6 +56,8 @@ function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; 
         protein: nutrition.protein || meal.protein || 0,
         carbs: nutrition.carbs || nutrition.carbohydrates || meal.carbs || 0,
         fat: nutrition.fats || nutrition.fat || meal.fat || 0,
+        servingSize: meal.servingSize || undefined,
+        preparationTime: meal.preparationTime || undefined,
         ingredients: ingredients.length > 0 ? ingredients : [name],
       };
       if (!groupMap[typeKey]) groupMap[typeKey] = [];
@@ -65,7 +69,9 @@ function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; 
 }
 
 export const CoachMealPlanScreen = ({ navigation, route }: any) => {
-  const { clientId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
+  const { clientId, userId: clientUserId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
+  /** API expects client User.id (same as CoachClientDetail `planClientId`). */
+  const apiClientId = Number(clientUserId ?? clientId);
   const { isDark, accent } = useTheme();
 
   const [planName, setPlanName] = useState('');
@@ -102,7 +108,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   }, []);
 
   useEffect(() => {
-    if (autoGenerate && clientId && !existingPlan) {
+    if (autoGenerate && apiClientId && !existingPlan) {
       handleGenerateWithAI();
     }
   }, []);
@@ -169,13 +175,13 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   };
 
   const handleGenerateWithAI = async () => {
-    if (!clientId) {
+    if (!apiClientId) {
       Alert.alert('No Client', 'Select a client first to generate a plan.');
       return;
     }
     setIsGenerating(true);
     try {
-      const { plan } = await coachService.generateDietForClient(Number(clientId));
+      const { plan } = await coachService.generateDietForClient(apiClientId);
       if (plan) {
         setPlanName(plan.planName || `${plan.goal || 'Diet'} Plan`);
         if (plan.dailyCalorieTarget) setCalorieTarget(String(plan.dailyCalorieTarget));
@@ -183,7 +189,12 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         Alert.alert('Plan Generated', 'The AI diet plan has been loaded. Review and edit it before saving.');
       }
     } catch (err: any) {
-      Alert.alert('Generation Failed', err?.message || 'Could not generate a plan. Make sure the client has completed their profile.');
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Could not generate a plan. The client must be assigned to you (they pick you under Coaches) and have a complete profile with a goal.';
+      Alert.alert('Generation Failed', String(msg));
     } finally {
       setIsGenerating(false);
     }
@@ -258,8 +269,8 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         Alert.alert('Plan Updated', `Diet plan "${planName}" has been updated.`, [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
-      } else if (clientId) {
-        await coachService.assignDietToClient(Number(clientId), {
+      } else if (apiClientId) {
+        await coachService.assignDietToClient(apiClientId, {
           planName,
           dailyCalorieTarget: caloriesNum,
           weeklyMealPlan,
@@ -303,7 +314,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
         {/* AI Generate banner */}
-        {clientId && (
+        {Number.isFinite(apiClientId) && apiClientId > 0 && (
           <TouchableOpacity
             onPress={handleGenerateWithAI}
             disabled={isGenerating}
@@ -406,34 +417,40 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
                 </View>
               )}
               {meals.map((item, i) => (
-                <View key={item.id} style={[tw`p-3 rounded-xl mb-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
-                  <View style={tw`flex-row items-start`}>
+                <View key={item.id} style={[tw`rounded-2xl mb-3 overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                  {/* Meal header */}
+                  <View style={[tw`flex-row items-start justify-between px-3 pt-3 pb-2`]}>
                     <View style={tw`flex-1 pr-2`}>
                       <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{item.name}</Text>
-                      <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>
-                        {item.calories} kcal · P:{item.protein}g · C:{item.carbs}g · F:{item.fat}g
-                      </Text>
-                      <Text style={[tw`text-xs font-bold mt-2 mb-1`, { color: subtextColor }]}>INGREDIENTS</Text>
-                      {(item.ingredients || []).map((ing, j) => (
-                        <TouchableOpacity
-                          key={`${item.id}-ing-${j}`}
-                          onPress={() => setIngredientModal({ itemIndex: i, ingredientIndex: j, draft: ing })}
-                          style={[tw`flex-row items-center py-1.5 border-b`, { borderColor }]}
-                        >
-                          <MaterialIcons name="edit-note" size={16} color={accent} style={tw`mr-2`} />
-                          <Text style={[tw`text-xs flex-1`, { color: textPrimary }]}>{ing}</Text>
-                          <MaterialIcons name="swap-horiz" size={16} color={subtextColor} />
-                        </TouchableOpacity>
-                      ))}
-                      <TouchableOpacity
-                        onPress={() =>
-                          updateMealIngredients(selectedDay, selectedMealType, i, (ings) => [...ings, 'Tap to describe ingredient'])
-                        }
-                        style={tw`flex-row items-center gap-1 mt-2`}
-                      >
-                        <MaterialIcons name="add-circle-outline" size={16} color="#10b981" />
-                        <Text style={[tw`text-xs font-bold`, { color: '#10b981' }]}>Add ingredient line</Text>
-                      </TouchableOpacity>
+                      {/* Serving + prep row */}
+                      <View style={tw`flex-row items-center gap-3 mt-1`}>
+                        {item.servingSize ? (
+                          <View style={tw`flex-row items-center gap-1`}>
+                            <MaterialIcons name="restaurant" size={12} color={accent} />
+                            <Text style={[tw`text-xs`, { color: accent }]}>{item.servingSize}</Text>
+                          </View>
+                        ) : null}
+                        {item.preparationTime ? (
+                          <View style={tw`flex-row items-center gap-1`}>
+                            <MaterialIcons name="timer" size={12} color={subtextColor} />
+                            <Text style={[tw`text-xs`, { color: subtextColor }]}>{item.preparationTime} min</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {/* Macro row */}
+                      <View style={tw`flex-row gap-2 mt-2`}>
+                        {[
+                          { label: 'kcal', value: item.calories, color: '#f59e0b' },
+                          { label: 'P', value: item.protein, color: '#3b82f6', unit: 'g' },
+                          { label: 'C', value: item.carbs, color: '#a855f7', unit: 'g' },
+                          { label: 'F', value: item.fat, color: '#10b981', unit: 'g' },
+                        ].map((m) => (
+                          <View key={m.label} style={[tw`flex-row items-center gap-0.5 px-1.5 py-0.5 rounded-lg`, { backgroundColor: m.color + '14' }]}>
+                            <Text style={[tw`text-xs font-bold`, { color: m.color }]}>{m.value}{m.unit || ''}</Text>
+                            <Text style={[tw`text-[10px]`, { color: subtextColor }]}>{m.label}</Text>
+                          </View>
+                        ))}
+                      </View>
                     </View>
                     <TouchableOpacity
                       onPress={() => {
@@ -444,8 +461,41 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
                           ),
                         }));
                       }}
+                      style={tw`p-1`}
                     >
                       <MaterialIcons name="remove-circle-outline" size={22} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Ingredients section */}
+                  <View style={[tw`mx-3 mb-3 rounded-xl p-3`, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                    <View style={tw`flex-row items-center gap-1.5 mb-2`}>
+                      <MaterialIcons name="list-alt" size={14} color={accent} />
+                      <Text style={[tw`text-xs font-bold uppercase tracking-wide`, { color: accent }]}>
+                        Ingredients &amp; Measurements
+                      </Text>
+                    </View>
+                    {(item.ingredients || []).map((ing, j) => (
+                      <TouchableOpacity
+                        key={`${item.id}-ing-${j}`}
+                        onPress={() => setIngredientModal({ itemIndex: i, ingredientIndex: j, draft: ing })}
+                        style={[tw`flex-row items-center py-2`, j < (item.ingredients || []).length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}
+                      >
+                        <View style={[tw`w-5 h-5 rounded-full items-center justify-center mr-2 shrink-0`, { backgroundColor: accent + '22' }]}>
+                          <Text style={[tw`text-[10px] font-bold`, { color: accent }]}>{j + 1}</Text>
+                        </View>
+                        <Text style={[tw`text-sm flex-1`, { color: textPrimary }]}>{ing}</Text>
+                        <MaterialIcons name="edit-note" size={16} color={subtextColor} />
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      onPress={() =>
+                        updateMealIngredients(selectedDay, selectedMealType, i, (ings) => [...ings, 'Tap to describe ingredient'])
+                      }
+                      style={tw`flex-row items-center gap-1.5 mt-2`}
+                    >
+                      <MaterialIcons name="add-circle-outline" size={16} color="#10b981" />
+                      <Text style={[tw`text-xs font-bold`, { color: '#10b981' }]}>Add ingredient line</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

@@ -46,13 +46,19 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     if (!planPicker?.client) return;
     const { type, client } = planPicker;
     setPlanPicker(null);
-    const params = { clientId: client.id, clientName: client.name, autoGenerate: method === 'ai' };
+    const uid = Number(client.userId);
+    const params = {
+      userId: uid,
+      clientId: uid,
+      clientName: client.name,
+      autoGenerate: method === 'ai',
+    };
     navigation.navigate(type === 'workout' ? 'CoachWorkoutPlan' : 'CoachMealPlan', params);
   };
 
   const mapClient = (c: coachService.CoachClient): ClientRow => ({
     id: String(c.id),
-    userId: c.userId,
+    userId: Number(c.userId),
     name: c.User ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}` : `Client #${c.id}`,
     plan: (c.goals as any)?.primary || 'General Fitness',
     lastCheckin: c.lastActivity || 'Recently',

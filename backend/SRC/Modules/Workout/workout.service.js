@@ -47,11 +47,17 @@ export const workoutService = {
   async approveWorkoutPlan(planId, coachId) {
     const plan = await WorkoutPlan.findByPk(planId);
     if (!plan) throw new AppError('Workout plan not found', 404);
+    const profile = await ClientProfile.findOne({ where: { userId: plan.userId } });
+    const coachNum = Number(coachId);
+    const selected = profile?.selectedCoachId != null ? Number(profile.selectedCoachId) : NaN;
+    if (!profile || !Number.isFinite(selected) || selected !== coachNum) {
+      throw new AppError('You can only approve workout plans for clients assigned to you', 403);
+    }
     // Deactivate old active plan first
     await WorkoutPlan.update({ isActive: false }, { where: { userId: plan.userId, isActive: true } });
     plan.isActive = true;
     plan.pendingCoachReview = false;
-    plan.assignedByCoachId = coachId;
+    plan.assignedByCoachId = coachNum;
     plan.assignedAt = new Date();
     await plan.save();
     return plan;

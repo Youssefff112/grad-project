@@ -261,6 +261,39 @@ async function seed() {
     }
   }
 
+  // ── Assign demo clients to the first seeded coach ──────────────────────────
+  // This allows coaches to generate/manage plans for demo clients without a 403.
+  console.log('\n🔗 Assigning demo clients to demo coaches...');
+  try {
+    const firstCoachEmail = SEED_USERS.find(u => u.role === 'coach')?.email;
+    const firstCoach = firstCoachEmail
+      ? await User.unscoped().findOne({ where: { email: firstCoachEmail } })
+      : null;
+
+    if (firstCoach) {
+      const clientEmails = SEED_USERS.filter(u => u.role === 'client').map(u => u.email);
+      for (const email of clientEmails) {
+        const clientUser = await User.unscoped().findOne({ where: { email } });
+        if (!clientUser) continue;
+        const [profile] = await ClientProfile.findOrCreate({
+          where: { userId: clientUser.id },
+          defaults: { userId: clientUser.id },
+        });
+        // Only assign if not already assigned to another coach
+        if (!profile.selectedCoachId) {
+          await profile.update({ selectedCoachId: firstCoach.id });
+          console.log(`  ✓ Assigned ${email} → ${firstCoachEmail}`);
+        } else {
+          console.log(`  – ${email} already has a coach (id=${profile.selectedCoachId})`);
+        }
+      }
+    } else {
+      console.log('  – No coach found; skipping client assignment.');
+    }
+  } catch (err) {
+    console.warn('  ⚠ Client assignment step failed:', err.message);
+  }
+
   console.log('\n✅ Seed complete.\n');
   console.log('Test credentials (all use password shown below):');
   console.log('─────────────────────────────────────────────────');

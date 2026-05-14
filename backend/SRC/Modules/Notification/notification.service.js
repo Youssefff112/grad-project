@@ -219,4 +219,32 @@ export const notificationService = {
       console.warn('[onWorkoutLogged push]', e?.message || e);
     }
   },
+
+  /** Client generated an AI meal plan that needs coach approval (in-app + optional push). */
+  async notifyCoachPendingClientDietPlan(coachUserId, { clientUserId, clientDisplayName, planId }) {
+    const cid = coachUserId != null ? Number(coachUserId) : NaN;
+    if (!Number.isFinite(cid) || cid <= 0) return;
+    try {
+      const name = (clientDisplayName || '').trim() || 'A client';
+      await Notification.create({
+        userId: cid,
+        channel: 'in_app',
+        title: 'Meal plan pending review',
+        message: `${name} generated an AI meal plan and is waiting for your approval.`,
+        type: 'meal',
+        icon: 'restaurant',
+        read: false,
+        status: 'sent',
+      });
+      await this.sendExpoPushIfEnabled(
+        cid,
+        undefined,
+        'Meal plan pending review',
+        `${name} submitted a meal plan. Open the client → Plans tab to approve.`,
+        { type: 'pending_diet_plan', planId: String(planId ?? ''), clientUserId: String(clientUserId ?? '') },
+      );
+    } catch (e) {
+      console.warn('[notifyCoachPendingClientDietPlan]', e?.message || e);
+    }
+  },
 };

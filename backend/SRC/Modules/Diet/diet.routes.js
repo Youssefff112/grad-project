@@ -11,6 +11,7 @@ router.post('/generate', requireAIPlan('client'), dietController.generatePlan);
 router.get('/active', requireActiveSubscription('client'), dietController.getActivePlan);
 router.delete('/active', requireActiveSubscription('client'), dietController.deletePlan);
 router.post('/track', requireActiveSubscription('client'), dietController.logDietDay);
+router.get('/log', requireActiveSubscription('client'), dietController.getLogForDate);
 router.get('/history', requireActiveSubscription('client'), dietController.getHistory);
 
 export default router;

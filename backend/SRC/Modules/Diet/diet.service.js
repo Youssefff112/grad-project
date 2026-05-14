@@ -22,7 +22,18 @@ export const dietService = {
     // Check if the user has an assigned coach — if so, plan starts as pending review
     const clientProfile = await ClientProfile.findOne({ where: { userId } });
     const hasCoach = !!(clientProfile?.selectedCoachId);
-    return this._generateDietPlanForUser(userId, null, null, hasCoach);
+    const plan = await this._generateDietPlanForUser(userId, null, null, hasCoach);
+    if (hasCoach && plan?.pendingCoachReview && clientProfile?.selectedCoachId) {
+      const coachUid = Number(clientProfile.selectedCoachId);
+      const user = await User.findByPk(userId, { attributes: ['firstName', 'lastName'] });
+      const clientDisplayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
+      void notificationService.notifyCoachPendingClientDietPlan(coachUid, {
+        clientUserId: userId,
+        clientDisplayName,
+        planId: plan.id,
+      });
+    }
+    return plan;
   },
 
   async generateDietPlanForUser(targetUserId, coachId, planName = null) {
@@ -44,10 +55,16 @@ export const dietService = {
   async approveDietPlan(planId, coachId) {
     const plan = await DietPlan.findByPk(planId);
     if (!plan) throw new AppError('Diet plan not found', 404);
+    const profile = await ClientProfile.findOne({ where: { userId: plan.userId } });
+    const coachNum = Number(coachId);
+    const selected = profile?.selectedCoachId != null ? Number(profile.selectedCoachId) : NaN;
+    if (!profile || !Number.isFinite(selected) || selected !== coachNum) {
+      throw new AppError('You can only approve meal plans for clients assigned to you', 403);
+    }
     await DietPlan.update({ isActive: false }, { where: { userId: plan.userId, isActive: true } });
     plan.isActive = true;
     plan.pendingCoachReview = false;
-    plan.assignedByCoachId = coachId;
+    plan.assignedByCoachId = coachNum;
     plan.assignedAt = new Date();
     await plan.save();
     return plan;
@@ -160,6 +177,22 @@ export const dietService = {
     });
 
     return log;
+  },
+
+  /**
+   * Return the DietLog row for a specific calendar date (or null if none exists).
+   * Used by the client app to restore per-day completion state.
+   */
+  async getDietLogForDate(userId, date) {
+    const logDate = date ? new Date(date) : new Date();
+    const startOfDay = new Date(logDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(logDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    const log = await DietLog.findOne({
+      where: { userId, date: { [Op.between]: [startOfDay, endOfDay] } },
+    });
+    return log || null;
   },
 
   async getDietHistory(userId, page = 1, limit = 10) {

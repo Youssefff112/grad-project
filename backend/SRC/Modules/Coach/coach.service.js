@@ -284,10 +284,80 @@ export const coachService = {
   /** Ensures the client user is assigned to this coach (by User.id). */
   async ensureCoachOwnsClient(coachUserId, clientUserId) {
     const profile = await ClientProfile.findOne({ where: { userId: clientUserId } });
-    if (!profile || profile.selectedCoachId !== coachUserId) {
-      throw new AppError('This client is not assigned to you', 403);
+    const coachNum = Number(coachUserId);
+    const selected = profile?.selectedCoachId != null ? Number(profile.selectedCoachId) : NaN;
+    if (!profile || !Number.isFinite(selected) || selected !== coachNum) {
+      throw new AppError(
+        'This client is not assigned to you. Ask the client to choose you as their coach (Coaches tab), then try again.',
+        403
+      );
     }
     return profile;
+  },
+
+  /**
+   * Detailed diet logs for a coach to inspect their client's meal completion history.
+   * Correlates each log's `mealsCompleted` map with the active plan's meal names so the
+   * coach can see exactly which meals were eaten on each day.
+   */
+  async getClientDietLogsDetailed(coachUserId, clientUserId, days = 14) {
+    await this.ensureCoachOwnsClient(coachUserId, clientUserId);
+
+    const daysNum = Math.max(1, Math.min(parseInt(days, 10) || 14, 90));
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - daysNum);
+
+    const [logs, plan] = await Promise.all([
+      DietLog.findAll({
+        where: { userId: clientUserId, date: { [Op.gte]: since } },
+        order: [['date', 'DESC']],
+        limit: 90,
+      }),
+      DietPlan.findOne({
+        where: { userId: clientUserId, isActive: true },
+        order: [['updatedAt', 'DESC']],
+      }),
+    ]);
+
+    const weekly = plan?.weeklyMealPlan || [];
+
+    return logs.map((row) => {
+      const plain = typeof row.get === 'function' ? row.get({ plain: true }) : { ...row };
+
+      // Determine which day of the week this log belongs to so we can look up meal names
+      const dayIndex = new Date(plain.date).getUTCDay(); // 0=Sun
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayName = dayNames[dayIndex];
+      const dayPlan = weekly.find((d) => String(d.day).toLowerCase() === dayName)
+        || weekly[0];
+
+      // Build id→name map for this day
+      const mealNameMap = {};
+      if (dayPlan && Array.isArray(dayPlan.meals)) {
+        dayPlan.meals.forEach((m, idx) => {
+          mealNameMap[`${m.type}-${idx}`] = m.name || `${m.type} ${idx + 1}`;
+        });
+      }
+
+      const mc = plain.mealsCompleted && typeof plain.mealsCompleted === 'object'
+        ? plain.mealsCompleted : {};
+
+      const namedMeals = Object.entries(mc).map(([id, done]) => ({
+        id,
+        name: mealNameMap[id] || id,
+        completed: Boolean(done),
+      }));
+
+      const total = namedMeals.length;
+      const completed = namedMeals.filter((m) => m.completed).length;
+
+      return {
+        ...plain,
+        namedMeals,
+        summary: { total, completed, pct: total > 0 ? Math.round((completed / total) * 100) : null },
+      };
+    });
   },
 
   /**

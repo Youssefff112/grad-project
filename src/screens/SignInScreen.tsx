@@ -54,18 +54,23 @@ export const SignInScreen = ({ navigation }: any) => {
   // Ensures a demo quick-login user has an active subscription for their plan tier in the DB.
   // Called after successful login/auto-register so AI features work immediately.
   const _ensureDemoQuickLoginSubscription = async (mockUser: MockUser) => {
-    const { subscription: existing } = await subscriptionService.getActiveSubscription('client').catch(() => ({ subscription: null }));
+    const subRole: 'client' | 'coach' = mockUser.role === 'coach' ? 'coach' : 'client';
+    const planName = mockUser.role === 'coach' ? 'ProCoach' : mockUser.subscriptionPlan;
+
+    const { subscription: existing } = await subscriptionService.getActiveSubscription(subRole).catch(() => ({ subscription: null }));
     if (existing?.status === 'active') return; // already active — nothing to do
 
-    const planData = PLAN_FEATURES[mockUser.subscriptionPlan];
+    const planData = PLAN_FEATURES[planName] ?? PLAN_FEATURES[mockUser.subscriptionPlan];
+    const price = planData?.price ?? 0;
+
     const { subscription } = await subscriptionService.createSubscription({
-      role: 'client',
-      planName: mockUser.subscriptionPlan,
-      price: planData.price,
+      role: subRole,
+      planName,
+      price,
       autoRenew: true,
     });
     await subscriptionService.recordPayment(subscription.id, {
-      amount: planData.price,
+      amount: price,
       provider: 'demo',
       status: 'paid',
     });

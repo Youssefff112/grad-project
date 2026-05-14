@@ -29,6 +29,15 @@ export const dietController = {
     }
   },
 
+  async getLogForDate(req, res, next) {
+    try {
+      const log = await dietService.getDietLogForDate(req.user.id, req.query.date);
+      successResponse(res, 200, 'Diet log retrieved', { log });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getHistory(req, res, next) {
     try {
       const { page, limit } = req.query;
