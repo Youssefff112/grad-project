@@ -475,6 +475,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
     }
 
     const adherence = clientActivity.adherence as AdherenceSummary | null | undefined;
+    const hasActiveDietPlan =
+      clientActivity.hasActivePlan?.diet ?? adherence?.hasActiveDietPlan ?? true;
     const today = new Date().toISOString().split('T')[0];
     const dlog = clientActivity.dietLogs.find((l: any) => {
       const d = l.date ? new Date(l.date).toISOString().split('T')[0] : '';
@@ -484,9 +486,10 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
       ? Object.values(dlog.mealsCompleted).filter(Boolean).length
       : 0;
     const mealSlots = dlog?.mealsCompleted ? Object.keys(dlog.mealsCompleted).length : 0;
-    const goalMl = adherence?.hydrationGoalMl ?? 2500;
+    // Only show a hydration goal when the client has an active plan.
+    const goalMl = hasActiveDietPlan ? (adherence?.hydrationGoalMl ?? null) : null;
     const waterL = dlog?.waterMl != null ? (Number(dlog.waterMl) / 1000).toFixed(1) : '—';
-    const goalL = (goalMl / 1000).toFixed(1);
+    const goalL = goalMl != null ? (goalMl / 1000).toFixed(1) : null;
     const recentWo = (clientActivity.workoutLogs || []).slice(0, 3);
 
     const bd = adherence?.todayBreakdown;
@@ -521,6 +524,16 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
 
     return (
       <View style={tw`gap-2`}>
+        {/* No active plan banner — shown instead of stale numbers */}
+        {!hasActiveDietPlan && (
+          <View style={[tw`flex-row items-center gap-2 px-3 py-2.5 rounded-xl mb-1`, { backgroundColor: '#f59e0b14', borderWidth: 1, borderColor: '#f59e0b30' }]}>
+            <MaterialIcons name="info-outline" size={15} color="#f59e0b" />
+            <Text style={[tw`text-xs flex-1 leading-relaxed`, { color: '#f59e0b' }]}>
+              Client has no active meal plan. Meal and hydration adherence scores are unavailable until a plan is created.
+            </Text>
+          </View>
+        )}
+
         {adherence && (
           <View style={tw`mb-2`}>
             <View style={tw`flex-row items-end justify-between mb-2`}>
@@ -538,7 +551,9 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
               </View>
             </View>
             <Text style={[tw`text-[10px] leading-relaxed mb-2`, { color: subtextColor }]}>
-              Combined score from whatever applies today: meal check-ins, water vs {goalL} L goal, and completed workout on scheduled training days.
+              {hasActiveDietPlan
+                ? `Combined score: meal check-ins, water vs ${goalL ?? '—'} L goal, and completed workout on training days.`
+                : 'Workout adherence only — no active meal plan.'}
             </Text>
             <View style={tw`flex-row justify-between gap-1`}>
               {(adherence.last7Days || []).map((day) => (
@@ -559,8 +574,19 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
               ))}
             </View>
             <View style={[tw`mt-3 pt-3`, { borderTopWidth: 1, borderColor }]}>
-              {pctBar('Meals (logged)', bd?.meals ?? null)}
-              {pctBar('Hydration (vs plan goal)', bd?.water ?? null, `Goal ${goalL} L from active meal plan`)}
+              {pctBar(
+                hasActiveDietPlan ? 'Meals (logged)' : 'Meals (no active plan)',
+                hasActiveDietPlan ? (bd?.meals ?? null) : null,
+              )}
+              {pctBar(
+                hasActiveDietPlan
+                  ? `Hydration (vs ${goalL ?? '—'} L goal)`
+                  : 'Hydration (no active plan)',
+                hasActiveDietPlan ? (bd?.water ?? null) : null,
+                hasActiveDietPlan && goalL
+                  ? `Goal ${goalL} L from active meal plan`
+                  : 'Create a meal plan to track hydration vs goal.',
+              )}
               {pctBar('Workout (scheduled day)', bd?.workout ?? null, trainHint)}
             </View>
           </View>
@@ -576,7 +602,11 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
         <View style={tw`flex-row justify-between`}>
           <Text style={[tw`text-xs`, { color: subtextColor }]}>Water</Text>
           <Text style={[tw`text-xs font-bold`, { color: textPrimary }]}>
-            {waterL === '—' ? '—' : `${waterL} / ${goalL} L`}
+            {waterL === '—'
+              ? '—'
+              : goalL != null
+                ? `${waterL} / ${goalL} L`
+                : `${waterL} L`}
           </Text>
         </View>
         <View style={tw`mt-1`}>

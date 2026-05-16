@@ -112,13 +112,31 @@ function buildDayMealCountMap(weeklyMealPlan) {
 }
 
 /**
- * Adherence = how closely logged behaviour matches the active plan (meals checked, water vs goal, workout on training days).
- * `weeklyMealPlan` is the array from the active DietPlan so we can use the correct total meals per day as the denominator.
+ * Adherence = how closely logged behaviour matches the active plan.
+ *
+ * `hasActiveDietPlan`  — false when the client has no current active diet plan.
+ *   When false, meal and water scores are forced to null so the coach dashboard
+ *   cannot display stale percentages from a deleted plan's logs.
+ *
+ * `weeklyMealPlan`     — used as the denominator for meal-completion percentages.
+ * `hydrationGoalMl`    — null when no active plan (not a hardcoded default).
  */
-function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingDayKeys, weeklyMealPlan) {
-  const goal = hydrationGoalMl != null && hydrationGoalMl > 0 ? Number(hydrationGoalMl) : 2500;
+function buildAdherenceSummary(
+  dietLogs,
+  workoutLogs,
+  hydrationGoalMl,
+  trainingDayKeys,
+  weeklyMealPlan,
+  hasActiveDietPlan,
+) {
+  // Only use a numeric goal if a plan exists; null suppresses water scores.
+  const goal =
+    hasActiveDietPlan && hydrationGoalMl != null && hydrationGoalMl > 0
+      ? Number(hydrationGoalMl)
+      : null;
+
   const trainSet = new Set((trainingDayKeys || []).map((k) => String(k).toLowerCase()));
-  const dayMealCount = buildDayMealCountMap(weeklyMealPlan);
+  const dayMealCount = buildDayMealCountMap(hasActiveDietPlan ? weeklyMealPlan : []);
 
   const dietByYmd = new Map();
   for (const row of dietLogs) {
@@ -137,9 +155,13 @@ function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingD
   const scoreDay = (ymd) => {
     const dlog = dietByYmd.get(ymd) || null;
     const dayName = utcDayNameForYmd(ymd);
+
+    // Meal and water scores are null when no active diet plan exists — stale logs
+    // must not surface as "current" adherence data.
     const totalPlannedMeals = dayName && dayMealCount[dayName] != null ? dayMealCount[dayName] : undefined;
-    const meal = mealScoreFromDlog(dlog, totalPlannedMeals);
-    const water = waterScoreFromDlog(dlog, goal);
+    const meal = hasActiveDietPlan ? mealScoreFromDlog(dlog, totalPlannedMeals) : null;
+    const water = hasActiveDietPlan ? waterScoreFromDlog(dlog, goal) : null;
+
     let workout = null;
     if (dayName && trainSet.size > 0 && trainSet.has(dayName)) {
       const logs = woByYmd.get(ymd) || [];
@@ -162,6 +184,7 @@ function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingD
 
   return {
     hydrationGoalMl: goal,
+    hasActiveDietPlan,
     trainingDayNames: [...trainSet],
     todayPercent: todayScores.combined,
     todayBreakdown: {
@@ -451,8 +474,11 @@ export const coachService = {
       }),
     ]);
 
-    const hydrationGoalMl =
-      activeDiet?.hydrationGoal != null ? Number(activeDiet.hydrationGoal) : 2500;
+    // Use null (not a hardcoded default) so buildAdherenceSummary can detect "no plan"
+    // and suppress stale meal/water scores that would otherwise show from old logs.
+    const hasActiveDietPlan = activeDiet != null;
+    const hasActiveWorkoutPlan = activeWorkout != null;
+    const hydrationGoalMl = activeDiet?.hydrationGoal != null ? Number(activeDiet.hydrationGoal) : null;
     const trainingDayKeys = trainingDayKeysFromSchedule(activeWorkout?.weeklySchedule);
     const weeklyMealPlan = activeDiet?.weeklyMealPlan || [];
 
@@ -462,12 +488,20 @@ export const coachService = {
     const plainDiet = toPlain(dietLogs);
     const plainWo = toPlain(workoutLogs);
 
-    const adherence = buildAdherenceSummary(plainDiet, plainWo, hydrationGoalMl, trainingDayKeys, weeklyMealPlan);
+    const adherence = buildAdherenceSummary(
+      plainDiet,
+      plainWo,
+      hydrationGoalMl,
+      trainingDayKeys,
+      weeklyMealPlan,
+      hasActiveDietPlan,
+    );
 
     return {
       dietLogs: plainDiet,
       workoutLogs: plainWo,
       adherence,
+      hasActivePlan: { diet: hasActiveDietPlan, workout: hasActiveWorkoutPlan },
     };
   },
 };

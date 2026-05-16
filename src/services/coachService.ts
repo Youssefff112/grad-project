@@ -316,7 +316,9 @@ export const approveClientDietPlan = async (planId: number): Promise<{ plan: any
 };
 
 export interface AdherenceSummary {
-  hydrationGoalMl: number;
+  hydrationGoalMl: number | null;
+  /** False when the client has no active diet plan — scores are null, not stale. */
+  hasActiveDietPlan: boolean;
   trainingDayNames: string[];
   todayPercent: number | null;
   todayBreakdown: {
@@ -332,6 +334,7 @@ export interface ClientActivitySnapshot {
   dietLogs: any[];
   workoutLogs: any[];
   adherence?: AdherenceSummary | null;
+  hasActivePlan?: { diet: boolean; workout: boolean };
 }
 
 /** Meals, water, completed workouts, and computed adherence for an assigned client (last N days). */
@@ -345,6 +348,7 @@ export const getClientActivity = async (
     dietLogs: Array.isArray(data?.dietLogs) ? data.dietLogs : [],
     workoutLogs: Array.isArray(data?.workoutLogs) ? data.workoutLogs : [],
     adherence: data?.adherence ?? null,
+    hasActivePlan: data?.hasActivePlan ?? undefined,
   };
 };
 
