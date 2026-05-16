@@ -37,7 +37,7 @@ const MEAL_ICON_MAP: Record<string, keyof typeof import('@expo/vector-icons').Ma
 
 export const MealsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { fullName } = useUser();
+  const { fullName, userId } = useUser();
   const { totalUnread } = useNotifications();
   const { customMeals } = useFoodManagement();
 
@@ -152,8 +152,24 @@ export const MealsScreen = ({ navigation }: any) => {
   );
 
   /**
+   * Build a base completion map with every meal ID set to false.
+   * This ensures the saved `mealsCompleted` object always contains ALL meal IDs
+   * as keys (including unchecked ones), so the backend can compute correct
+   * percentages (completed / total) rather than (completed / checked).
+   */
+  const buildBaseMealMap = useCallback(
+    (meals: typeof mealsToDisplay): Record<string, boolean> => {
+      const base: Record<string, boolean> = {};
+      meals.forEach((m) => { base[m.id] = false; });
+      return base;
+    },
+    [],
+  );
+
+  /**
    * Load completion state for the currently selected day.
    * Priority: server log → local cache (today only) → all unchecked.
+   * Always merges retrieved data over a full base so every meal ID is present.
    * Fires whenever the selected day or the active plan changes.
    */
   useEffect(() => {
@@ -166,11 +182,15 @@ export const MealsScreen = ({ navigation }: any) => {
     setLogLoading(true);
 
     const load = async () => {
+      // Full base — all meals unchecked; overlaid with whatever was saved
+      const base = buildBaseMealMap(mealsToDisplay);
+
       try {
         const { log } = await dietService.getDietLog(selectedDateStr);
         if (cancelled) return;
-        if (log?.mealsCompleted && Object.keys(log.mealsCompleted).length > 0) {
-          setCheckedMeals(log.mealsCompleted as Record<string, boolean>);
+        if (log?.mealsCompleted) {
+          // Merge: base provides missing keys as false, server log overrides known values
+          setCheckedMeals({ ...base, ...(log.mealsCompleted as Record<string, boolean>) });
           // Restore water intake only for today's log
           if (selectedDateStr === todayStr && log.waterMl != null && log.waterMl > 0) {
             setWaterMlOverride(log.waterMl);
@@ -185,10 +205,10 @@ export const MealsScreen = ({ navigation }: any) => {
       if (cancelled) return;
 
       if (selectedDateStr === todayStr) {
-        // Fall back to local offline cache for today
-        const cached = await offlineService.getCachedMealLog(selectedDateStr);
+        // Fall back to local offline cache for today (user-scoped key)
+        const cached = await offlineService.getCachedMealLog(selectedDateStr, userId);
         if (!cancelled && cached) {
-          setCheckedMeals(cached.checkedMeals);
+          setCheckedMeals({ ...base, ...cached.checkedMeals });
           setWaterGlasses(cached.waterGlasses);
           const w = (cached as { waterMl?: number }).waterMl;
           if (typeof w === 'number' && w > 0) setWaterMlOverride(w);
@@ -197,13 +217,16 @@ export const MealsScreen = ({ navigation }: any) => {
         }
       }
 
-      // No log found — reset to unchecked
-      if (!cancelled) setCheckedMeals({});
+      // No log found — initialise with all meals unchecked
+      if (!cancelled) setCheckedMeals(base);
     };
 
     load().finally(() => { if (!cancelled) setLogLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedDayIndex, activePlan?.id, selectedDateStr, todayStr]);
+  // mealsToDisplay deliberately excluded: it is derived from activePlan + selectedDayIndex
+  // which ARE in the dep array, so rebuilding on plan/day change is correct.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDayIndex, activePlan?.id, selectedDateStr, todayStr, userId]);
 
   // Cache locally + debounce backend save whenever TODAY's meal/water state changes.
   // This effect intentionally skips saving when viewing past/future days — those logs
@@ -213,12 +236,17 @@ export const MealsScreen = ({ navigation }: any) => {
 
     const waterMlEffective = waterMlOverride ?? waterGlasses * WATER_ML_PER_GLASS;
 
+    // Ensure every meal ID is present (unchecked meals explicitly false) so the
+    // backend denominator is always the full assigned meal count, not just the
+    // number of tapped meals.
+    const fullMealMap: Record<string, boolean> = { ...buildBaseMealMap(mealsToDisplay), ...checkedMeals };
+
     offlineService.cacheMealLog(todayStr, {
-      checkedMeals,
+      checkedMeals: fullMealMap,
       waterGlasses,
       date: todayStr,
       waterMl: waterMlEffective,
-    });
+    }, userId);
 
     setSaveStatus('saving');
     if (logTimer.current) clearTimeout(logTimer.current);
@@ -226,7 +254,7 @@ export const MealsScreen = ({ navigation }: any) => {
       try {
         const consumed = mealsToDisplay.reduce(
           (acc, meal) => {
-            if (checkedMeals[meal.id]) {
+            if (fullMealMap[meal.id]) {
               acc.calories += meal.calories;
               acc.protein += meal.protein;
               acc.carbs += meal.carbs;
@@ -236,11 +264,11 @@ export const MealsScreen = ({ navigation }: any) => {
           },
           { calories: 0, protein: 0, carbs: 0, fats: 0 },
         );
-        const allChecked = mealsToDisplay.length > 0 && mealsToDisplay.every((m) => checkedMeals[m.id]);
-        const anyChecked = mealsToDisplay.some((m) => checkedMeals[m.id]);
+        const allChecked = mealsToDisplay.length > 0 && mealsToDisplay.every((m) => fullMealMap[m.id]);
+        const anyChecked = mealsToDisplay.some((m) => fullMealMap[m.id]);
         await dietService.logDietDay({
           date: todayStr,
-          mealsCompleted: checkedMeals,
+          mealsCompleted: fullMealMap,
           caloriesConsumed: consumed.calories,
           macrosConsumed: { protein: consumed.protein, carbs: consumed.carbs, fats: consumed.fats },
           status: allChecked ? 'full' : anyChecked ? 'partial' : 'missed',

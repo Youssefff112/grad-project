@@ -46,14 +46,36 @@ function averageIgnoreNull(values) {
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
 }
 
-function mealScoreFromDlog(dlog) {
+/**
+ * Compute the meal-completion score (0-100) for a single diet-log row.
+ *
+ * `totalPlannedMeals` is the number of meals scheduled on the plan for that
+ * day of the week.  It is used as the denominator when available, which gives
+ * the correct percentage even for clients who have old logs that only contain
+ * keys for meals they actually ate (not the skipped ones).
+ *
+ * Fallback order:
+ *  1. mealsCompleted keys (all keys, both true and false) vs totalPlannedMeals
+ *  2. status enum (followed → 100, partial → 50, missed → 0)
+ */
+function mealScoreFromDlog(dlog, totalPlannedMeals) {
   if (!dlog) return null;
   const mc = dlog.mealsCompleted && typeof dlog.mealsCompleted === 'object' ? dlog.mealsCompleted : {};
-  const keys = Object.keys(mc);
-  if (keys.length > 0) {
-    const done = keys.filter((k) => mc[k]).length;
-    return Math.round((done / keys.length) * 100);
+  const allKeys = Object.keys(mc);
+  const done = allKeys.filter((k) => mc[k]).length;
+
+  if (allKeys.length > 0) {
+    // Use the plan's total as denominator when it is larger (covers skipped meals
+    // that the client never tapped — they wouldn't appear as explicit false keys
+    // in old logs).
+    const total =
+      typeof totalPlannedMeals === 'number' && totalPlannedMeals > allKeys.length
+        ? totalPlannedMeals
+        : allKeys.length;
+    return Math.round((done / total) * 100);
   }
+
+  // No mealsCompleted map at all — fall back to status label
   if (dlog.status === 'followed') return 100;
   if (dlog.status === 'partial') return 50;
   if (dlog.status === 'missed') return 0;
@@ -74,11 +96,29 @@ function trainingDayKeysFromSchedule(weeklySchedule) {
 }
 
 /**
- * Adherence = how closely logged behaviour matches the active plan (meals checked, water vs goal, workout on training days).
+ * Build a map from lowercase day-name → total meals planned for that day.
+ * e.g. { monday: 4, tuesday: 4, ... }
  */
-function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingDayKeys) {
+function buildDayMealCountMap(weeklyMealPlan) {
+  const map = {};
+  if (!Array.isArray(weeklyMealPlan)) return map;
+  for (const dayPlan of weeklyMealPlan) {
+    const dayName = String(dayPlan.day || '').toLowerCase();
+    if (dayName && Array.isArray(dayPlan.meals)) {
+      map[dayName] = dayPlan.meals.length;
+    }
+  }
+  return map;
+}
+
+/**
+ * Adherence = how closely logged behaviour matches the active plan (meals checked, water vs goal, workout on training days).
+ * `weeklyMealPlan` is the array from the active DietPlan so we can use the correct total meals per day as the denominator.
+ */
+function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingDayKeys, weeklyMealPlan) {
   const goal = hydrationGoalMl != null && hydrationGoalMl > 0 ? Number(hydrationGoalMl) : 2500;
   const trainSet = new Set((trainingDayKeys || []).map((k) => String(k).toLowerCase()));
+  const dayMealCount = buildDayMealCountMap(weeklyMealPlan);
 
   const dietByYmd = new Map();
   for (const row of dietLogs) {
@@ -96,9 +136,10 @@ function buildAdherenceSummary(dietLogs, workoutLogs, hydrationGoalMl, trainingD
 
   const scoreDay = (ymd) => {
     const dlog = dietByYmd.get(ymd) || null;
-    const meal = mealScoreFromDlog(dlog);
-    const water = waterScoreFromDlog(dlog, goal);
     const dayName = utcDayNameForYmd(ymd);
+    const totalPlannedMeals = dayName && dayMealCount[dayName] != null ? dayMealCount[dayName] : undefined;
+    const meal = mealScoreFromDlog(dlog, totalPlannedMeals);
+    const water = waterScoreFromDlog(dlog, goal);
     let workout = null;
     if (dayName && trainSet.size > 0 && trainSet.has(dayName)) {
       const logs = woByYmd.get(ymd) || [];
@@ -343,13 +384,21 @@ export const coachService = {
       const mc = plain.mealsCompleted && typeof plain.mealsCompleted === 'object'
         ? plain.mealsCompleted : {};
 
-      const namedMeals = Object.entries(mc).map(([id, done]) => ({
+      // Build the named meals list.
+      // Include every key in mealsCompleted AND every key in mealNameMap so that
+      // meals the client never tapped (implicitly not eaten) still show up.
+      const allMealIds = new Set([...Object.keys(mealNameMap), ...Object.keys(mc)]);
+      const namedMeals = [...allMealIds].map((id) => ({
         id,
         name: mealNameMap[id] || id,
-        completed: Boolean(done),
+        completed: Boolean(mc[id]),
       }));
 
-      const total = namedMeals.length;
+      // Use the plan's meal count for the day as the authoritative total.
+      // This is always >= namedMeals.length and is correct even for old logs
+      // that only stored keys for explicitly tapped meals.
+      const plannedCount = dayPlan && Array.isArray(dayPlan.meals) ? dayPlan.meals.length : 0;
+      const total = Math.max(namedMeals.length, plannedCount);
       const completed = namedMeals.filter((m) => m.completed).length;
 
       return {
@@ -389,10 +438,11 @@ export const coachService = {
     });
 
     const [activeDiet, activeWorkout] = await Promise.all([
+      // Fetch weeklyMealPlan so we know how many meals are assigned per day (correct denominator)
       DietPlan.findOne({
         where: { userId: clientUserId, isActive: true },
         order: [['updatedAt', 'DESC']],
-        attributes: ['hydrationGoal'],
+        attributes: ['hydrationGoal', 'weeklyMealPlan'],
       }),
       WorkoutPlan.findOne({
         where: { userId: clientUserId, isActive: true },
@@ -404,6 +454,7 @@ export const coachService = {
     const hydrationGoalMl =
       activeDiet?.hydrationGoal != null ? Number(activeDiet.hydrationGoal) : 2500;
     const trainingDayKeys = trainingDayKeysFromSchedule(activeWorkout?.weeklySchedule);
+    const weeklyMealPlan = activeDiet?.weeklyMealPlan || [];
 
     const toPlain = (rows) =>
       rows.map((r) => (typeof r.get === 'function' ? r.get({ plain: true }) : r));
@@ -411,7 +462,7 @@ export const coachService = {
     const plainDiet = toPlain(dietLogs);
     const plainWo = toPlain(workoutLogs);
 
-    const adherence = buildAdherenceSummary(plainDiet, plainWo, hydrationGoalMl, trainingDayKeys);
+    const adherence = buildAdherenceSummary(plainDiet, plainWo, hydrationGoalMl, trainingDayKeys, weeklyMealPlan);
 
     return {
       dietLogs: plainDiet,

@@ -25,10 +25,14 @@ export interface CachedMessage {
   timestamp: number;
 }
 
-// Meal caching
-export const cacheMealLog = async (date: string, mealLog: DailyMealLog) => {
+// Meal caching — keys are scoped by userId so different accounts on the same device never share data.
+function mealLogKey(date: string, userId?: string | null): string {
+  return userId ? `meal_log_${userId}_${date}` : `meal_log_${date}`;
+}
+
+export const cacheMealLog = async (date: string, mealLog: DailyMealLog, userId?: string | null) => {
   try {
-    const key = `meal_log_${date}`;
+    const key = mealLogKey(date, userId);
     await AsyncStorage.setItem(key, JSON.stringify(mealLog)).catch((error) => {
       console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
     });
@@ -37,9 +41,9 @@ export const cacheMealLog = async (date: string, mealLog: DailyMealLog) => {
   }
 };
 
-export const getCachedMealLog = async (date: string): Promise<DailyMealLog | null> => {
+export const getCachedMealLog = async (date: string, userId?: string | null): Promise<DailyMealLog | null> => {
   try {
-    const key = `meal_log_${date}`;
+    const key = mealLogKey(date, userId);
     const cached = await AsyncStorage.getItem(key).catch(() => null);
     if (!cached) return null;
     try {
@@ -208,7 +212,7 @@ export const clearAllCache = async () => {
 
     const cacheKeys = keys.filter(
       (key) =>
-        key.startsWith('meal_log_') ||
+        key.startsWith('meal_log_') ||    // covers both meal_log_<date> and meal_log_<uid>_<date>
         key.startsWith('workout_cache_') ||
         key.startsWith('messages_cache_') ||
         key.startsWith('api_cache_')
