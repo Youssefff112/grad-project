@@ -12,6 +12,7 @@ import { RatingStarPicker } from '../../components/RatingStarPicker';
 import { ReviewSubmissionModal } from '../../components/ReviewSubmissionModal';
 import * as coachService from '../../services/coachService';
 import * as clientService from '../../services/clientService';
+import { buildImageUrl } from '../../utils/imageUrl';
 import type { CoachDetail, Review } from '../../services/coachService';
 import { canClientSelectPersonalCoach } from '../../utils/planUtils';
 import { coachDisplayName } from '../../utils/coachDisplayName';
@@ -179,7 +180,7 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
         <View style={tw`items-center pt-8 pb-6 px-4`}>
           <View style={[tw`w-24 h-24 rounded-full overflow-hidden mb-4 items-center justify-center`, { backgroundColor: accent + '20' }]}>
             {coach.profilePicture ? (
-              <Image source={{ uri: coach.profilePicture }} style={tw`w-full h-full`} />
+              <Image source={{ uri: buildImageUrl(coach.profilePicture) }} style={tw`w-full h-full`} />
             ) : (
               <MaterialIcons name="person" size={52} color={accent} />
             )}

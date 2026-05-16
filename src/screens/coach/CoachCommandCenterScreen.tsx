@@ -1,5 +1,18 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+
+const formatLastActive = (value: string | null | undefined): string => {
+  if (!value || value === 'Recently') return 'Recently';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,7 +34,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
 
-  type ClientRow = { id: string; userId: number; name: string; plan: string; lastCheckin: string; progress: number; status: string; };
+  type ClientRow = { id: string; userId: number; name: string; plan: string; lastCheckin: string; lastCheckinRaw: string; progress: number; status: string; };
 
   const [allClients, setAllClients] = useState<ClientRow[]>([]);
   const [analytics, setAnalytics] = useState<coachService.CoachAnalytics>({
@@ -61,7 +74,8 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     userId: Number(c.userId),
     name: c.User ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}` : `Client #${c.id}`,
     plan: (c.goals as any)?.primary || 'General Fitness',
-    lastCheckin: c.lastActivity || 'Recently',
+    lastCheckin: formatLastActive(c.lastActivity),
+    lastCheckinRaw: c.lastActivity || '',
     progress: 0,
     status: c.status || 'active',
   });
@@ -93,13 +107,14 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   // Derive the four most-recent clients and inactive ones
   const recentClients = allClients.slice(0, 4);
 
-  const isInactive = (lastCheckin: string): boolean => {
-    const d = new Date(lastCheckin);
+  const isInactive = (rawDate: string): boolean => {
+    if (!rawDate) return false;
+    const d = new Date(rawDate);
     if (isNaN(d.getTime())) return false;
     return (Date.now() - d.getTime()) > 3 * 24 * 60 * 60 * 1000;
   };
   const inactiveClients = allClients.filter(
-    (c) => c.status === 'active' && isInactive(c.lastCheckin),
+    (c) => c.status === 'active' && isInactive(c.lastCheckinRaw),
   );
 
   const startChat = async (client: ClientRow) => {
@@ -143,7 +158,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           )}
         </TouchableOpacity>
         <Text style={[tw`text-lg font-bold tracking-tighter`, { color: accent }]}>Vertex</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('CoachProfileEdit')} style={tw`flex size-10 items-center justify-center`}>
+        <TouchableOpacity onPress={() => navigation.navigate('CoachSettings')} style={tw`flex size-10 items-center justify-center`}>
           <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
         </TouchableOpacity>
       </View>
@@ -176,30 +191,40 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
         {/* Quick Actions */}
         <View style={tw`px-4 mt-8`}>
           <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: textPrimary }]}>Quick Actions</Text>
-          <View style={tw`flex-row flex-wrap gap-3`}>
-            {[
-              { label: 'Add Client', sub: 'Manage roster', icon: 'person-add' as const, onPress: () => navigation.navigate('CoachClientList'), featured: true },
-              { label: 'New Workout', sub: 'Create program', icon: 'fitness-center' as const, onPress: () => openPlanPicker('workout'), featured: false },
-              { label: 'Meal Plan', sub: 'Assign to client', icon: 'restaurant-menu' as const, onPress: () => openPlanPicker('meal'), featured: false },
-              { label: 'Message', sub: 'Quick chat', icon: 'send' as const, onPress: () => setShowQuickMessage(true), featured: false },
-            ].map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                onPress={item.onPress}
-                style={[
-                  tw`w-[48%] rounded-2xl p-4`,
-                  item.featured
-                    ? { backgroundColor: accent + '18', borderWidth: 1.5, borderColor: accent + '40' }
-                    : { backgroundColor: cardBg, borderWidth: 1, borderColor },
-                ]}
-              >
-                <View style={[tw`w-11 h-11 rounded-xl items-center justify-center mb-3`, { backgroundColor: item.featured ? accent + '28' : accent + '14' }]}>
-                  <MaterialIcons name={item.icon} size={24} color={accent} />
-                </View>
-                <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{item.label}</Text>
-                <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{item.sub}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={tw`gap-3`}>
+            {/* Top row: Workout + Meal Plan */}
+            <View style={tw`flex-row gap-3`}>
+              {[
+                { label: 'New Workout', sub: 'Create program', icon: 'fitness-center' as const, onPress: () => openPlanPicker('workout') },
+                { label: 'Meal Plan', sub: 'Assign to client', icon: 'restaurant-menu' as const, onPress: () => openPlanPicker('meal') },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.label}
+                  onPress={item.onPress}
+                  style={[tw`flex-1 rounded-2xl p-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}
+                >
+                  <View style={[tw`w-11 h-11 rounded-xl items-center justify-center mb-3`, { backgroundColor: accent + '14' }]}>
+                    <MaterialIcons name={item.icon} size={24} color={accent} />
+                  </View>
+                  <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{item.label}</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>{item.sub}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* Full-width Message row */}
+            <TouchableOpacity
+              onPress={() => setShowQuickMessage(true)}
+              style={[tw`w-full rounded-2xl p-4 flex-row items-center gap-4`, { backgroundColor: accent + '18', borderWidth: 1.5, borderColor: accent + '40' }]}
+            >
+              <View style={[tw`w-11 h-11 rounded-xl items-center justify-center`, { backgroundColor: accent + '28' }]}>
+                <MaterialIcons name="send" size={24} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>Message a Client</Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: subtextColor }]}>Open a direct chat with any client</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={accent} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -279,80 +304,6 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
                   </View>
                 </TouchableOpacity>
               ))}
-            </View>
-          </View>
-        )}
-
-        {/* Roster Progress Snapshot */}
-        {allClients.length > 0 && (
-          <View style={tw`px-4 mt-8`}>
-            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: textPrimary }]}>
-              Roster Overview
-            </Text>
-            <View style={[tw`rounded-2xl p-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
-              {/* Active vs Pending bar */}
-              <View style={tw`mb-4`}>
-                <View style={tw`flex-row items-center justify-between mb-2`}>
-                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: subtextColor }]}>Active vs Pending</Text>
-                  <Text style={[tw`text-xs font-black`, { color: textPrimary }]}>
-                    {analytics.activeClients} / {analytics.totalClients || allClients.length}
-                  </Text>
-                </View>
-                <View style={[tw`h-2.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
-                  <View
-                    style={[
-                      tw`h-full rounded-full`,
-                      {
-                        width: `${analytics.totalClients ? Math.round((analytics.activeClients / analytics.totalClients) * 100) : 0}%`,
-                        backgroundColor: accent,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Stat pills */}
-              <View style={tw`flex-row gap-2`}>
-                {[
-                  { label: 'Total', value: analytics.totalClients || allClients.length, color: accent },
-                  { label: 'Active', value: analytics.activeClients, color: '#10b981' },
-                  { label: 'Pending', value: analytics.pendingClients, color: '#f59e0b' },
-                  ...(analytics.totalSessions != null ? [{ label: 'Sessions', value: analytics.totalSessions, color: '#8b5cf6' }] : []),
-                ].map((s) => (
-                  <View
-                    key={s.label}
-                    style={[tw`flex-1 items-center py-3 rounded-xl`, { backgroundColor: s.color + '12' }]}
-                  >
-                    <Text style={[tw`text-base font-black`, { color: s.color }]}>{s.value}</Text>
-                    <Text style={[tw`text-[10px] font-bold uppercase tracking-wide mt-0.5`, { color: subtextColor }]}>{s.label}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Inactive warning pill */}
-              {inactiveClients.length > 0 && (
-                <View style={[tw`flex-row items-center gap-2 mt-3 px-3 py-2 rounded-xl`, { backgroundColor: '#f59e0b12' }]}>
-                  <MaterialIcons name="warning-amber" size={14} color="#f59e0b" />
-                  <Text style={[tw`text-xs font-semibold flex-1`, { color: '#f59e0b' }]}>
-                    {inactiveClients.length} client{inactiveClients.length > 1 ? 's' : ''} inactive for 3+ days
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Hydration: coaches set targets in meal plans; clients log intake in the app */}
-        {allClients.filter((c) => c.status === 'active').length > 0 && (
-          <View style={tw`px-4 mt-8`}>
-            <View style={[tw`rounded-2xl p-4 flex-row gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
-              <MaterialIcons name="water-drop" size={22} color="#38bdf8" style={tw`mt-0.5`} />
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Water goals vs. intake</Text>
-                <Text style={[tw`text-xs mt-1 leading-relaxed`, { color: subtextColor }]}>
-                  Set how much water each client should aim for in their active meal plan (hydration goal). Only the client logs glasses or litres in the app—you do not log water for them.
-                </Text>
-              </View>
             </View>
           </View>
         )}

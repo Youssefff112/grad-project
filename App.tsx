@@ -106,10 +106,11 @@ function AppNavigator() {
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
+        animationDuration: 250,
+        freezeOnBlur: true,
         gestureEnabled: true,
-        gestureDirection: 'horizontal',
         contentStyle: {
-          backgroundColor: isDark ? '#0a0a12' : '#f8f7f5',
+          backgroundColor: isDark ? '#08080f' : '#f8f7f5',
         },
       }}
     >

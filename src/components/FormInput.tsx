@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
+  Animated,
   TextInput,
   View,
   Text,
@@ -32,16 +33,56 @@ export const FormInput: React.FC<FormInputProps> = ({
   disabled = false,
   value,
   onChangeText,
+  onFocus,
+  onBlur,
   ...props
 }) => {
-  const { isDark, accent } = useTheme();
+  const { isDark, accent, colors } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
 
-  const inputBg = isDark ? '#1e293b' : '#ffffff';
-  const inputBorder = error ? '#ef4444' : isDark ? 'rgba(255,255,255,0.1)' : accent + '18';
-  const inputText = isDark ? '#ffffff' : '#1e293b';
-  const labelColor = isDark ? '#e2e8f0' : '#1e293b';
-  const helperColor = error ? '#ef4444' : isDark ? '#94a3b8' : '#64748b';
+  // Animated border glow on focus
+  const focusAnim = useRef(new Animated.Value(0)).current;
+
+  const handleFocus = useCallback(
+    (e: any) => {
+      Animated.timing(focusAnim, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: false,
+      }).start();
+      onFocus?.(e);
+    },
+    [focusAnim, onFocus],
+  );
+
+  const handleBlur = useCallback(
+    (e: any) => {
+      Animated.timing(focusAnim, {
+        toValue: 0,
+        duration: 160,
+        useNativeDriver: false,
+      }).start();
+      onBlur?.(e);
+    },
+    [focusAnim, onBlur],
+  );
+
+  const animatedBorderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      error ? colors.error : colors.inputBorder,
+      error ? colors.error : accent + '90',
+    ],
+  });
+
+  const animatedBorderWidth = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.5, 2],
+  });
+
+  const labelColor = isDark ? colors.textSecondary : colors.text;
+  const helperColor = error ? colors.error : colors.textMuted;
+  const inputText = colors.text;
 
   return (
     <View style={tw`flex-col gap-2`}>
@@ -55,32 +96,39 @@ export const FormInput: React.FC<FormInputProps> = ({
           >
             {label}
           </Text>
-          {required && <Text style={{ color: '#ef4444' }}>*</Text>}
+          {required && <Text style={{ color: colors.error }}>*</Text>}
         </View>
       )}
 
-      <View style={tw`relative`}>
+      <Animated.View
+        style={[
+          tw`relative w-full rounded-2xl overflow-hidden`,
+          {
+            borderWidth: animatedBorderWidth,
+            borderColor: animatedBorderColor,
+            backgroundColor: disabled
+              ? isDark ? colors.bg : '#f5f5f5'
+              : colors.inputBg,
+            opacity: disabled ? 0.5 : 1,
+          },
+        ]}
+      >
         <TextInput
           style={[
-            tw`w-full h-14 rounded-xl px-4 pr-12 text-lg`,
-            {
-              backgroundColor: disabled ? (isDark ? '#0a0a12' : '#f5f5f5') : inputBg,
-              borderWidth: 2,
-              borderColor: inputBorder,
-              color: inputText,
-              opacity: disabled ? 0.5 : 1,
-            },
+            tw`w-full h-14 px-4 pr-12 text-base`,
+            { color: inputText },
           ]}
           placeholder={placeholder}
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={colors.textMuted}
           editable={!disabled}
           secureTextEntry={isPassword && !showPassword}
           value={value}
           onChangeText={onChangeText}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           {...props}
         />
 
-        {/* Right Icon (password toggle or custom icon) */}
         {isPassword ? (
           <TouchableOpacity
             onPress={() => setShowPassword(!showPassword)}
@@ -90,24 +138,21 @@ export const FormInput: React.FC<FormInputProps> = ({
             <MaterialIcons
               name={showPassword ? 'visibility' : 'visibility-off'}
               size={22}
-              color="#94a3b8"
+              color={colors.textMuted}
             />
           </TouchableOpacity>
         ) : icon ? (
-          <View style={tw`absolute right-4 top-4`}>
-            {icon}
-          </View>
+          <View style={tw`absolute right-4 top-4`}>{icon}</View>
         ) : null}
-      </View>
+      </Animated.View>
 
-      {/* Error or Helper Text */}
       {(error || helperText) && (
         <View style={tw`flex-row items-center gap-1 px-1`}>
           {error && (
-            <MaterialIcons name="error" size={14} color="#ef4444" />
+            <MaterialIcons name="error" size={14} color={colors.error} />
           )}
           <Text style={[tw`text-xs font-medium`, { color: helperColor }]}>
-            {error ? (helperText || 'Error') : helperText}
+            {error ? helperText || 'Error' : helperText}
           </Text>
         </View>
       )}

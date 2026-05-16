@@ -18,7 +18,25 @@ interface Meal {
   ingredients: string[];
 }
 
+interface MealGroup {
+  type: string;
+  clockTime: string;
+  items: Meal[];
+}
+
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+
+const MEAL_DEFAULT_TIMES: Record<string, string> = {
+  Breakfast: '08:00',
+  Lunch: '13:00',
+  Dinner: '19:00',
+  Snack: '16:00',
+};
+
+function timeToMinutes(t: string): number {
+  const [h, m] = (t || '00:00').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -32,15 +50,16 @@ function mealTypeLabel(type: string): string {
 }
 
 // Map backend weeklyMealPlan → UI dayPlans format
-function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; items: Meal[] }[]> {
-  const result: Record<string, { type: string; items: Meal[] }[]> = {};
+function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, MealGroup[]> {
+  const result: Record<string, MealGroup[]> = {};
   weeklyMealPlan.forEach((dayEntry: any) => {
     const idx = DAY_FULL_NAMES.indexOf((dayEntry.day || '').toLowerCase());
     if (idx === -1) return;
     const label = DAY_LABELS[idx];
-    const groupMap: Record<string, Meal[]> = {};
+    const groupMap: Record<string, { items: Meal[]; clockTime: string }> = {};
     (dayEntry.meals || []).forEach((meal: any, i: number) => {
       const typeKey = mealTypeLabel(meal.type || meal.mealType || '');
+      const clockTime = meal.clockTime || MEAL_DEFAULT_TIMES[typeKey] || '12:00';
       const nutrition = meal.nutrition || meal.macros || {};
       const rawIng = meal.ingredients;
       const ingredients = Array.isArray(rawIng)
@@ -60,10 +79,13 @@ function mapMealPlanToUI(weeklyMealPlan: any[]): Record<string, { type: string; 
         preparationTime: meal.preparationTime || undefined,
         ingredients: ingredients.length > 0 ? ingredients : [name],
       };
-      if (!groupMap[typeKey]) groupMap[typeKey] = [];
-      groupMap[typeKey].push(item);
+      if (!groupMap[typeKey]) groupMap[typeKey] = { items: [], clockTime };
+      groupMap[typeKey].items.push(item);
     });
-    result[label] = Object.entries(groupMap).map(([type, items]) => ({ type, items }));
+    const groups = Object.entries(groupMap).map(([type, { items, clockTime }]) => ({ type, clockTime, items }));
+    // Sort ascending by clockTime
+    groups.sort((a, b) => timeToMinutes(a.clockTime) - timeToMinutes(b.clockTime));
+    result[label] = groups;
   });
   return result;
 }
@@ -78,7 +100,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   const [calorieTarget, setCalorieTarget] = useState('2000');
   const [selectedDay, setSelectedDay] = useState('Mon');
   const [selectedMealType, setSelectedMealType] = useState('Breakfast');
-  const [dayPlans, setDayPlans] = useState<Record<string, { type: string; items: Meal[] }[]>>({});
+  const [dayPlans, setDayPlans] = useState<Record<string, MealGroup[]>>({});
   const [showFoodPicker, setShowFoodPicker] = useState(false);
   const [customFoodName, setCustomFoodName] = useState('');
   const [customCalories, setCustomCalories] = useState('');
@@ -87,6 +109,8 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   const [customFat, setCustomFat] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editingTimeForType, setEditingTimeForType] = useState<string | null>(null);
+  const [editingTimeValue, setEditingTimeValue] = useState('');
   const [ingredientModal, setIngredientModal] = useState<{
     itemIndex: number;
     ingredientIndex: number;
@@ -120,6 +144,18 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
   const getDayMeals = (day: string) => dayPlans[day] || [];
 
+  const handleUpdateClockTime = (day: string, mealType: string, newTime: string) => {
+    if (!/^\d{1,2}:\d{2}$/.test(newTime)) return;
+    setDayPlans(prev => {
+      const updated = (prev[day] || []).map(g =>
+        g.type === mealType ? { ...g, clockTime: newTime } : g,
+      );
+      updated.sort((a, b) => timeToMinutes(a.clockTime) - timeToMinutes(b.clockTime));
+      return { ...prev, [day]: updated };
+    });
+    setEditingTimeForType(null);
+  };
+
   const getDayCalories = (day: string) =>
     getDayMeals(day).reduce((total, group) =>
       total + group.items.reduce((t, item) => t + item.calories, 0), 0);
@@ -145,7 +181,8 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           ),
         };
       }
-      return { ...prev, [selectedDay]: [...dayData, { type: selectedMealType, items: [mealItem] }] };
+      const newGroup: MealGroup = { type: selectedMealType, clockTime: MEAL_DEFAULT_TIMES[selectedMealType] || '12:00', items: [mealItem] };
+      return { ...prev, [selectedDay]: [...dayData, newGroup] };
     });
     setShowFoodPicker(false);
     setCustomFoodName('');
@@ -389,11 +426,11 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         </View>
 
         {/* Meal type selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-4`} contentContainerStyle={tw`px-4 gap-2`}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-2`} contentContainerStyle={tw`px-4 gap-2`}>
           {MEAL_TYPES.map(type => (
             <TouchableOpacity
               key={type}
-              onPress={() => setSelectedMealType(type)}
+              onPress={() => { setSelectedMealType(type); setEditingTimeForType(null); }}
               style={[tw`px-4 py-2 rounded-full`, {
                 backgroundColor: selectedMealType === type ? accent + '20' : isDark ? '#1e293b' : '#e2e8f0',
                 borderWidth: 1,
@@ -404,6 +441,40 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        {/* Editable clock time for selected meal type */}
+        {(() => {
+          const currentClockTime = getDayMeals(selectedDay).find(g => g.type === selectedMealType)?.clockTime ?? MEAL_DEFAULT_TIMES[selectedMealType] ?? '12:00';
+          return editingTimeForType === selectedMealType ? (
+            <View style={tw`flex-row items-center gap-2 mb-4`}>
+              <MaterialIcons name="schedule" size={16} color={accent} />
+              <TextInput
+                value={editingTimeValue}
+                onChangeText={setEditingTimeValue}
+                placeholder="HH:MM"
+                placeholderTextColor={subtextColor}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                style={[tw`flex-1 text-sm font-bold px-3 py-2 rounded-xl`, { color: accent, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderWidth: 1, borderColor: accent + '40' }]}
+                autoFocus
+              />
+              <TouchableOpacity onPress={() => handleUpdateClockTime(selectedDay, selectedMealType, editingTimeValue)} style={[tw`px-3 py-2 rounded-xl`, { backgroundColor: accent }]}>
+                <Text style={tw`text-white text-xs font-bold`}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEditingTimeForType(null)}>
+                <MaterialIcons name="close" size={18} color={subtextColor} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => { setEditingTimeForType(selectedMealType); setEditingTimeValue(currentClockTime); }}
+              style={tw`flex-row items-center gap-1.5 mb-4`}
+            >
+              <MaterialIcons name="schedule" size={14} color={accent} />
+              <Text style={[tw`text-xs font-semibold`, { color: accent }]}>{currentClockTime}</Text>
+              <MaterialIcons name="edit" size={12} color={accent} />
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* Meals for selected day/type */}
         {(() => {

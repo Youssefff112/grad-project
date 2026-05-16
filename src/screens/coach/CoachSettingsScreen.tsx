@@ -150,16 +150,11 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
           { borderBottomWidth: 1, borderColor },
         ]}
       >
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={tw`flex size-12 items-center justify-center`}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={accent} />
-        </TouchableOpacity>
+        <View style={tw`w-12`} />
         <Text
           style={[tw`text-lg font-bold tracking-tight flex-1 text-center`, { color: textPrimary }]}
         >
-          Settings
+          Profile
         </Text>
         <View style={tw`w-12`} />
       </View>
@@ -316,7 +311,7 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <CoachBottomNav activeId="settings" navigation={navigation} totalUnread={totalUnread} />
+      <CoachBottomNav activeId="profile" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

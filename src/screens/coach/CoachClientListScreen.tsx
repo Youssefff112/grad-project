@@ -9,6 +9,20 @@ import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 import * as coachService from '../../services/coachService';
 
+/** Format an ISO date string as "May 16, 2:30 PM" — or return "Recently" for invalid values. */
+const formatLastActive = (value: string | null | undefined): string => {
+  if (!value || value === 'Recently') return 'Recently';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 type ClientStatus = 'active' | 'pending' | 'inactive';
 
 interface Client {
@@ -45,21 +59,41 @@ export const CoachClientListScreen = ({ navigation }: any) => {
       const mapped: Client[] = raw.map((c) => {
         const uid = c.userId != null ? Number(c.userId) : NaN;
         return {
-        id: String(c.id),
-        userId: String(Number.isFinite(uid) ? uid : c.id),
-        name: c.User
-          ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}`
-          : `Client #${c.id}`,
-        email: c.User?.email || '',
-        plan: (c.goals as any)?.primary || 'General Fitness',
-        status: (c.status as ClientStatus) || 'active',
-        joinedDate: '',
-        lastActivity: c.lastActivity || 'Recently',
-        progress: 0,
-        weight: null,
-      };
+          id: String(c.id),
+          userId: String(Number.isFinite(uid) ? uid : c.id),
+          name: c.User
+            ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}`
+            : `Client #${c.id}`,
+          email: c.User?.email || '',
+          plan: (c.goals as any)?.primary || 'General Fitness',
+          status: (c.status as ClientStatus) || 'active',
+          joinedDate: '',
+          lastActivity: formatLastActive(c.lastActivity),
+          progress: 0,
+          weight: null,
+        };
       });
-      setClients(mapped);
+
+      // Fetch today's adherence for every active client in parallel.
+      // todayPercent is the real meal/workout completion percentage for the day.
+      const activeClients = mapped.filter((c) => c.status === 'active');
+      const activityResults = await Promise.allSettled(
+        activeClients.map((c) =>
+          coachService.getClientActivity(Number(c.id), 1),
+        ),
+      );
+      const progressById: Record<string, number> = {};
+      activityResults.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          const pct = result.value.adherence?.todayPercent;
+          progressById[activeClients[idx].id] = pct != null ? Math.round(pct) : 0;
+        }
+      });
+
+      setClients(mapped.map((c) => ({
+        ...c,
+        progress: progressById[c.id] ?? c.progress,
+      })));
     } catch {
       setClients([]);
     } finally {

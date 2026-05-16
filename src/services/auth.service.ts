@@ -62,6 +62,7 @@ export interface User {
     allergies?: string[];
     notificationSettings?: any;
     bodyFat?: number;
+    lastPlanReviewDate?: string;
     canUseComputerVision?: boolean;
     canUseAIAssistant?: boolean;
   };

@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
-  variant?: 'default' | 'elevated' | 'outlined' | 'filled';
+  variant?: 'default' | 'elevated' | 'outlined' | 'filled' | 'glass';
   padding?: 'sm' | 'md' | 'lg' | 'none';
 }
 
@@ -16,7 +16,7 @@ export const Card: React.FC<CardProps> = ({
   style,
   ...props
 }) => {
-  const { isDark, accent } = useTheme();
+  const { isDark, accent, colors } = useTheme();
 
   const paddingMap = {
     none: '',
@@ -27,39 +27,54 @@ export const Card: React.FC<CardProps> = ({
 
   const variantStyles = {
     default: {
-      backgroundColor: isDark ? '#111128' : '#ffffff',
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      borderColor: colors.cardBorder,
       shadowColor: 'transparent',
     },
     elevated: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      borderWidth: 0,
-      shadowColor: accent,
+      backgroundColor: isDark ? colors.bgSurface : '#ffffff',
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? colors.cardBorder : 'transparent',
+      shadowColor: isDark ? accent : '#000000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 4,
+      shadowOpacity: isDark ? 0.20 : 0.08,
+      shadowRadius: 12,
+      elevation: 6,
     },
     outlined: {
       backgroundColor: 'transparent',
-      borderWidth: 2,
-      borderColor: accent + '40',
+      borderWidth: 1.5,
+      borderColor: accent + '50',
+      shadowColor: 'transparent',
     },
     filled: {
-      backgroundColor: isDark ? '#1e293b' : accent + '08',
+      backgroundColor: isDark ? colors.bgSurface : accent + '08',
       borderWidth: 0,
       borderColor: 'transparent',
+      shadowColor: 'transparent',
+    },
+    glass: {
+      backgroundColor: isDark
+        ? 'rgba(255,255,255,0.05)'
+        : 'rgba(255,255,255,0.75)',
+      borderWidth: 1,
+      borderColor: isDark
+        ? 'rgba(255,255,255,0.10)'
+        : 'rgba(255,255,255,0.90)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.25 : 0.06,
+      shadowRadius: 8,
+      elevation: 3,
     },
   };
-
-  const selectedVariant = variantStyles[variant];
 
   return (
     <View
       style={[
-        tw`rounded-xl ${paddingMap[padding]}`,
-        selectedVariant,
+        tw`rounded-2xl ${paddingMap[padding]}`,
+        variantStyles[variant],
         style,
       ]}
       {...props}

@@ -13,19 +13,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
-import { apiPatch, apiPost } from '../services/api';
+import { apiPatch, apiPost, apiUpload } from '../services/api';
+import * as imageUploadService from '../services/imageUploadService';
+import { buildImageUrl } from '../utils/imageUrl';
 
 type Section = 'profile' | 'password';
 
 export const EditProfileScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { fullName, email, setFullName, setEmail } = useUser();
+  const { fullName, email, setFullName, setEmail, syncProfileFromServer, profilePicture } = useUser();
 
   const [activeSection, setActiveSection] = useState<Section>('profile');
   const [name, setName] = useState(fullName ?? '');
@@ -45,44 +46,25 @@ export const EditProfileScreen = ({ navigation }: any) => {
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
-  const handlePickPhoto = async () => {
+  const handleChangePhoto = async () => {
+    const image = await imageUploadService.pickImageWithChoice();
+    if (!image) return;
+    // Show local preview immediately
+    setPhotoUri(image.uri);
+    setIsSaving(true);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        setPhotoUri(result.assets[0].uri);
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to pick image');
+      const formData = imageUploadService.createFormDataForImage(image, 'image');
+      const res: any = await apiUpload('/user/profile-picture', formData);
+      // Server returns imageUrl (relative path) — sync context so all screens update
+      await syncProfileFromServer();
+      // Keep local preview (already set); context sync will carry the server URL
+    } catch (err: any) {
+      setPhotoUri(null);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to upload photo.';
+      Alert.alert('Upload Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
-  };
-
-  const handleTakePhoto = async () => {
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        setPhotoUri(result.assets[0].uri);
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to take photo');
-    }
-  };
-
-  const showPhotoOptions = () => {
-    Alert.alert('Change Profile Photo', 'Choose a source', [
-      { text: 'Take Photo', onPress: handleTakePhoto },
-      { text: 'Choose from Library', onPress: handlePickPhoto },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
   };
 
   const handleSaveProfile = async () => {
@@ -112,9 +94,9 @@ export const EditProfileScreen = ({ navigation }: any) => {
     } catch (err: any) {
       const msg =
         err.response?.data?.message ||
-        err.message === 'Network Error'
+        (err.message === 'Network Error'
           ? 'Cannot reach the server. Check your connection.'
-          : 'Failed to save profile. Please try again.';
+          : err.message || 'Failed to save profile. Please try again.');
       Alert.alert('Error', msg);
     } finally {
       setIsSaving(false);
@@ -225,8 +207,11 @@ export const EditProfileScreen = ({ navigation }: any) => {
             <>
               {/* Avatar */}
               <View style={tw`items-center pt-4 pb-6`}>
-                {photoUri ? (
-                  <Image source={{ uri: photoUri }} style={tw`w-24 h-24 rounded-full mb-3`} />
+                {(photoUri || profilePicture) ? (
+                  <Image
+                    source={{ uri: photoUri ?? buildImageUrl(profilePicture) ?? undefined }}
+                    style={tw`w-24 h-24 rounded-full mb-3`}
+                  />
                 ) : (
                   <View
                     style={[
@@ -242,7 +227,7 @@ export const EditProfileScreen = ({ navigation }: any) => {
                     tw`px-4 py-2 rounded-full gap-2 flex-row items-center`,
                     { backgroundColor: accent + '18' },
                   ]}
-                  onPress={showPhotoOptions}
+                  onPress={handleChangePhoto}
                 >
                   <MaterialIcons name="camera-alt" size={16} color={accent} />
                   <Text style={[tw`text-sm font-bold`, { color: accent }]}>Change Photo</Text>

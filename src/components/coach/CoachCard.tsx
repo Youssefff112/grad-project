@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Coach } from '../../services/coachService';
 import { coachDisplayName } from '../../utils/coachDisplayName';
 import { formatCoachRating } from '../../utils/coachRating';
+import { buildImageUrl } from '../../utils/imageUrl';
 
 export interface CoachCardProps {
   coach: Coach & { displayName?: string };
@@ -75,7 +76,7 @@ export const CoachCard: React.FC<CoachCardProps> = ({
             ]}
           >
             {coach.profilePicture ? (
-              <Image source={{ uri: coach.profilePicture }} style={tw`w-full h-full`} />
+              <Image source={{ uri: buildImageUrl(coach.profilePicture) }} style={tw`w-full h-full`} />
             ) : (
               <MaterialIcons name="person" size={32} color={accent} />
             )}

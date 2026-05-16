@@ -224,6 +224,36 @@ export const apiDelete = <T = any>(url: string, config?: any): Promise<T> => {
 };
 
 /**
+ * Upload FormData via fetch (not axios) so React Native can inject the
+ * correct multipart/form-data boundary automatically.
+ * Axios's default `Content-Type: application/json` header interferes with
+ * FormData boundary generation, causing server-side parse failures.
+ */
+export const apiUpload = async <T = any>(url: string, formData: FormData): Promise<T> => {
+  const token = await tokenManager.getAccessToken();
+  const fullUrl = `${environment.API_BASE_URL}${url}`;
+
+  const response = await fetch(fullUrl, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // No Content-Type — React Native fetch sets multipart/form-data + boundary automatically
+    },
+    body: formData,
+  });
+
+  const json = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const err = new Error(json.message || `Upload failed (${response.status})`) as any;
+    err.response = { status: response.status, data: json };
+    throw err;
+  }
+
+  return json as T;
+};
+
+/**
  * Health check - Check if backend is available
  */
 export const checkBackendHealth = async (): Promise<boolean> => {

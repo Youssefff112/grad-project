@@ -22,6 +22,8 @@ interface UIConversation {
   id: string;
   name: string;
   avatar: string;
+  /** Relative server path or null — built into full URL with buildImageUrl */
+  otherUserAvatar: string | null;
   lastMessage: string;
   time: string;
   unread: number;
@@ -84,11 +86,18 @@ export const MessagesScreen = ({ navigation }: any) => {
               : 'New conversation started';
 
             const unreadCount = Math.max(0, Math.floor(Number(conv.unreadCount)) || 0);
+            // Extract profile picture from the other party (profile is a JSONB object)
+            const otherProfile = (otherParty as any)?.profile;
+            const otherUserAvatar: string | null =
+              typeof otherProfile?.profilePicture === 'string' && otherProfile.profilePicture
+                ? otherProfile.profilePicture
+                : null;
 
             return {
               id: conv.id,
               name: otherName,
-              avatar: isMeCoach ? 'person' : 'fitness-center', // icon logic
+              avatar: isMeCoach ? 'person' : 'fitness-center',
+              otherUserAvatar,
               lastMessage: lastMsg,
               time: timeStr,
               unread: unreadCount,
@@ -146,6 +155,7 @@ export const MessagesScreen = ({ navigation }: any) => {
     navigation.navigate('Chat', {
       conversationId: conversation.id,
       conversationName: conversation.name,
+      otherUserAvatar: conversation.otherUserAvatar ?? null,
       ...(conversation.otherUserId != null ? { receiverId: conversation.otherUserId } : {}),
     });
   };
@@ -231,16 +241,18 @@ export const MessagesScreen = ({ navigation }: any) => {
                   )}
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={openNewMessage}>
-                <View
-                  style={[
-                    tw`w-12 h-12 rounded-full items-center justify-center`,
-                    { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
-                  ]}
-                >
-                  <MaterialIcons name="edit" size={20} color={accent} />
-                </View>
-              </TouchableOpacity>
+              {isCoach && (
+                <TouchableOpacity onPress={openNewMessage}>
+                  <View
+                    style={[
+                      tw`w-12 h-12 rounded-full items-center justify-center`,
+                      { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
+                    ]}
+                  >
+                    <MaterialIcons name="edit" size={20} color={accent} />
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>

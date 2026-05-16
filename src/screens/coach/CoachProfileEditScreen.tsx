@@ -19,6 +19,7 @@ import * as coachService from '../../services/coachService';
 import * as imageUploadService from '../../services/imageUploadService';
 import { TransformationCarousel } from '../../components/TransformationCarousel';
 import { CertificationBadge } from '../../components/CertificationBadge';
+import { buildImageUrl } from '../../utils/imageUrl';
 
 export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isDark } = useTheme();
@@ -103,18 +104,24 @@ export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigati
   };
 
   const handleUploadProfilePicture = async () => {
+    const image = await imageUploadService.pickImageWithChoice(); // Camera or Gallery
+    if (!image) return;
+    // Show local URI as immediate preview
+    setProfilePicture(image);
+    const formData = imageUploadService.createFormDataForImage(image, 'image');
+    setSaving(true);
     try {
-      const image = await imageUploadService.pickImageFromGallery();
-      if (image) {
-        setProfilePicture(image);
-        const formData = imageUploadService.createFormDataForImage(image, 'image');
-        setSaving(true);
-        const response = await coachService.uploadProfilePicture(formData);
-        setProfile(prev => prev ? { ...prev, profilePicture: response.imageUrl } : null);
-        Alert.alert('Success', 'Profile picture uploaded');
-      }
+      const response = await coachService.uploadProfilePicture(formData);
+      // Server returns the relative path (/uploads/…); store it on profile so
+      // buildImageUrl() converts it to a full URL for display.
+      const serverPath = response.imageUrl;
+      setProfile(prev => prev ? { ...prev, profilePicture: serverPath } : null);
+      setProfilePicture(null); // drop local preview — profile.profilePicture drives the Image now
+      Alert.alert('Success', 'Profile picture updated');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to upload image');
+      setProfilePicture(null);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to upload image. Please try again.';
+      Alert.alert('Upload Failed', msg);
     } finally {
       setSaving(false);
     }
@@ -271,24 +278,26 @@ export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigati
       <ScrollView contentContainerStyle={tw`px-4 pb-8`}>
         {/* Profile Picture */}
         <View style={tw`mt-6 items-center mb-6`}>
-          <View style={tw`w-20 h-20 rounded-full bg-gray-300 overflow-hidden mb-4`}>
-            {profile?.profilePicture ? (
-              <Image
-                source={{ uri: profile.profilePicture }}
-                style={tw`w-full h-full`}
-              />
-            ) : (
-              <View style={tw`w-full h-full items-center justify-center bg-gray-400`}>
-                <MaterialIcons name="person" size={32} color="white" />
+          <TouchableOpacity onPress={handleUploadProfilePicture} activeOpacity={0.8}>
+            <View style={tw`w-24 h-24 rounded-full bg-gray-300 overflow-hidden mb-3`}>
+              {(profilePicture?.uri || profile?.profilePicture) ? (
+                <Image
+                  source={{ uri: profilePicture?.uri ?? buildImageUrl(profile!.profilePicture!) }}
+                  style={tw`w-full h-full`}
+                  onError={() => {/* silently degrade to placeholder */}}
+                />
+              ) : (
+                <View style={tw`w-full h-full items-center justify-center bg-gray-400`}>
+                  <MaterialIcons name="person" size={40} color="white" />
+                </View>
+              )}
+              {/* Camera overlay */}
+              <View style={[tw`absolute bottom-0 left-0 right-0 py-1 items-center`, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+                <MaterialIcons name="camera-alt" size={16} color="white" />
               </View>
-            )}
-          </View>
-          <TouchableOpacity
-            onPress={handleUploadProfilePicture}
-            style={tw`px-4 py-2 rounded-lg ${isDark ? 'bg-blue-600' : 'bg-orange-500'}`}
-          >
-            <Text style={tw`text-white font-semibold`}>Upload Photo</Text>
+            </View>
           </TouchableOpacity>
+          <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Tap to change photo</Text>
         </View>
 
         {/* Bio */}

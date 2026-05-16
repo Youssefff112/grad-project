@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -17,6 +18,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
+import { buildImageUrl } from '../utils/imageUrl';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../config/environment';
 import {
@@ -31,8 +33,12 @@ import tokenManager from '../utils/tokenManager';
 const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 
 export const ChatScreen = ({ navigation, route }: any) => {
-  const { conversationName = 'Chat', conversationId: routeConvId = null, receiverId: routeReceiverId = null } =
-    route.params || {};
+  const {
+    conversationName = 'Chat',
+    conversationId: routeConvId = null,
+    receiverId: routeReceiverId = null,
+    otherUserAvatar: routeOtherUserAvatar = null,
+  } = route.params || {};
   const conversationIdFromRoute =
     routeConvId && routeConvId !== 'null' && routeConvId !== 'undefined' ? String(routeConvId) : null;
   const receiverId =
@@ -40,8 +46,10 @@ export const ChatScreen = ({ navigation, route }: any) => {
       ? Number(routeReceiverId)
       : null;
   const { isDark, accent } = useTheme();
-  const { userId } = useUser();
+  const { userId, profilePicture: myProfilePicture } = useUser();
   const { markAsRead } = useNotifications();
+  const otherUserAvatarUrl = buildImageUrl(routeOtherUserAvatar);
+  const myAvatarUrl = buildImageUrl(myProfilePicture);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -277,10 +285,30 @@ export const ChatScreen = ({ navigation, route }: any) => {
     currentUserIdRef.current = userId;
   }, [userId]);
 
+  const renderAvatar = (isSent: boolean) => {
+    const url = isSent ? myAvatarUrl : otherUserAvatarUrl;
+    return (
+      <View
+        style={[
+          tw`w-7 h-7 rounded-full overflow-hidden`,
+          isSent ? tw`ml-1.5` : tw`mr-1.5`,
+          { backgroundColor: accent + '20' },
+        ]}
+      >
+        {url ? (
+          <Image source={{ uri: url }} style={tw`w-full h-full`} />
+        ) : (
+          <View style={[tw`w-full h-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
+            <MaterialIcons name="person" size={14} color={accent} />
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderMessage = (message: ChatMessage) => {
     const isSent = currentUserIdRef.current === String(message.senderId);
 
-    // Format timestamp nicely
     const dateObj = new Date(message.createdAt || new Date());
     const displayTime = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -289,11 +317,11 @@ export const ChatScreen = ({ navigation, route }: any) => {
         key={message.id}
         delayLongPress={300}
         style={[
-          tw`mb-3 flex-row max-w-[85%]`,
-          isSent ? tw`self-end` : tw`self-start`,
-          isSent && tw`flex-row-reverse`,
+          tw`mb-3 flex-row items-end max-w-[85%]`,
+          isSent ? tw`self-end flex-row-reverse` : tw`self-start`,
         ]}
       >
+        {renderAvatar(isSent)}
         <View
           style={[
             tw`px-4 py-3 rounded-2xl`,
@@ -347,9 +375,21 @@ export const ChatScreen = ({ navigation, route }: any) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} color={primaryText} />
         </TouchableOpacity>
-        <Text style={[tw`text-lg font-bold flex-1 ml-4`, { color: primaryText }]}>
-          {conversationName}
-        </Text>
+        {/* Avatar + name */}
+        <View style={tw`flex-1 flex-row items-center ml-3 gap-2`}>
+          <View style={[tw`w-9 h-9 rounded-full overflow-hidden`, { backgroundColor: accent + '20' }]}>
+            {otherUserAvatarUrl ? (
+              <Image source={{ uri: otherUserAvatarUrl }} style={tw`w-full h-full`} />
+            ) : (
+              <View style={[tw`w-full h-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
+                <MaterialIcons name="person" size={20} color={accent} />
+              </View>
+            )}
+          </View>
+          <Text style={[tw`text-base font-bold flex-1`, { color: primaryText }]} numberOfLines={1}>
+            {conversationName}
+          </Text>
+        </View>
         <TouchableOpacity onPress={showChatOptions}>
           <MaterialIcons name="more-vert" size={24} color={primaryText} />
         </TouchableOpacity>

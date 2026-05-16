@@ -430,7 +430,7 @@ export const ProgressScreen = ({ navigation }: any) => {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <TraineeBottomNav activeId="track" navigation={navigation} totalUnread={totalUnread} />
+      <TraineeBottomNav activeId="home" navigation={navigation} totalUnread={totalUnread} />
     </SafeAreaView>
   );
 };

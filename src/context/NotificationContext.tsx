@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUser } from './UserContext';
 
 interface NotificationContextType {
   conversations: Map<string, number>;
@@ -13,139 +14,187 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
-const NOTIFICATIONS_CACHE_KEY = 'notifications_cache';
+
+const cacheKey = (userId: string | null) =>
+  userId ? `notifications_cache_${userId}` : null;
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [conversations, setConversations] = useState<Map<string, number>>(() => {
-    return new Map();
-  });
+  const { userId, isAuthenticated } = useUser();
+  const [conversations, setConversations] = useState<Map<string, number>>(new Map());
+  // Track which userId we last loaded so we don't re-load on unrelated renders
+  const loadedForRef = useRef<string | null>(null);
 
-  // Load persisted notifications on mount
+  // --- Load / clear per-user cache whenever the logged-in user changes ---
+  // After loading cache, also fetch fresh unread counts from the server so
+  // the badge is accurate without the user needing to open the Messages screen.
   useEffect(() => {
-    const loadPersistedNotifications = async () => {
+    if (!userId || !isAuthenticated) {
+      setConversations(new Map());
+      loadedForRef.current = null;
+      return;
+    }
+    if (loadedForRef.current === userId) return;
+    loadedForRef.current = userId;
+
+    const init = async () => {
+      // 1. Load cached (instant display)
       try {
-        const cached = await AsyncStorage.getItem(NOTIFICATIONS_CACHE_KEY).catch(() => null);
-        if (cached) {
-          try {
-            const entries = JSON.parse(cached);
-            const newMap = new Map<string, number>(entries);
-            setConversations(newMap);
-            console.log('[Notifications] Loaded persisted notifications');
-          } catch (parseError) {
-            console.warn('[Notifications] Failed to parse cached notifications:', parseError);
-          }
+        const key = cacheKey(userId)!;
+        const raw = await AsyncStorage.getItem(key).catch(() => null);
+        if (raw) {
+          setConversations(new Map<string, number>(JSON.parse(raw)));
+        } else {
+          setConversations(new Map());
         }
-      } catch (error) {
-        console.warn('[Notifications] Error loading persisted notifications:', error);
+      } catch {
+        setConversations(new Map());
+      }
+
+      // 2. Sync fresh unread counts from server (background — no await block on UI)
+      try {
+        const { getConversations } = require('../services/messaging.service');
+        const convs: any[] = await getConversations().catch(() => []);
+        if (!convs.length) return;
+        const counts: Record<string, number> = {};
+        for (const conv of convs) {
+          counts[String(conv.id)] = Math.max(0, Math.floor(Number(conv.unreadCount)) || 0);
+        }
+        // Use setConversations directly to avoid stale-closure issues with persist
+        setConversations((prev) => {
+          const next = new Map(prev);
+          for (const [id, count] of Object.entries(counts)) {
+            next.set(id, count);
+          }
+          const key = cacheKey(userId);
+          if (key) {
+            AsyncStorage.setItem(key, JSON.stringify(Array.from(next.entries()))).catch(() => {});
+          }
+          return next;
+        });
+      } catch {
+        // offline or 401 — keep cached values
       }
     };
 
-    loadPersistedNotifications();
-  }, []);
+    init();
+  }, [userId, isAuthenticated]);
 
-  // Make unread count real-time using Socket
-  const totalUnread = Array.from(conversations.values()).reduce((sum, count) => sum + count, 0);
+  // --- Persist helper (user-keyed) ---
+  const persist = useCallback(
+    async (map: Map<string, number>) => {
+      if (!userId) return;
+      const key = cacheKey(userId)!;
+      try {
+        await AsyncStorage.setItem(key, JSON.stringify(Array.from(map.entries()))).catch(() => {});
+      } catch {}
+    },
+    [userId],
+  );
 
-  // Persist notifications whenever they change
-  const persistNotifications = useCallback(async (map: Map<string, number>) => {
-    try {
-      const entries = Array.from(map.entries());
-      await AsyncStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(entries)).catch((error) => {
-        console.warn('[Notifications] Error in AsyncStorage.setItem:', error);
+  const totalUnread = Array.from(conversations.values()).reduce((s, n) => s + n, 0);
+
+  const markAsRead = useCallback(
+    (conversationId: string) => {
+      setConversations((prev) => {
+        const next = new Map(prev);
+        next.set(conversationId, 0);
+        persist(next);
+        return next;
       });
-    } catch (error) {
-      console.warn('[Notifications] Error persisting notifications:', error);
-    }
-  }, []);
-
-  const markAsRead = useCallback((conversationId: string) => {
-    setConversations((prev) => {
-      const newMap = new Map(prev);
-      newMap.set(conversationId, 0);
-      persistNotifications(newMap);
-      return newMap;
-    });
-  }, [persistNotifications]);
+    },
+    [persist],
+  );
 
   const markAsUnread = useCallback(
     (conversationId: string, count: number) => {
       setConversations((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(conversationId, count);
-        persistNotifications(newMap);
-        return newMap;
+        const next = new Map(prev);
+        next.set(conversationId, count);
+        persist(next);
+        return next;
       });
     },
-    [persistNotifications]
+    [persist],
   );
 
   const addNotification = useCallback(
     (conversationId: string) => {
       setConversations((prev) => {
-        const newMap = new Map(prev);
-        const current = newMap.get(conversationId) || 0;
-        newMap.set(conversationId, current + 1);
-        persistNotifications(newMap);
-        return newMap;
+        const next = new Map(prev);
+        next.set(conversationId, (next.get(conversationId) || 0) + 1);
+        persist(next);
+        return next;
       });
     },
-    [persistNotifications]
+    [persist],
   );
 
   const clearAllNotifications = useCallback(() => {
     setConversations((prev) => {
-      const newMap = new Map(prev);
-      newMap.forEach((_, key) => newMap.set(key, 0));
-      persistNotifications(newMap);
-      return newMap;
+      const next = new Map(prev);
+      next.forEach((_, k) => next.set(k, 0));
+      persist(next);
+      return next;
     });
-  }, [persistNotifications]);
+  }, [persist]);
 
   const syncUnreadFromServer = useCallback(
     (countsByConversationId: Record<string, number>) => {
       setConversations((prev) => {
-        const newMap = new Map(prev);
+        const next = new Map(prev);
         for (const [id, raw] of Object.entries(countsByConversationId)) {
-          const n = Math.max(0, Math.floor(Number(raw)) || 0);
-          newMap.set(String(id), n);
+          next.set(String(id), Math.max(0, Math.floor(Number(raw)) || 0));
         }
-        persistNotifications(newMap);
-        return newMap;
+        persist(next);
+        return next;
       });
     },
-    [persistNotifications]
+    [persist],
   );
 
-  // Make unread count real-time using Socket
+  // --- Real-time socket: one connection per logged-in user ---
   useEffect(() => {
+    if (!userId || !isAuthenticated) return;
+
     let socket: any = null;
+    let cancelled = false;
+
     const initSocket = async () => {
       try {
-        const io = require('socket.io-client').io;
-        const environment = require('../config/environment').environment;
         const tokenManager = require('../utils/tokenManager');
-        
+        const { environment } = require('../config/environment');
+        const { io } = require('socket.io-client');
+
         const token = await tokenManager.getAccessToken();
-        if (!token) return;
-        
-        socket = io(environment.BACKEND_URL, { auth: { token } });
-        
+        if (!token || cancelled) return;
+
+        socket = io(environment.BACKEND_URL, {
+          auth: { token },
+          transports: ['websocket'],
+        });
+
+        socket.on('connect', () => {
+          // Join this user's private room so targeted `io.to(userId)` emissions reach us
+          socket.emit('join_room', userId);
+        });
+
         socket.on('new_message', (msg: any) => {
-          if (msg && msg.conversationId) {
-             addNotification(msg.conversationId);
+          if (msg?.conversationId) {
+            addNotification(String(msg.conversationId));
           }
         });
-      } catch (err) {
-        console.log('Socket real-time initialization failed gracefully');
+      } catch {
+        // Silently degrade — real-time not available
       }
     };
-    
+
     initSocket();
-    
+
     return () => {
+      cancelled = true;
       if (socket) socket.disconnect();
-    }
-  }, [addNotification]);
+    };
+  }, [userId, isAuthenticated, addNotification]);
 
   return (
     <NotificationContext.Provider
@@ -165,9 +214,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 };
 
 export const useNotifications = () => {
-  const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error('useNotifications must be used within NotificationProvider');
-  }
-  return context;
+  const ctx = useContext(NotificationContext);
+  if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
+  return ctx;
 };

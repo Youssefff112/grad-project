@@ -23,11 +23,25 @@ import {
 const DEFAULT_DAILY_TARGET = { calories: 2000, protein: 150, carbs: 200, fats: 65 };
 
 const MEAL_TIME_MAP: Record<string, string> = {
-  breakfast: '7:30 AM',
-  lunch: '12:30 PM',
-  dinner: '7:30 PM',
-  snack: '4:00 PM',
+  breakfast: '07:30',
+  lunch: '12:30',
+  dinner: '19:30',
+  snack: '16:00',
 };
+
+/** Parse "HH:MM" or legacy "H:MM AM/PM" into minutes-since-midnight */
+function mealTimeToMinutes(t: string): number {
+  if (!t) return 0;
+  const ampm = /(am|pm)/i.exec(t);
+  if (ampm) {
+    const [timePart] = t.split(/\s+/);
+    const [h, m] = timePart.split(':').map(Number);
+    const isPm = ampm[0].toLowerCase() === 'pm';
+    return ((isPm && h !== 12 ? h + 12 : !isPm && h === 12 ? 0 : h) * 60) + (m || 0);
+  }
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
 const MEAL_ICON_MAP: Record<string, keyof typeof import('@expo/vector-icons').MaterialIcons.glyphMap> = {
   breakfast: 'wb-sunny',
   lunch: 'restaurant',
@@ -52,7 +66,7 @@ export const MealsScreen = ({ navigation }: any) => {
   const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({});
-  const [waterGlasses, setWaterGlasses] = useState(3);
+  const [waterGlasses, setWaterGlasses] = useState(0);
   /** Exact ml when user uses the calculator; otherwise derived from glasses × 250 */
   const [waterMlOverride, setWaterMlOverride] = useState<number | null>(null);
   const [showWaterCalc, setShowWaterCalc] = useState(false);
@@ -82,17 +96,21 @@ export const MealsScreen = ({ navigation }: any) => {
 
   // Build display meals: prefer active backend plan → custom meals → empty
   const mealsToDisplay = (() => {
+    let list: {
+      id: string; meal: string; time: string; icon: any;
+      items: any[]; calories: number; protein: number; carbs: number; fats: number;
+    }[] = [];
     if (activePlan) {
       const selectedDayName = DAY_FULL_NAMES[selectedDayIndex];
       const dayPlan = activePlan.weeklyMealPlan.find(
         (d) => d.day.toLowerCase() === selectedDayName.toLowerCase()
       ) || activePlan.weeklyMealPlan[selectedDayIndex] || activePlan.weeklyMealPlan[0];
       if (dayPlan) {
-        return dayPlan.meals.map((m, idx) => ({
+        list = dayPlan.meals.map((m, idx) => ({
           id: `${m.type}-${idx}`,
           meal: m.name,
-          time: MEAL_TIME_MAP[m.type] || '12:00 PM',
-          icon: MEAL_ICON_MAP[m.type] || 'restaurant',
+          time: (m as any).clockTime || MEAL_TIME_MAP[(m.type || '').toLowerCase()] || '12:00',
+          icon: MEAL_ICON_MAP[(m.type || '').toLowerCase()] || 'restaurant',
           items: m.ingredients,
           calories: m.nutrition.calories,
           protein: m.nutrition.protein,
@@ -100,14 +118,13 @@ export const MealsScreen = ({ navigation }: any) => {
           fats: m.nutrition.fats,
         }));
       }
-    }
-    const localMeals = customMeals || [];
-    if (localMeals.length > 0) {
-      return localMeals.map((meal) => ({
+    } else {
+      const localMeals = customMeals || [];
+      list = localMeals.map((meal) => ({
         id: meal.id,
         meal: meal.name,
-        time: MEAL_TIME_MAP[meal.mealType] || '12:00 PM',
-        icon: MEAL_ICON_MAP[meal.mealType] || 'restaurant',
+        time: MEAL_TIME_MAP[(meal.mealType || '').toLowerCase()] || '12:00',
+        icon: MEAL_ICON_MAP[(meal.mealType || '').toLowerCase()] || 'restaurant',
         items: meal.foods.map((f) => `Food #${f.foodId}`),
         calories: meal.totalCalories,
         protein: meal.totalMacros.protein,
@@ -115,7 +132,8 @@ export const MealsScreen = ({ navigation }: any) => {
         fats: meal.totalMacros.fats,
       }));
     }
-    return [];
+    // Sort ascending by time
+    return list.sort((a, b) => mealTimeToMinutes(a.time) - mealTimeToMinutes(b.time));
   })();
 
   // Load active diet plan; re-runs on every focus so deletes/regenerations
@@ -254,13 +272,22 @@ export const MealsScreen = ({ navigation }: any) => {
     // number of tapped meals.
     const fullMealMap: Record<string, boolean> = { ...buildBaseMealMap(mealsToDisplay), ...checkedMeals };
 
-    // Scope the offline cache by planId so old entries don't bleed into a new plan
+    // Plan-scoped cache (meal completions keyed by planId to avoid cross-plan bleed)
     offlineService.cacheMealLog(todayStr, {
       checkedMeals: fullMealMap,
       waterGlasses,
       date: todayStr,
       waterMl: waterMlEffective,
     }, userId, activePlan?.id ?? null);
+
+    // User-scoped cache (no planId) — read by the home screen Daily Dial
+    // water tracker which doesn't know the active plan ID.
+    offlineService.cacheMealLog(todayStr, {
+      checkedMeals: fullMealMap,
+      waterGlasses,
+      date: todayStr,
+      waterMl: waterMlEffective,
+    }, userId, null);
 
     setSaveStatus('saving');
     if (logTimer.current) clearTimeout(logTimer.current);
@@ -501,8 +528,8 @@ export const MealsScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {/* Calorie Ring + Macros Section */}
-        <View
+        {/* Calorie Ring + Macros Section — only shown when there are meals */}
+        {!planLoading && mealsToDisplay.length > 0 && <View
           style={[
             tw`mx-5 mt-4 rounded-3xl p-5`,
             { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
@@ -613,7 +640,7 @@ export const MealsScreen = ({ navigation }: any) => {
               );
             })}
           </View>
-        </View>
+        </View>}
 
         {/* Meal Cards */}
         <View style={tw`px-5 mt-6`}>

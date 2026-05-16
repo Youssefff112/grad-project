@@ -61,14 +61,12 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [calorieTarget, setCalorieTarget] = useState(2000);
   const [waterGlasses, setWaterGlasses] = useState(0);
+  const [hasActiveDietPlan, setHasActiveDietPlan] = useState(false);
   const { isDark, accent } = useTheme();
-  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach, setSubscriptionPlan } = useUser();
+  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach, setSubscriptionPlan, updateLastPlanReview, userId } = useUser();
   const { totalUnread } = useNotifications();
   const { isOnline, syncInProgress, queuedCount } = useOffline();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
-
-  // Calculate readiness score based on various factors
-  const readinessScore = Math.floor(Math.random() * 40 + 60); // 60-100%
 
   const loadActivePlan = useCallback(async () => {
     try {
@@ -126,7 +124,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     try {
       const today = new Date().toISOString().split('T')[0];
       const [logResult, planResult] = await Promise.allSettled([
-        offlineService.getCachedMealLog(today),
+        offlineService.getCachedMealLog(today, userId),
         dietService.getActiveDietPlan(),
       ]);
 
@@ -143,6 +141,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       }
 
       const dietPlan = plan;
+      setHasActiveDietPlan(!!dietPlan);
       // Reset to default when there's no active diet plan, otherwise the
       // home page keeps showing the deleted plan's calorie target.
       setCalorieTarget(dietPlan?.dailyCalorieTarget ?? 2000);
@@ -185,20 +184,6 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       null
     );
   }, [activePlan]);
-
-  const getReadinessStatus = () => {
-    if (readinessScore >= 80) return 'Optimal';
-    if (readinessScore >= 60) return 'Good';
-    return 'Fair';
-  };
-
-  const getReadinessRecommendation = () => {
-    const score = readinessScore;
-    if (score >= 85) return 'Your recovery is optimal. High intensity training is recommended today.';
-    if (score >= 70) return 'You\'re ready for moderate to high intensity. Recovery is adequate.';
-    if (score >= 50) return 'Consider lighter training today. Your body needs more recovery.';
-    return 'Take it easy today. Focus on stretching and mobility work.';
-  };
 
   // Check if plan review is due (every 7 days)
   const shouldShowPlanReview = useMemo(() => {
@@ -296,26 +281,28 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 />
                 <TouchableOpacity
                   onPress={async () => {
-                    if (weightInput.trim() || bodyFatInput.trim()) {
-                      const newWeight = weightInput.trim() ? parseFloat(weightInput) : undefined;
-                      const newBodyFat = bodyFatInput.trim() ? parseFloat(bodyFatInput) : undefined;
+                    const newWeight = weightInput.trim() ? parseFloat(weightInput) : undefined;
+                    const newBodyFat = bodyFatInput.trim() ? parseFloat(bodyFatInput) : undefined;
+                    const weightValid = newWeight != null && isFinite(newWeight) && newWeight > 0;
+                    const fatValid = newBodyFat != null && isFinite(newBodyFat) && newBodyFat > 0;
 
-                      if (newWeight) setWeight(newWeight);
-                      if (newBodyFat) setBodyFatPercentage(newBodyFat);
+                    if (!weightValid && !fatValid) return;
 
-                      try {
-                        await progressService.addMeasurement({
-                          weight: newWeight,
-                          bodyFat: newBodyFat,
-                          measuredAt: new Date().toISOString(),
-                        });
-                      } catch {
-                        // silently fail — local state already updated
-                      }
+                    if (weightValid) setWeight(newWeight!);
+                    if (fatValid) setBodyFatPercentage(newBodyFat!);
 
-                      setWeightInput('');
-                      setBodyFatInput('');
-                    }
+                    // Mark the check-in done — hides the banner until next week
+                    updateLastPlanReview();
+
+                    // Persist to measurements history (non-blocking)
+                    progressService.addMeasurement({
+                      weight: weightValid ? newWeight : undefined,
+                      bodyFat: fatValid ? newBodyFat : undefined,
+                      measuredAt: new Date().toISOString(),
+                    }).catch(() => {/* silently fail — profile already updated */});
+
+                    setWeightInput('');
+                    setBodyFatInput('');
                   }}
                   style={[tw`rounded-lg p-3 items-center justify-center`, { backgroundColor: accent }]}
                 >
@@ -399,15 +386,28 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                     <MaterialIcons name="local-fire-department" size={18} color={accent} />
                     <Text style={[tw`text-xs font-semibold uppercase tracking-wider`, { color: isDark ? '#64748b' : '#94a3b8' }]}>Calories</Text>
                   </View>
-                  <Text style={[tw`text-2xl font-black leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                    {caloriesConsumed.toLocaleString()}
-                  </Text>
+                  {!hasActiveDietPlan && caloriesConsumed === 0 ? (
+                    <Text style={[tw`text-sm font-semibold leading-tight`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                      No meals{'\n'}logged yet
+                    </Text>
+                  ) : (
+                    <Text style={[tw`text-2xl font-black leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                      {caloriesConsumed.toLocaleString()}
+                    </Text>
+                  )}
                   <View style={[tw`w-full h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
                     <View style={[tw`h-full rounded-full`, { backgroundColor: accent, width: `${Math.round(pct * 100)}%` }]} />
                   </View>
                   <Text style={[tw`text-xs font-semibold`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    {remaining > 0 ? `${remaining.toLocaleString()} kcal left` : 'Goal reached!'}{'\n'}
-                    <Text style={{ color: isDark ? '#475569' : '#cbd5e1' }}>of {calorieTarget.toLocaleString()}</Text>
+                    {!hasActiveDietPlan && caloriesConsumed === 0
+                      ? 'Generate a meal plan'
+                      : remaining > 0
+                        ? `${remaining.toLocaleString()} kcal left`
+                        : 'Goal reached!'
+                    }{'\n'}
+                    {(hasActiveDietPlan || caloriesConsumed > 0) && (
+                      <Text style={{ color: isDark ? '#475569' : '#cbd5e1' }}>of {calorieTarget.toLocaleString()}</Text>
+                    )}
                   </Text>
                 </TouchableOpacity>
               );
@@ -444,31 +444,6 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               );
             })()}
 
-            {/* Readiness Score */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('VisionAnalysisLab')}
-              activeOpacity={0.7}
-              style={[tw`w-full flex-col gap-2 rounded-xl p-5 shadow-sm mt-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
-            >
-              <View style={tw`flex-row items-center justify-between`}>
-                <View style={tw`flex-row items-center gap-2`}>
-                  <MaterialIcons name="bolt" size={24} color={accent} />
-                  <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Readiness Score</Text>
-                </View>
-                <Text style={[tw`text-2xl font-black`, { color: accent }]}>{readinessScore}%</Text>
-              </View>
-              <Text style={[tw`text-sm leading-relaxed mt-1`, { color: isDark ? '#94a3b8' : '#475569' }]}>
-                {getReadinessRecommendation()}
-              </Text>
-              <View style={tw`flex-row gap-2 mt-2`}>
-                <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent + '28' }]}>
-                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: accent }]}>{getReadinessStatus()}</Text>
-                </View>
-                <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
-                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: isDark ? '#cbd5e1' : '#475569' }]}>Start Workout →</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
           </View>
         </View>
 

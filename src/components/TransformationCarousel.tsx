@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Transformation } from '../services/coachService';
+import { buildImageUrl } from '../utils/imageUrl';
 
 interface TransformationCarouselProps {
   transformations: Transformation[];
@@ -55,7 +56,7 @@ export const TransformationCarousel: React.FC<TransformationCarouselProps> = ({
       >
         {/* After image - full background */}
         <Image
-          source={{ uri: transformation.afterImageUrl }}
+          source={{ uri: buildImageUrl(transformation.afterImageUrl) }}
           style={{
             width: '100%',
             height: '100%',
@@ -73,7 +74,7 @@ export const TransformationCarousel: React.FC<TransformationCarouselProps> = ({
           }}
         >
           <Image
-            source={{ uri: transformation.beforeImageUrl }}
+            source={{ uri: buildImageUrl(transformation.beforeImageUrl) }}
             style={{
               width: imageContainerWidth,
               height: '100%'

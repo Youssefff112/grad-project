@@ -3,7 +3,7 @@
  * Handles all coach-related API calls
  */
 
-import { apiGet, apiPost, apiPatch, apiDelete } from './api';
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from './api';
 
 export interface Coach {
   id: number;
@@ -153,11 +153,7 @@ export const updateCoachProfile = async (updates: Partial<Coach>): Promise<{ pro
 };
 
 export const uploadProfilePicture = async (imageFile: FormData): Promise<{ imageUrl: string; profile: Coach }> => {
-  const response = await apiPost('/coach/profile-picture', imageFile, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  const response = await apiUpload('/coach/profile-picture', imageFile);
   return {
     imageUrl: response.data?.imageUrl || '',
     profile: response.data?.profile || {}
@@ -165,11 +161,7 @@ export const uploadProfilePicture = async (imageFile: FormData): Promise<{ image
 };
 
 export const addTransformation = async (formData: FormData): Promise<{ transformation: Transformation; profile: Coach }> => {
-  const response = await apiPost('/coach/transformations', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  const response = await apiUpload('/coach/transformations', formData);
   return {
     transformation: response.data?.transformation || {},
     profile: response.data?.profile || {}
@@ -189,11 +181,7 @@ export const deleteTransformation = async (transformId: string): Promise<void> =
 };
 
 export const addCertification = async (formData: FormData): Promise<{ certification: Certification; profile: Coach }> => {
-  const response = await apiPost('/coach/certifications', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  const response = await apiUpload('/coach/certifications', formData);
   return {
     certification: response.data?.certification || {},
     profile: response.data?.profile || {}

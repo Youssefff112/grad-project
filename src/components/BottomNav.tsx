@@ -1,8 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import React, { useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ViewStyle, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 
 interface NavItem {
@@ -19,18 +18,135 @@ interface BottomNavProps {
   containerStyle?: ViewStyle | Record<string, any>[];
 }
 
+const AnimatedTabItem: React.FC<{
+  item: NavItem;
+  isActive: boolean;
+  isCompact: boolean;
+  accent: string;
+  textMuted: string;
+  errorColor: string;
+  onPress: () => void;
+}> = ({ item, isActive, isCompact, accent, textMuted, errorColor, onPress }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const indicatorOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+
+  // Animate indicator on active change
+  React.useEffect(() => {
+    Animated.timing(indicatorOpacity, {
+      toValue: isActive ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [isActive]);
+
+  const handlePress = useCallback(() => {
+    Animated.sequence([
+      Animated.spring(scaleAnim, {
+        toValue: 0.88,
+        useNativeDriver: true,
+        tension: 400,
+        friction: 10,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 8,
+      }),
+    ]).start();
+    onPress();
+  }, [scaleAnim, onPress]);
+
+  return (
+    <Animated.View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        transform: [{ scale: scaleAnim }],
+      }}
+    >
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={1}
+        style={{
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          paddingHorizontal: 2,
+        }}
+      >
+        {/* Active top-bar indicator */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: -(isCompact ? 10 : 10),
+            width: isCompact ? 20 : 24,
+            height: 2.5,
+            borderRadius: 2,
+            backgroundColor: accent,
+            opacity: indicatorOpacity,
+          }}
+        />
+
+        {/* Icon pill */}
+        <View
+          style={{
+            width: isCompact ? 40 : 46,
+            height: isCompact ? 30 : 34,
+            borderRadius: isCompact ? 10 : 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: isActive ? accent + '18' : 'transparent',
+            marginBottom: 2,
+          }}
+        >
+          <MaterialIcons
+            name={item.icon}
+            size={isCompact ? 20 : 22}
+            color={isActive ? accent : textMuted}
+          />
+        </View>
+
+        {!!item.badge && item.badge > 0 && (
+          <Text
+            style={{
+              fontSize: isCompact ? 10 : 11,
+              fontWeight: '800',
+              color: errorColor,
+              marginBottom: 1,
+              lineHeight: isCompact ? 12 : 14,
+            }}
+          >
+            {item.badge > 99 ? '99+' : item.badge}
+          </Text>
+        )}
+
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: isCompact ? 9 : 10,
+            fontWeight: isActive ? '800' : '600',
+            color: isActive ? accent : textMuted,
+            letterSpacing: 0.3,
+            textTransform: 'uppercase',
+          }}
+        >
+          {item.label}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export const BottomNav: React.FC<BottomNavProps> = ({
   items,
   activeId,
   onSelect,
   containerStyle,
 }) => {
-  const { isDark, accent } = useTheme();
+  const { isDark, accent, colors } = useTheme();
   const insets = useSafeAreaInsets();
   const isCompact = items.length > 5;
-
-  const navBg = isDark ? '#0e0e1a' : '#ffffff';
-  const inactiveColor = isDark ? '#556070' : '#94a3b8';
 
   return (
     <View
@@ -41,9 +157,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           left: 0,
           right: 0,
           zIndex: 20,
-          backgroundColor: navBg,
+          backgroundColor: colors.navBg,
           borderTopWidth: 1,
-          borderTopColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
+          borderTopColor: colors.navBorder,
           paddingTop: 10,
           paddingBottom: Math.max(insets.bottom, 8) + 4,
           paddingHorizontal: 4,
@@ -51,77 +167,26 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           alignItems: 'flex-start',
           justifyContent: 'space-around',
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: isDark ? 0.35 : 0.08,
-          shadowRadius: 10,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: isDark ? 0.4 : 0.06,
+          shadowRadius: 12,
           elevation: 16,
         },
         containerStyle,
       ]}
     >
-      {items.map((item) => {
-        const isActive = item.id === activeId;
-        return (
-          <TouchableOpacity
-            key={item.id}
-            onPress={() => onSelect(item.id)}
-            activeOpacity={0.7}
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              paddingHorizontal: 2,
-            }}
-          >
-            {/* Icon container with active pill */}
-            <View
-              style={{
-                width: isCompact ? 40 : 48,
-                height: isCompact ? 32 : 36,
-                borderRadius: isCompact ? 10 : 12,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: isActive ? accent + '22' : 'transparent',
-                marginBottom: 2,
-              }}
-            >
-              <MaterialIcons
-                name={item.icon}
-                size={isCompact ? 21 : 24}
-                color={isActive ? accent : inactiveColor}
-              />
-            </View>
-
-            {!!item.badge && item.badge > 0 && (
-              <Text
-                style={{
-                  fontSize: isCompact ? 10 : 11,
-                  fontWeight: '800',
-                  color: '#ef4444',
-                  marginBottom: 1,
-                  lineHeight: isCompact ? 12 : 14,
-                }}
-              >
-                {item.badge > 99 ? '99+' : item.badge}
-              </Text>
-            )}
-
-            {/* Label */}
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: isCompact ? 9 : 10,
-                fontWeight: '700',
-                color: isActive ? accent : inactiveColor,
-                letterSpacing: 0.2,
-                textTransform: 'uppercase',
-              }}
-            >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+      {items.map((item) => (
+        <AnimatedTabItem
+          key={item.id}
+          item={item}
+          isActive={item.id === activeId}
+          isCompact={isCompact}
+          accent={accent}
+          textMuted={colors.textMuted}
+          errorColor={colors.error}
+          onPress={() => onSelect(item.id)}
+        />
+      ))}
     </View>
   );
 };

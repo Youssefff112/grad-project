@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as tokenManager from '../utils/tokenManager';
-import authService from '../services/auth.service';
+import authService, { type User as AuthUser } from '../services/auth.service';
 import { getClientSubscriptionStatus, getClientProfile } from '../services/clientService';
+import * as progressService from '../services/progressService';
 import { isClientPlan } from '../constants/plans';
 import type { CoachApplicationStatus } from '../utils/coachGate';
 
@@ -29,6 +30,7 @@ interface UserContextType {
   email: string;
   role: UserRole;
   isAdmin: boolean;
+  profilePicture: string | null;
   weight: number | null;
   bodyFatPercentage: number | null;
   userMode: UserMode;
@@ -67,6 +69,10 @@ interface UserContextType {
   updateLastPlanReview: () => void;
   setNotificationSettings: (settings: NotificationSettings) => void;
   setRole: (role: UserRole) => void;
+  /** Apply server profile fields (login response or GET /users/profile). */
+  hydrateFromAuthUser: (user: AuthUser) => void;
+  /** Pull latest profile + measurements from API (old + new accounts). */
+  syncProfileFromServer: () => Promise<void>;
 
   // Authentication methods
   setAuthTokens: (accessToken: string, refreshToken: string) => Promise<void>;
@@ -82,6 +88,7 @@ const UserContext = createContext<UserContextType>({
   email: '',
   role: 'client',
   isAdmin: false,
+  profilePicture: null,
   weight: null,
   bodyFatPercentage: null,
   userMode: 'Basic',
@@ -128,6 +135,8 @@ const UserContext = createContext<UserContextType>({
   updateLastPlanReview: () => {},
   setNotificationSettings: () => {},
   setRole: () => {},
+  hydrateFromAuthUser: () => {},
+  syncProfileFromServer: async () => {},
 
   // Authentication methods defaults
   setAuthTokens: async () => {},
@@ -142,6 +151,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [fullName, setFullNameState] = useState('');
   const [email, setEmailState] = useState('');
   const [role, setRoleState] = useState<UserRole>('client');
+  const [profilePicture, setProfilePictureState] = useState<string | null>(null);
   const [weight, setWeightState] = useState<number | null>(null);
   const [bodyFatPercentage, setBodyFatPercentageState] = useState<number | null>(null);
   const [userMode, setUserModeState] = useState<UserMode>('Basic');
@@ -537,12 +547,110 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch(console.error);
   }, []);
 
+  const hydrateFromAuthUser = useCallback((user: AuthUser) => {
+    const p = user.profile;
+    if (!p) return;
+
+    // Profile picture (stored in profile.profilePicture for clients)
+    if (typeof (p as any).profilePicture === 'string' && (p as any).profilePicture) {
+      setProfilePictureState((p as any).profilePicture);
+    }
+
+    if (p.currentWeight != null && Number.isFinite(Number(p.currentWeight))) {
+      const w = Number(p.currentWeight);
+      setWeightState(w);
+      AsyncStorage.setItem('user_weight', w.toString()).catch(() => {});
+    }
+    if (p.bodyFat != null && Number.isFinite(Number(p.bodyFat))) {
+      const bf = Number(p.bodyFat);
+      setBodyFatPercentageState(bf);
+      AsyncStorage.setItem('user_body_fat_percentage', bf.toString()).catch(() => {});
+    }
+    const reviewDate = (p as { lastPlanReviewDate?: string }).lastPlanReviewDate;
+    if (reviewDate) {
+      setLastPlanReviewDateState(reviewDate);
+      AsyncStorage.setItem('user_last_plan_review', reviewDate).catch(() => {});
+    }
+    if (p.experienceLevel) {
+      setExperienceLevelState(p.experienceLevel as ExperienceLevel);
+      AsyncStorage.setItem('user_experience_level', p.experienceLevel).catch(() => {});
+    }
+    if (p.dietaryPreferences && Array.isArray(p.dietaryPreferences)) {
+      setDietPreferencesState(p.dietaryPreferences as DietPreference[]);
+      AsyncStorage.setItem('user_diet_preferences', JSON.stringify(p.dietaryPreferences)).catch(() => {});
+    }
+    if (typeof p.canUseComputerVision === 'boolean') {
+      setCanUseComputerVisionState(p.canUseComputerVision);
+      AsyncStorage.setItem('user_cv_enabled', JSON.stringify(p.canUseComputerVision)).catch(() => {});
+    }
+    if (typeof p.canUseAIAssistant === 'boolean') {
+      setCanUseAIAssistantState(p.canUseAIAssistant);
+      AsyncStorage.setItem('user_ai_enabled', JSON.stringify(p.canUseAIAssistant)).catch(() => {});
+    }
+    if (p.notificationSettings && typeof p.notificationSettings === 'object') {
+      setNotificationSettingsState((prev) => ({ ...prev, ...p.notificationSettings }));
+    }
+  }, []);
+
+  const syncProfileFromServer = useCallback(async () => {
+    try {
+      const res = await authService.getProfile();
+      const user = res.data?.user;
+      if (!user) return;
+
+      hydrateFromAuthUser(user);
+
+      const p = user.profile || {};
+      if (p.currentWeight == null) {
+        try {
+          const { measurements } = await progressService.getMeasurements(1, 30);
+          if (measurements?.length) {
+            const sorted = [...measurements].sort(
+              (a, b) => new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime(),
+            );
+            const latest = sorted[0];
+            if (latest.weight != null) {
+              const w = Number(latest.weight);
+              setWeightState(w);
+              AsyncStorage.setItem('user_weight', w.toString()).catch(() => {});
+              authService
+                .updateProfile({ profile: { currentWeight: w } } as any)
+                .catch(() => {});
+            }
+            if (p.bodyFat == null && latest.bodyFat != null) {
+              const bf = Number(latest.bodyFat);
+              setBodyFatPercentageState(bf);
+              AsyncStorage.setItem('user_body_fat_percentage', bf.toString()).catch(() => {});
+            }
+          }
+        } catch {
+          /* measurements optional */
+        }
+      }
+    } catch {
+      /* offline — keep cached profile */
+    }
+  }, [hydrateFromAuthUser]);
+
+  // Sync weight, body fat, check-in date, and preferences from server for every account.
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    syncProfileFromServer();
+  }, [isLoading, isAuthenticated, syncProfileFromServer]);
+
   const updateLastPlanReview = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
     setLastPlanReviewDateState(today);
     AsyncStorage.setItem('user_last_plan_review', today).catch((error) =>
       console.log('Failed to save plan review date:', error)
     );
+    tokenManager.getAccessToken().then((token) => {
+      if (token) {
+        authService
+          .updateProfile({ profile: { lastPlanReviewDate: today } } as any)
+          .catch(console.error);
+      }
+    }).catch(console.error);
   }, []);
 
   const setUserId = useCallback(async (id: string) => {
@@ -637,6 +745,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       role,
       isAdmin: role === 'admin',
+      profilePicture,
       weight,
       bodyFatPercentage,
       userMode,
@@ -674,6 +783,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setNotificationSettings,
       setRole,
       setCoachApplicationStatus,
+      hydrateFromAuthUser,
+      syncProfileFromServer,
 
       // Authentication methods
       setAuthTokens,

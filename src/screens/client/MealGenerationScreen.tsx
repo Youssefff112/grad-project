@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,6 +28,20 @@ const prettyLabel = (s?: string) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim() || 'General';
+
+/** Default clock times for each meal type (24-h for sorting, display as HH:MM) */
+const MEAL_DEFAULT_TIMES: Record<string, string> = {
+  breakfast: '08:00',
+  lunch: '13:00',
+  dinner: '19:00',
+  snack: '16:00',
+};
+
+/** Parse "HH:MM" into minutes-since-midnight for numeric sorting */
+function timeToMinutes(t: string): number {
+  const [h, m] = (t || '00:00').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
 
 const MEAL_ALTERNATIVES: Record<string, Array<{ name: string; calories: number; protein: number; carbs: number; fat: number; serving: string }>> = {
   breakfast: [
@@ -82,7 +97,10 @@ interface GeneratedMealPlan {
   dietType: string;
   macronutrients?: { protein: number; carbs: number; fats: number };
   meals: Array<{
+    /** Meal type label e.g. "Breakfast" */
     time: string;
+    /** Editable clock time "HH:MM", used for sorting and display */
+    clockTime: string;
     items: MealItem[];
     totalCalories: number;
   }>;
@@ -93,15 +111,12 @@ interface GeneratedMealPlan {
 const dietPlanToDisplay = (plan: dietService.DietPlan, status?: 'pending' | 'approved'): GeneratedMealPlan => {
   const resolvedStatus = status ?? (plan.pendingCoachReview ? 'pending' : 'approved');
   const firstDay = plan.weeklyMealPlan?.[0];
-  return {
-    id: String(plan.id),
-    name: `${prettyLabel(plan.goal) || 'My'} Meal Plan`,
-    dayCount: plan.weeklyMealPlan?.length || 7,
-    totalCalories: plan.dailyCalorieTarget,
-    dietType: prettyLabel(plan.dietaryPreference) || 'Balanced',
-    macronutrients: plan.macronutrients,
-    meals: (firstDay?.meals || []).map(m => ({
+  const rawMeals = (firstDay?.meals || []).map(m => {
+    const typeKey = (m.type || '').toLowerCase();
+    const clockTime = (m as any).clockTime || MEAL_DEFAULT_TIMES[typeKey] || '12:00';
+    return {
       time: m.type.charAt(0).toUpperCase() + m.type.slice(1),
+      clockTime,
       totalCalories: m.nutrition.calories,
       items: [{
         name: m.name,
@@ -113,7 +128,18 @@ const dietPlanToDisplay = (plan: dietService.DietPlan, status?: 'pending' | 'app
         preparationTime: (m as any).preparationTime,
         ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
       }],
-    })),
+    };
+  });
+  // Sort by clock time ascending
+  rawMeals.sort((a, b) => timeToMinutes(a.clockTime) - timeToMinutes(b.clockTime));
+  return {
+    id: String(plan.id),
+    name: `${prettyLabel(plan.goal) || 'My'} Meal Plan`,
+    dayCount: plan.weeklyMealPlan?.length || 7,
+    totalCalories: plan.dailyCalorieTarget,
+    dietType: prettyLabel(plan.dietaryPreference) || 'Balanced',
+    macronutrients: plan.macronutrients,
+    meals: rawMeals,
     status: resolvedStatus,
   };
 };
@@ -132,6 +158,9 @@ export const MealGenerationScreen = ({ navigation }: any) => {
 
   // Substitute modal: { mealIdx, itemIdx }
   const [substituteTarget, setSubstituteTarget] = useState<{ mealIdx: number; itemIdx: number } | null>(null);
+  // Time editor: mealIdx → value being edited
+  const [editingTimeIdx, setEditingTimeIdx] = useState<number | null>(null);
+  const [editingTimeValue, setEditingTimeValue] = useState('');
 
   const bg = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -201,6 +230,18 @@ export const MealGenerationScreen = ({ navigation }: any) => {
         'Unable to generate meal plan. Make sure your profile is complete and you have an active subscription.';
       Alert.alert('Generation Failed', msg, [{ text: 'OK' }]);
     }
+  };
+
+  const handleUpdateMealTime = (mealIdx: number, newTime: string) => {
+    if (!generatedMeal) return;
+    // Validate format HH:MM
+    if (!/^\d{1,2}:\d{2}$/.test(newTime)) return;
+    const updated = generatedMeal.meals.map((meal, idx) =>
+      idx === mealIdx ? { ...meal, clockTime: newTime } : meal,
+    );
+    updated.sort((a, b) => timeToMinutes(a.clockTime) - timeToMinutes(b.clockTime));
+    setGeneratedMeal({ ...generatedMeal, meals: updated });
+    setEditingTimeIdx(null);
   };
 
   const handleSubstituteMeal = (
@@ -438,6 +479,25 @@ export const MealGenerationScreen = ({ navigation }: any) => {
           </View>
         )}
 
+        {!isLoadingPlan && availableMeals.length === 0 && (!customMeals || customMeals.length === 0) && (
+          <View
+            style={[
+              tw`mt-6 rounded-2xl p-8 items-center`,
+              { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+            ]}
+          >
+            <View style={[tw`w-16 h-16 rounded-full items-center justify-center mb-4`, { backgroundColor: accent + '14' }]}>
+              <MaterialIcons name="restaurant-menu" size={32} color={accent} />
+            </View>
+            <Text style={[tw`text-base font-bold mb-1 text-center`, { color: textPrimary }]}>
+              No meal plan yet
+            </Text>
+            <Text style={[tw`text-sm text-center`, { color: textSecondary }]}>
+              Generate an AI plan or build a custom meal to see calories and macros here.
+            </Text>
+          </View>
+        )}
+
         {/* ── Custom Meals Section ──────────────────────────────────────────────── */}
         {customMeals && customMeals.length > 0 && (
           <View style={tw`mt-8`}>
@@ -569,27 +629,60 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                               { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
                             ]}
                           >
-                            {/* Meal type header */}
-                            <View style={[tw`flex-row items-center justify-between px-4 py-3`, { backgroundColor: accent + '14' }]}>
-                              <View style={tw`flex-row items-center gap-2`}>
-                                <MaterialIcons
-                                  name={
-                                    meal.time.toLowerCase() === 'breakfast' ? 'wb-sunny' :
-                                    meal.time.toLowerCase() === 'lunch' ? 'wb-cloudy' :
-                                    meal.time.toLowerCase() === 'dinner' ? 'nights-stay' : 'apple'
-                                  }
-                                  size={18}
-                                  color={accent}
-                                />
-                                <Text style={[tw`font-bold text-base`, { color: accent }]}>
-                                  {meal.time}
-                                </Text>
+                            {/* Meal type header with editable time */}
+                            <View style={[tw`px-4 py-3`, { backgroundColor: accent + '14' }]}>
+                              <View style={tw`flex-row items-center justify-between`}>
+                                <View style={tw`flex-row items-center gap-2`}>
+                                  <MaterialIcons
+                                    name={
+                                      meal.time.toLowerCase() === 'breakfast' ? 'wb-sunny' :
+                                      meal.time.toLowerCase() === 'lunch' ? 'wb-cloudy' :
+                                      meal.time.toLowerCase() === 'dinner' ? 'nights-stay' : 'apple'
+                                    }
+                                    size={18}
+                                    color={accent}
+                                  />
+                                  <Text style={[tw`font-bold text-base`, { color: accent }]}>
+                                    {meal.time}
+                                  </Text>
+                                </View>
+                                <View style={[tw`px-2 py-1 rounded-full`, { backgroundColor: accent + '28' }]}>
+                                  <Text style={[tw`text-xs font-black`, { color: accent }]}>
+                                    {meal.totalCalories} kcal
+                                  </Text>
+                                </View>
                               </View>
-                              <View style={[tw`px-2 py-1 rounded-full`, { backgroundColor: accent + '28' }]}>
-                                <Text style={[tw`text-xs font-black`, { color: accent }]}>
-                                  {meal.totalCalories} kcal
-                                </Text>
-                              </View>
+                              {/* Time row — tap to edit */}
+                              {editingTimeIdx === mealIdx ? (
+                                <View style={tw`flex-row items-center gap-2 mt-2`}>
+                                  <MaterialIcons name="schedule" size={14} color={accent} />
+                                  <TextInput
+                                    value={editingTimeValue}
+                                    onChangeText={setEditingTimeValue}
+                                    placeholder="HH:MM"
+                                    placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
+                                    keyboardType="numbers-and-punctuation"
+                                    maxLength={5}
+                                    style={[tw`text-sm font-bold flex-1 px-2 py-1 rounded-lg`, { color: accent, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: accent + '40' }]}
+                                    autoFocus
+                                  />
+                                  <TouchableOpacity onPress={() => handleUpdateMealTime(mealIdx, editingTimeValue)} style={[tw`px-2 py-1 rounded-lg`, { backgroundColor: accent }]}>
+                                    <Text style={tw`text-white text-xs font-bold`}>Save</Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity onPress={() => setEditingTimeIdx(null)}>
+                                    <MaterialIcons name="close" size={16} color={accent} />
+                                  </TouchableOpacity>
+                                </View>
+                              ) : (
+                                <TouchableOpacity
+                                  onPress={() => { setEditingTimeIdx(mealIdx); setEditingTimeValue(meal.clockTime); }}
+                                  style={tw`flex-row items-center gap-1 mt-1.5`}
+                                >
+                                  <MaterialIcons name="schedule" size={13} color={accent} />
+                                  <Text style={[tw`text-xs font-semibold`, { color: accent }]}>{meal.clockTime}</Text>
+                                  <MaterialIcons name="edit" size={11} color={accent} />
+                                </TouchableOpacity>
+                              )}
                             </View>
 
                             {/* Meal items */}

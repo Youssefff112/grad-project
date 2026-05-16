@@ -30,6 +30,20 @@ export const userController = {
     }
   },
 
+  async uploadProfilePicture(req, res, next) {
+    try {
+      const { AppError } = await import('../../Utils/appError.utils.js');
+      if (!req.file) throw new AppError('No file uploaded', 400);
+      const imageUrl = `/uploads/${req.file.filename}`;
+      const user = await userService.updateProfile(req.user.id, {
+        profile: { profilePicture: imageUrl },
+      });
+      successResponse(res, 200, 'Profile picture updated', { imageUrl, user });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async deleteAccount(req, res, next) {
     try {
       await userService.deleteAccount(req.user.id);

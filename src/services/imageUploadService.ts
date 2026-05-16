@@ -4,7 +4,7 @@
  */
 
 import * as ImagePicker from 'expo-image-picker';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 export interface PickedImage {
   uri: string;
@@ -91,6 +91,36 @@ export const takePhotoWithCamera = async (): Promise<PickedImage | null> => {
     console.error('Error taking photo:', error);
     throw error;
   }
+};
+
+/**
+ * Show an Alert asking the user to choose Camera or Gallery,
+ * then return the picked image (or null if cancelled).
+ */
+export const pickImageWithChoice = (): Promise<PickedImage | null> => {
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Change Photo',
+      'Choose a source',
+      [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            try { resolve(await takePhotoWithCamera()); }
+            catch { resolve(null); }
+          },
+        },
+        {
+          text: 'Choose from Library',
+          onPress: async () => {
+            try { resolve(await pickImageFromGallery()); }
+            catch { resolve(null); }
+          },
+        },
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+      ],
+    );
+  });
 };
 
 /**

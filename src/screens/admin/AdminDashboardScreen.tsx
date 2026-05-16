@@ -67,8 +67,6 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
   const statCards = [
     { label: 'Total Users', value: stats?.totalUsers ?? '—', icon: 'people' as const, color: accent },
     { label: 'New This Week', value: stats?.newUsersThisWeek ?? '—', icon: 'person-add' as const, color: '#10b981' },
-    { label: 'Total Exercises', value: stats?.totalExercises ?? '—', icon: 'fitness-center' as const, color: '#f59e0b' },
-    { label: 'User Types', value: stats?.usersByType?.length ?? '—', icon: 'category' as const, color: '#8b5cf6' },
   ];
 
   return (
@@ -141,32 +139,6 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
                 ))}
               </View>
             </View>
-
-            {/* User type breakdown */}
-            {stats?.usersByType && stats.usersByType.length > 0 && (
-              <View style={tw`px-5 mt-5`}>
-                <Text style={[tw`text-xs font-bold uppercase tracking-widest mb-3`, { color: subtextColor }]}>Users by Type</Text>
-                <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}>
-                  {stats.usersByType.map((item, i) => (
-                    <View
-                      key={item.userType}
-                      style={[tw`flex-row items-center justify-between px-4 py-3.5`, {
-                        borderBottomWidth: i < stats.usersByType.length - 1 ? 1 : 0,
-                        borderColor: borderColor,
-                      }]}
-                    >
-                      <View style={tw`flex-row items-center gap-3`}>
-                        <View style={[tw`w-2 h-2 rounded-full`, { backgroundColor: accent }]} />
-                        <Text style={[tw`text-sm font-semibold capitalize`, { color: textPrimary }]}>{item.userType}</Text>
-                      </View>
-                      <View style={[tw`px-3 py-0.5 rounded-full`, { backgroundColor: accent + '14' }]}>
-                        <Text style={[tw`text-xs font-bold`, { color: accent }]}>{item.count}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
 
             {/* Pending Coach Notifications */}
             {notifAvailable && pendingCoaches.length > 0 && (

@@ -25,7 +25,7 @@ import { resolveCoachGate } from '../utils/coachGate';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole, setUserId, setCoachApplicationStatus } = useUser();
+  const { setFullName, setEmail: saveEmail, setSubscriptionPlan, setAuthTokens, setRole, setUserId, setCoachApplicationStatus, hydrateFromAuthUser, syncProfileFromServer } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -104,6 +104,7 @@ export const SignInScreen = ({ navigation }: any) => {
         // Update user profile info
         setFullName(fullName);
         saveEmail(user.email);
+        hydrateFromAuthUser(user);
 
         // Persist role to context + AsyncStorage
         setRole(user.role as any);
@@ -135,6 +136,9 @@ export const SignInScreen = ({ navigation }: any) => {
         } else {
           setSubscriptionPlan('Free');
         }
+
+        // Pull full profile (weight, check-in date, preferences) for old + new accounts
+        syncProfileFromServer().catch(() => {});
 
         // Navigate based on role
         if (user.role === 'admin') {
