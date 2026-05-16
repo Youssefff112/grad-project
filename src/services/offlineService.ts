@@ -25,14 +25,29 @@ export interface CachedMessage {
   timestamp: number;
 }
 
-// Meal caching — keys are scoped by userId so different accounts on the same device never share data.
-function mealLogKey(date: string, userId?: string | null): string {
-  return userId ? `meal_log_${userId}_${date}` : `meal_log_${date}`;
+/**
+ * Meal log cache key scoped by user AND active plan so that switching plans
+ * automatically invalidates stale data from the previous plan without any
+ * explicit cache-clearing call.
+ *
+ * Format: meal_log_<userId>_<planId>_<date>
+ * Legacy fall-back (no planId): meal_log_<userId>_<date>
+ * Original fall-back (no userId): meal_log_<date>
+ */
+function mealLogKey(date: string, userId?: string | null, planId?: number | null): string {
+  if (userId && planId != null) return `meal_log_${userId}_${planId}_${date}`;
+  if (userId) return `meal_log_${userId}_${date}`;
+  return `meal_log_${date}`;
 }
 
-export const cacheMealLog = async (date: string, mealLog: DailyMealLog, userId?: string | null) => {
+export const cacheMealLog = async (
+  date: string,
+  mealLog: DailyMealLog,
+  userId?: string | null,
+  planId?: number | null,
+) => {
   try {
-    const key = mealLogKey(date, userId);
+    const key = mealLogKey(date, userId, planId);
     await AsyncStorage.setItem(key, JSON.stringify(mealLog)).catch((error) => {
       console.warn('[OfflineService] Error in AsyncStorage.setItem:', error);
     });
@@ -41,9 +56,13 @@ export const cacheMealLog = async (date: string, mealLog: DailyMealLog, userId?:
   }
 };
 
-export const getCachedMealLog = async (date: string, userId?: string | null): Promise<DailyMealLog | null> => {
+export const getCachedMealLog = async (
+  date: string,
+  userId?: string | null,
+  planId?: number | null,
+): Promise<DailyMealLog | null> => {
   try {
-    const key = mealLogKey(date, userId);
+    const key = mealLogKey(date, userId, planId);
     const cached = await AsyncStorage.getItem(key).catch(() => null);
     if (!cached) return null;
     try {

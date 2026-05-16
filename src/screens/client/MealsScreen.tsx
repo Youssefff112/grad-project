@@ -182,16 +182,29 @@ export const MealsScreen = ({ navigation }: any) => {
     setLogLoading(true);
 
     const load = async () => {
-      // Full base — all meals unchecked; overlaid with whatever was saved
+      // Full base — all meals unchecked; used when no valid log exists for this plan
       const base = buildBaseMealMap(mealsToDisplay);
 
       try {
         const { log } = await dietService.getDietLog(selectedDateStr);
         if (cancelled) return;
-        if (log?.mealsCompleted) {
-          // Merge: base provides missing keys as false, server log overrides known values
-          setCheckedMeals({ ...base, ...(log.mealsCompleted as Record<string, boolean>) });
-          // Restore water intake only for today's log
+
+        if (log) {
+          // PLAN-SWITCH GUARD: only apply meal completions when the log belongs to
+          // the currently active plan.  If the client switched plans today, the old
+          // log's mealsCompleted must NOT be applied to the new plan's meals
+          // (different meals at the same positional IDs would show as already eaten).
+          const logBelongsToCurrentPlan =
+            log.dietPlanId != null && Number(log.dietPlanId) === activePlan.id;
+
+          if (logBelongsToCurrentPlan && log.mealsCompleted) {
+            setCheckedMeals({ ...base, ...(log.mealsCompleted as Record<string, boolean>) });
+          } else {
+            // Different / missing plan ID — start fresh for this plan.
+            setCheckedMeals(base);
+          }
+
+          // Water intake is independent of which meal plan is active — always restore it.
           if (selectedDateStr === todayStr && log.waterMl != null && log.waterMl > 0) {
             setWaterMlOverride(log.waterMl);
             setWaterGlasses(Math.min(24, Math.round(log.waterMl / WATER_ML_PER_GLASS)));
@@ -205,8 +218,8 @@ export const MealsScreen = ({ navigation }: any) => {
       if (cancelled) return;
 
       if (selectedDateStr === todayStr) {
-        // Fall back to local offline cache for today (user-scoped key)
-        const cached = await offlineService.getCachedMealLog(selectedDateStr, userId);
+        // Fall back to local offline cache (scoped by userId + planId to avoid cross-plan bleed)
+        const cached = await offlineService.getCachedMealLog(selectedDateStr, userId, activePlan.id);
         if (!cancelled && cached) {
           setCheckedMeals({ ...base, ...cached.checkedMeals });
           setWaterGlasses(cached.waterGlasses);
@@ -217,7 +230,7 @@ export const MealsScreen = ({ navigation }: any) => {
         }
       }
 
-      // No log found — initialise with all meals unchecked
+      // No valid log found for this plan — initialise with all meals unchecked
       if (!cancelled) setCheckedMeals(base);
     };
 
@@ -241,12 +254,13 @@ export const MealsScreen = ({ navigation }: any) => {
     // number of tapped meals.
     const fullMealMap: Record<string, boolean> = { ...buildBaseMealMap(mealsToDisplay), ...checkedMeals };
 
+    // Scope the offline cache by planId so old entries don't bleed into a new plan
     offlineService.cacheMealLog(todayStr, {
       checkedMeals: fullMealMap,
       waterGlasses,
       date: todayStr,
       waterMl: waterMlEffective,
-    }, userId);
+    }, userId, activePlan?.id ?? null);
 
     setSaveStatus('saving');
     if (logTimer.current) clearTimeout(logTimer.current);

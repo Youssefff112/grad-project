@@ -131,11 +131,26 @@ export const dietService = {
     const prevWaterMl = existingLog?.waterMl != null ? existingLog.waterMl : null;
 
     if (existingLog) {
-      existingLog.mealsCompleted = mealsCompleted ?? existingLog.mealsCompleted;
-      if (caloriesConsumed !== undefined) existingLog.caloriesConsumed = caloriesConsumed;
-      if (macrosConsumed !== undefined) existingLog.macrosConsumed = macrosConsumed;
+      // PLAN-SWITCH DETECTION: if this log was created for a different plan, reset all
+      // plan-specific fields so old completions/calories don't bleed into the new plan.
+      const planSwitched =
+        existingLog.dietPlanId != null &&
+        Number(existingLog.dietPlanId) !== Number(activePlan.id);
+
+      if (planSwitched) {
+        // Hard-reset plan-specific fields; keep water (plan-independent) if not resupplied
+        existingLog.mealsCompleted = mealsCompleted || {};
+        existingLog.caloriesConsumed = caloriesConsumed ?? null;
+        existingLog.macrosConsumed = macrosConsumed || {};
+        existingLog.status = normalizedStatus || 'partial';
+      } else {
+        existingLog.mealsCompleted = mealsCompleted ?? existingLog.mealsCompleted;
+        if (caloriesConsumed !== undefined) existingLog.caloriesConsumed = caloriesConsumed;
+        if (macrosConsumed !== undefined) existingLog.macrosConsumed = macrosConsumed;
+        if (normalizedStatus !== undefined) existingLog.status = normalizedStatus;
+      }
+
       if (notes !== undefined) existingLog.notes = notes;
-      if (normalizedStatus !== undefined) existingLog.status = normalizedStatus;
       if (waterMl !== undefined && waterMl !== null) {
         const w = parseInt(waterMl, 10);
         if (!Number.isNaN(w)) existingLog.waterMl = Math.max(0, Math.min(w, 20000));
