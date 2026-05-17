@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack';
 import { stackScreenOptions } from './src/navigation/screenTransitions';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -80,7 +80,7 @@ import { CoachSettingsScreen } from './src/screens/coach/CoachSettingsScreen';
 import { CoachPendingApprovalScreen } from './src/screens/coach/CoachPendingApprovalScreen';
 import { CoachApplicationRejectedScreen } from './src/screens/coach/CoachApplicationRejectedScreen';
 
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
 function AppNavigator() {
   const { isDark } = useTheme();
@@ -108,7 +108,7 @@ function AppNavigator() {
       screenOptions={{
         headerShown: false,
         ...stackScreenOptions,
-        contentStyle: {
+        cardStyle: {
           backgroundColor: isDark ? '#08080f' : '#f8f7f5',
         },
       }}

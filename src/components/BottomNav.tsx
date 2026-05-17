@@ -1,6 +1,5 @@
 import React, { useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ViewStyle, Animated, Easing } from 'react-native';
-import { STACK_TRANSITION_MS } from '../navigation/screenTransitions';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -35,7 +34,7 @@ const AnimatedTabItem: React.FC<{
   React.useEffect(() => {
     Animated.timing(indicatorOpacity, {
       toValue: isActive ? 1 : 0,
-      duration: STACK_TRANSITION_MS,
+      duration: 200,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
