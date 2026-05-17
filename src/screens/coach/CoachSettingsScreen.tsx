@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import * as coachService from '../../services/coachService';
 
 export const CoachSettingsScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
-  const { fullName, email, logout } = useUser();
+  const { fullName, email, logout, profilePicture, syncProfileFromServer } = useUser();
   const { totalUnread } = useNotifications();
 
   const [analytics, setAnalytics] = useState<coachService.CoachAnalytics>({
@@ -32,6 +34,12 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
       .then(({ analytics: data }) => setAnalytics(data))
       .catch(() => {});
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      syncProfileFromServer();
+    }, [syncProfileFromServer]),
+  );
 
   const STATS = [
     { label: 'Clients', value: String(analytics.activeClients ?? 0), icon: 'group' as const },
@@ -162,14 +170,18 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
       <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
         {/* Avatar & Name */}
         <View style={tw`items-center pt-6 pb-5`}>
-          <View
-            style={[
-              tw`w-24 h-24 rounded-full items-center justify-center mb-4`,
-              { backgroundColor: accent + '20', borderWidth: 2, borderColor: accent },
-            ]}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CoachProfileEdit')}
+            activeOpacity={0.85}
+            style={tw`mb-4`}
           >
-            <MaterialIcons name="person" size={48} color={accent} />
-          </View>
+            <ProfileAvatar
+              profilePicture={profilePicture}
+              size={96}
+              accent={accent}
+              isDark={isDark}
+            />
+          </TouchableOpacity>
           <Text style={[tw`text-2xl font-bold`, { color: textPrimary }]}>
             {fullName || 'Coach'}
           </Text>

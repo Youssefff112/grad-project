@@ -4,6 +4,7 @@ import * as tokenManager from '../utils/tokenManager';
 import authService, { type User as AuthUser } from '../services/auth.service';
 import { getClientSubscriptionStatus, getClientProfile } from '../services/clientService';
 import * as progressService from '../services/progressService';
+import * as coachService from '../services/coachService';
 import { isClientPlan } from '../constants/plans';
 import type { CoachApplicationStatus } from '../utils/coachGate';
 
@@ -73,6 +74,8 @@ interface UserContextType {
   hydrateFromAuthUser: (user: AuthUser) => void;
   /** Pull latest profile + measurements from API (old + new accounts). */
   syncProfileFromServer: () => Promise<void>;
+  /** Set avatar path after upload (client user.profile or coach CoachProfile). */
+  setProfilePicture: (path: string | null) => void;
 
   // Authentication methods
   setAuthTokens: (accessToken: string, refreshToken: string) => Promise<void>;
@@ -137,6 +140,7 @@ const UserContext = createContext<UserContextType>({
   setRole: () => {},
   hydrateFromAuthUser: () => {},
   syncProfileFromServer: async () => {},
+  setProfilePicture: () => {},
 
   // Authentication methods defaults
   setAuthTokens: async () => {},
@@ -592,6 +596,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const setProfilePicture = useCallback((path: string | null) => {
+    setProfilePictureState(path);
+  }, []);
+
   const syncProfileFromServer = useCallback(async () => {
     try {
       const res = await authService.getProfile();
@@ -599,6 +607,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!user) return;
 
       hydrateFromAuthUser(user);
+
+      if (user.role === 'coach') {
+        try {
+          const { profile } = await coachService.getMyCoachProfile();
+          if (profile?.profilePicture) {
+            setProfilePictureState(profile.profilePicture);
+          }
+        } catch {
+          /* coach profile optional during sync */
+        }
+      }
 
       const p = user.profile || {};
       if (p.currentWeight == null) {
@@ -711,6 +730,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCanUseComputerVisionState(false);
       setCanUseAIAssistantState(false);
       setLastPlanReviewDateState(null);
+      setProfilePictureState(null);
 
       // Clear all stored data
       await Promise.all([
@@ -785,6 +805,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCoachApplicationStatus,
       hydrateFromAuthUser,
       syncProfileFromServer,
+      setProfilePicture,
 
       // Authentication methods
       setAuthTokens,

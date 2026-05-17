@@ -4,6 +4,7 @@
  */
 
 import { apiGet, apiPost, apiPatch } from './api';
+import { API_ROUTES } from '../constants/apiRoutes';
 import * as tokenManager from '../utils/tokenManager';
 
 export interface LoginRequest {
@@ -65,6 +66,7 @@ export interface User {
     lastPlanReviewDate?: string;
     canUseComputerVision?: boolean;
     canUseAIAssistant?: boolean;
+    profilePicture?: string;
   };
 }
 
@@ -116,7 +118,7 @@ export const register = async (userData: RegisterRequest): Promise<RegisterRespo
  * Get current user profile
  */
 export const getProfile = async (): Promise<ProfileResponse> => {
-  return apiGet<ProfileResponse>('/users/profile');
+  return apiGet<ProfileResponse>(API_ROUTES.users.profile);
 };
 
 /**
@@ -138,14 +140,14 @@ export const logout = async (): Promise<void> => {
  * Update user profile
  */
 export const updateProfile = async (updates: Partial<User>): Promise<ProfileResponse> => {
-  return apiPatch<ProfileResponse>('/users/profile', updates);
+  return apiPatch<ProfileResponse>(API_ROUTES.users.profile, updates);
 };
 
 /**
  * Complete onboarding
  */
 export const completeOnboarding = async (profile: any): Promise<ProfileResponse> => {
-  return apiPost<ProfileResponse>('/users/onboarding', { profile });
+  return apiPost<ProfileResponse>(API_ROUTES.users.onboarding, { profile });
 };
 
 export default {

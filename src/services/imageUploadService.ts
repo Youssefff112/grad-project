@@ -77,10 +77,11 @@ export const pickImageFromGallery = async (): Promise<PickedImage | null> => {
 
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
+      const name = asset.fileName || `image-${Date.now()}.jpg`;
       return {
         uri: asset.uri,
-        type: 'image/jpeg',
-        name: `image-${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+        name,
       };
     }
 
@@ -114,10 +115,11 @@ export const takePhotoWithCamera = async (): Promise<PickedImage | null> => {
 
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
+      const name = asset.fileName || `camera-${Date.now()}.jpg`;
       return {
         uri: asset.uri,
-        type: 'image/jpeg',
-        name: `camera-${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+        name,
       };
     }
 
