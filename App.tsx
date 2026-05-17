@@ -9,7 +9,6 @@ import { OfflineProvider } from './src/context/OfflineContext';
 import { FoodManagementProvider } from './src/context/FoodManagementContext';
 import { ExerciseManagementProvider } from './src/context/ExerciseManagementContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import './src/services/pushNotificationSetup';
 
 // Shared / Auth screens
 import { SplashScreen } from './src/screens/SplashScreen';
