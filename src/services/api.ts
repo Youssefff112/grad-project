@@ -11,6 +11,7 @@ import * as offlineService from './offlineService';
 import * as syncQueueService from './syncQueueService';
 import type { OperationType } from './syncQueueService';
 import { getCurrentNetworkState } from './networkService';
+import { unwrapApiData } from '../utils/apiResponse';
 
 const URL_TO_OPERATION_TYPE: Record<string, OperationType> = {
   messages: 'message',
@@ -250,7 +251,7 @@ export const apiUpload = async <T = any>(url: string, formData: FormData): Promi
     throw err;
   }
 
-  return json as T;
+  return unwrapApiData<T>(json);
 };
 
 /**

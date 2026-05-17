@@ -1,6 +1,8 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -65,8 +67,10 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static files for uploads
-app.use('/uploads', express.static('uploads'));
+// Serve uploaded images (same folder as multer in SRC/Utils/fileUpload.js)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health Check
 app.get('/health', (req, res) => {

@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -18,21 +17,23 @@ import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
-import { apiPatch, apiPost, apiUpload } from '../services/api';
+import { apiPost, apiUpload } from '../services/api';
+import authService from '../services/auth.service';
 import * as imageUploadService from '../services/imageUploadService';
-import { buildImageUrl } from '../utils/imageUrl';
+import { ProfileAvatar } from '../components/ProfileAvatar';
+import { API_ROUTES } from '../constants/apiRoutes';
 
 type Section = 'profile' | 'password';
 
 export const EditProfileScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { fullName, email, setFullName, setEmail, syncProfileFromServer, profilePicture } = useUser();
+  const { fullName, email, setFullName, setEmail, syncProfileFromServer, profilePicture, setProfilePicture } = useUser();
 
   const [activeSection, setActiveSection] = useState<Section>('profile');
   const [name, setName] = useState(fullName ?? '');
   const [emailInput, setEmailInput] = useState(email ?? '');
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
@@ -49,21 +50,21 @@ export const EditProfileScreen = ({ navigation }: any) => {
   const handleChangePhoto = async () => {
     const image = await imageUploadService.pickImageWithChoice();
     if (!image) return;
-    // Show local preview immediately
-    setPhotoUri(image.uri);
-    setIsSaving(true);
+    setIsUploadingPhoto(true);
     try {
       const formData = imageUploadService.createFormDataForImage(image, 'image');
-      const res: any = await apiUpload('/user/profile-picture', formData);
-      // Server returns imageUrl (relative path) — sync context so all screens update
+      const data = await apiUpload<{ imageUrl: string }>(API_ROUTES.users.profilePicture, formData);
+      if (!data.imageUrl) {
+        throw new Error('Server did not return a photo URL');
+      }
+      // Stored on server in user.profile JSON — only the URL path is kept in app state
+      setProfilePicture(data.imageUrl);
       await syncProfileFromServer();
-      // Keep local preview (already set); context sync will carry the server URL
     } catch (err: any) {
-      setPhotoUri(null);
       const msg = err?.response?.data?.message || err?.message || 'Failed to upload photo.';
       Alert.alert('Upload Failed', msg);
     } finally {
-      setIsSaving(false);
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -81,7 +82,7 @@ export const EditProfileScreen = ({ navigation }: any) => {
     try {
       const [firstName, ...rest] = name.trim().split(' ');
       const lastName = rest.join(' ');
-      await apiPatch('/user/profile', {
+      await authService.updateProfile({
         firstName,
         lastName: lastName || undefined,
         email: emailInput.trim(),
@@ -207,27 +208,21 @@ export const EditProfileScreen = ({ navigation }: any) => {
             <>
               {/* Avatar */}
               <View style={tw`items-center pt-4 pb-6`}>
-                {(photoUri || profilePicture) ? (
-                  <Image
-                    source={{ uri: photoUri ?? buildImageUrl(profilePicture) ?? undefined }}
-                    style={tw`w-24 h-24 rounded-full mb-3`}
-                  />
-                ) : (
-                  <View
-                    style={[
-                      tw`w-24 h-24 rounded-full items-center justify-center mb-3`,
-                      { backgroundColor: accent + '20', borderWidth: 2, borderColor: accent },
-                    ]}
-                  >
-                    <MaterialIcons name="person" size={48} color={accent} />
-                  </View>
-                )}
+                <ProfileAvatar
+                  profilePicture={profilePicture}
+                  size={96}
+                  accent={accent}
+                  isDark={isDark}
+                  uploading={isUploadingPhoto}
+                  style={tw`mb-3`}
+                />
                 <TouchableOpacity
                   style={[
                     tw`px-4 py-2 rounded-full gap-2 flex-row items-center`,
                     { backgroundColor: accent + '18' },
                   ]}
                   onPress={handleChangePhoto}
+                  disabled={isUploadingPhoto}
                 >
                   <MaterialIcons name="camera-alt" size={16} color={accent} />
                   <Text style={[tw`text-sm font-bold`, { color: accent }]}>Change Photo</Text>

@@ -4,6 +4,7 @@
  */
 
 import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from './api';
+import { API_ROUTES } from '../constants/apiRoutes';
 
 export interface Coach {
   id: number;
@@ -143,20 +144,20 @@ export const checkReviewEligibility = async (
 
 // Coach profile management (coaches only)
 export const getMyCoachProfile = async (): Promise<{ profile: Coach }> => {
-  const response = await apiGet('/coach/profile');
+  const response = await apiGet(API_ROUTES.coach.profile);
   return { profile: response.data?.profile || {} };
 };
 
 export const updateCoachProfile = async (updates: Partial<Coach>): Promise<{ profile: Coach }> => {
-  const response = await apiPatch('/coach/profile', updates);
+  const response = await apiPatch(API_ROUTES.coach.profile, updates);
   return { profile: response.data?.profile || {} };
 };
 
 export const uploadProfilePicture = async (imageFile: FormData): Promise<{ imageUrl: string; profile: Coach }> => {
-  const response = await apiUpload('/coach/profile-picture', imageFile);
+  const data = await apiUpload<{ imageUrl: string; profile: Coach }>(API_ROUTES.coach.profilePicture, imageFile);
   return {
-    imageUrl: response.data?.imageUrl || '',
-    profile: response.data?.profile || {}
+    imageUrl: data.imageUrl || '',
+    profile: data.profile || {},
   };
 };
 

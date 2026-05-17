@@ -28,11 +28,22 @@ const storage = multer.diskStorage({
 
 // File filter to only accept images
 const fileFilter = (req, file, cb) => {
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedMimes.includes(file.mimetype)) {
+  const allowedMimes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+    'application/octet-stream', // common for React Native FormData on iOS
+  ];
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const allowedExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+  if (allowedMimes.includes(file.mimetype) || allowedExt.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only JPEG, PNG, GIF and WebP are allowed.'), false);
+    cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WebP and HEIC are allowed.'), false);
   }
 };
 
