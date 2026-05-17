@@ -105,9 +105,10 @@ function AppNavigator() {
       initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
-        animationDuration: 250,
-        freezeOnBlur: true,
+        // One transition everywhere (bottom nav, buttons, deep links): direction-neutral
+        // fade so pops never look "backwards" and matches Apple Fitness–style polish.
+        animation: 'fade',
+        animationDuration: 220,
         gestureEnabled: true,
         contentStyle: {
           backgroundColor: isDark ? '#08080f' : '#f8f7f5',
@@ -120,26 +121,36 @@ function AppNavigator() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
       <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
-      <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
       <Stack.Screen name="MeasurementsSettings" component={MeasurementsSettingsScreen} />
-      <Stack.Screen name="Messages" component={MessagesScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
-      {/* Client (Trainee) flow */}
+      <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
+      <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
+      <Stack.Screen name="Meals" component={MealsScreen} />
+      <Stack.Screen name="Messages" component={MessagesScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="CoachBrowsingScreen" component={CoachBrowsingScreen} />
+      <Stack.Screen name="CoachCommandCenter" component={CoachCommandCenterScreen} />
+      <Stack.Screen name="CoachClientList" component={CoachClientListScreen} />
+      <Stack.Screen name="CoachSchedule" component={CoachScheduleScreen} />
+      <Stack.Screen name="CoachSettings" component={CoachSettingsScreen} />
+      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <Stack.Screen name="AdminUsers" component={AdminUserManagementScreen} />
+      <Stack.Screen name="AdminCoaches" component={AdminCoachApprovalsScreen} />
+      <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionScreen} />
+
+      {/* Client feature / detail */}
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="SubscriptionSelection" component={SubscriptionSelectionScreen} />
       <Stack.Screen name="OnboardingPreferences" component={OnboardingPreferencesScreen} />
       <Stack.Screen name="Biometrics" component={BiometricsScreen} />
       <Stack.Screen name="SafeGuardIntake" component={SafeGuardIntakeScreen} />
       <Stack.Screen name="Goals" component={GoalsScreen} />
-      <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
       <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <Stack.Screen name="Calibration" component={CalibrationScreen} />
       <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
-      <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
-      <Stack.Screen name="Meals" component={MealsScreen} />
       <Stack.Screen name="AddFood" component={AddFoodScreen} />
       <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
       <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
@@ -155,31 +166,20 @@ function AppNavigator() {
       <Stack.Screen name="MealGeneration" component={MealGenerationScreen} />
       <Stack.Screen name="EditExperience" component={EditExperienceScreen} />
       <Stack.Screen name="EditDiet" component={EditDietScreen} />
-      <Stack.Screen name="CoachBrowsingScreen" component={CoachBrowsingScreen} />
       <Stack.Screen name="CoachProfileDetail" component={CoachProfileDetailScreen} />
       <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
 
-      {/* Admin flow */}
-      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
-      <Stack.Screen name="AdminUsers" component={AdminUserManagementScreen} />
-      <Stack.Screen name="AdminCoaches" component={AdminCoachApprovalsScreen} />
-      <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionScreen} />
-
-      {/* Coach flow */}
+      {/* Coach feature / detail */}
       <Stack.Screen name="CoachPendingApproval" component={CoachPendingApprovalScreen} />
       <Stack.Screen name="CoachApplicationRejected" component={CoachApplicationRejectedScreen} />
       <Stack.Screen name="CoachSubscription" component={CoachSubscriptionScreen} />
-      <Stack.Screen name="CoachCommandCenter" component={CoachCommandCenterScreen} />
       <Stack.Screen name="CoachProfileEdit" component={CoachProfileEditScreen} />
-      <Stack.Screen name="CoachClientList" component={CoachClientListScreen} />
       <Stack.Screen name="CoachClientDetail" component={CoachClientDetailScreen} />
       <Stack.Screen name="CoachMealPlan" component={CoachMealPlanScreen} />
       <Stack.Screen name="CoachWorkoutPlan" component={CoachWorkoutPlanScreen} />
-      <Stack.Screen name="CoachSchedule" component={CoachScheduleScreen} />
       <Stack.Screen name="CoachEarnings" component={CoachEarningsScreen} />
       <Stack.Screen name="CoachReviewManagement" component={CoachReviewManagementScreen} />
       <Stack.Screen name="CoachProgramTemplates" component={CoachProgramTemplatesScreen} />
-      <Stack.Screen name="CoachSettings" component={CoachSettingsScreen} />
     </Stack.Navigator>
   );
 }
