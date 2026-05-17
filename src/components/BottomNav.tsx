@@ -26,7 +26,7 @@ const AnimatedTabItem: React.FC<{
   textMuted: string;
   errorColor: string;
   onPress: () => void;
-}> = ({ item, isActive, isCompact, accent, textMuted, errorColor, onPress }) => {
+}> = React.memo(({ item, isActive, isCompact, accent, textMuted, errorColor, onPress }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const indicatorOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
 
@@ -136,7 +136,7 @@ const AnimatedTabItem: React.FC<{
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   items,
