@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ViewStyle, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ViewStyle, Animated, Easing } from 'react-native';
+import { STACK_TRANSITION_MS } from '../navigation/screenTransitions';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -34,24 +35,25 @@ const AnimatedTabItem: React.FC<{
   React.useEffect(() => {
     Animated.timing(indicatorOpacity, {
       toValue: isActive ? 1 : 0,
-      duration: 180,
+      duration: STACK_TRANSITION_MS,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [isActive]);
+  }, [isActive, indicatorOpacity]);
 
   const handlePress = useCallback(() => {
     Animated.sequence([
       Animated.spring(scaleAnim, {
-        toValue: 0.88,
+        toValue: 0.92,
         useNativeDriver: true,
-        tension: 400,
-        friction: 10,
+        speed: 28,
+        bounciness: 0,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         useNativeDriver: true,
-        tension: 200,
-        friction: 8,
+        speed: 14,
+        bounciness: 4,
       }),
     ]).start();
     onPress();

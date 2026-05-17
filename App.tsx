@@ -1,5 +1,7 @@
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useMemo } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { stackScreenOptions } from './src/navigation/screenTransitions';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { UserProvider, useUser } from './src/context/UserContext';
@@ -104,11 +106,7 @@ function AppNavigator() {
       initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
-        // One transition everywhere (bottom nav, buttons, deep links): direction-neutral
-        // fade so pops never look "backwards" and matches Apple Fitness–style polish.
-        animation: 'fade',
-        animationDuration: 220,
-        gestureEnabled: true,
+        ...stackScreenOptions,
         contentStyle: {
           backgroundColor: isDark ? '#08080f' : '#f8f7f5',
         },
@@ -183,6 +181,33 @@ function AppNavigator() {
   );
 }
 
+function AppNavigationContainer() {
+  const { isDark, accent, colors } = useTheme();
+
+  const navigationTheme = useMemo(() => {
+    const base = isDark ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      dark: isDark,
+      colors: {
+        ...base.colors,
+        primary: accent,
+        background: colors.bg,
+        card: colors.card,
+        text: colors.text,
+        border: colors.cardBorder,
+        notification: colors.error,
+      },
+    };
+  }, [isDark, accent, colors]);
+
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <AppNavigator />
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -193,9 +218,7 @@ export default function App() {
               <ExerciseManagementProvider>
                 <NotificationProvider>
                   <LoadingProvider>
-                    <NavigationContainer>
-                      <AppNavigator />
-                    </NavigationContainer>
+                    <AppNavigationContainer />
                   </LoadingProvider>
                 </NotificationProvider>
               </ExerciseManagementProvider>
