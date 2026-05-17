@@ -4,7 +4,7 @@
  */
 
 import * as ImagePicker from 'expo-image-picker';
-import { Alert, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 
 export interface PickedImage {
   uri: string;
@@ -12,19 +12,46 @@ export interface PickedImage {
   name: string;
 }
 
-/**
- * Request camera and gallery permissions
- */
-export const requestPermissions = async () => {
-  if (Platform.OS !== 'web') {
-    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-    const galleryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+const hasMediaLibraryAccess = (
+  status: ImagePicker.MediaLibraryPermissionResponse,
+) => status.granted || status.accessPrivileges === 'limited';
 
-    if (cameraStatus.status !== 'granted' || galleryStatus.status !== 'granted') {
-      return false;
-    }
-  }
-  return true;
+const promptOpenSettings = (title: string, message: string) => {
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Open Settings', onPress: () => Linking.openSettings() },
+  ]);
+};
+
+/** Request photo-library access only (for picking from gallery). */
+export const requestGalleryPermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'web') return true;
+
+  const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+  if (hasMediaLibraryAccess(current)) return true;
+
+  const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  return hasMediaLibraryAccess(result);
+};
+
+/** Request camera access only (for taking a photo). */
+export const requestCameraPermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'web') return true;
+
+  const current = await ImagePicker.getCameraPermissionsAsync();
+  if (current.granted) return true;
+
+  const result = await ImagePicker.requestCameraPermissionsAsync();
+  return result.granted;
+};
+
+/** Request both camera and gallery (legacy helper). */
+export const requestPermissions = async () => {
+  const [camera, gallery] = await Promise.all([
+    requestCameraPermission(),
+    requestGalleryPermission(),
+  ]);
+  return camera && gallery;
 };
 
 /**
@@ -32,9 +59,13 @@ export const requestPermissions = async () => {
  */
 export const pickImageFromGallery = async (): Promise<PickedImage | null> => {
   try {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission && Platform.OS !== 'web') {
-      throw new Error('Camera/Gallery permission denied');
+    const hasPermission = await requestGalleryPermission();
+    if (!hasPermission) {
+      promptOpenSettings(
+        'Photos access required',
+        'Allow photo library access to choose an image.',
+      );
+      return null;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -65,9 +96,13 @@ export const pickImageFromGallery = async (): Promise<PickedImage | null> => {
  */
 export const takePhotoWithCamera = async (): Promise<PickedImage | null> => {
   try {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission && Platform.OS !== 'web') {
-      throw new Error('Camera permission denied');
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      promptOpenSettings(
+        'Camera access required',
+        'Allow camera access to take a photo.',
+      );
+      return null;
     }
 
     const result = await ImagePicker.launchCameraAsync({

@@ -12,9 +12,19 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "FitCore uses the camera for profile photos and workout form analysis.",
+        "NSPhotoLibraryUsageDescription": "FitCore uses your photo library so you can choose profile and progress images.",
+        "NSMicrophoneUsageDescription": "FitCore may use the microphone when recording video during workouts."
+      }
     },
     "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -33,6 +43,13 @@
           "icon": "./assets/icon.png",
           "color": "#ffffff",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FitCore uses your photo library so you can choose profile and progress images.",
+          "cameraPermission": "FitCore uses the camera for profile photos and workout form analysis."
         }
       ]
     ]
