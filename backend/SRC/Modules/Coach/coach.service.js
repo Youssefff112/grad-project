@@ -504,5 +504,32 @@ export const coachService = {
       hasActivePlan: { diet: hasActiveDietPlan, workout: hasActiveWorkoutPlan },
     };
   },
+
+  /**
+   * Paginated workout log history for a specific client, visible to their coach.
+   * Returns the full WorkoutLog rows so the coach can see exercise names, reps, notes, form score, etc.
+   */
+  async getClientWorkoutLogs(coachUserId, clientUserId, { page = 1, limit = 20 } = {}) {
+    await this.requireApprovedCoach(coachUserId);
+
+    const offset = (Math.max(1, page) - 1) * Math.min(50, limit);
+    const { count, rows } = await WorkoutLog.findAndCountAll({
+      where: { userId: clientUserId },
+      order: [['date', 'DESC']],
+      limit: Math.min(50, limit),
+      offset,
+    });
+
+    const toPlain = (r) => (typeof r.get === 'function' ? r.get({ plain: true }) : r);
+    return {
+      logs: rows.map(toPlain),
+      pagination: {
+        total: count,
+        page,
+        limit,
+        totalPages: Math.ceil(count / limit),
+      },
+    };
+  },
 };
 

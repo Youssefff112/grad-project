@@ -106,11 +106,12 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
     }
   }, []);
 
-  // Refresh on every focus so deletes / regenerates done from other screens
-  // are reflected here immediately.
+  // Refresh plan exercises AND history on every focus so changes from other
+  // screens (completed workouts, deleted plans) are reflected immediately.
   useFocusEffect(
     useCallback(() => {
       loadActivePlanExercises();
+      loadWorkoutHistory(); // always refresh history on screen focus
     }, [loadActivePlanExercises]),
   );
 

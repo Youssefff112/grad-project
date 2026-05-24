@@ -36,6 +36,7 @@ import { TraineeCommandCenterScreen } from './src/screens/client/TraineeCommandC
 import { SubscriptionPlansScreen } from './src/screens/client/SubscriptionPlansScreen';
 import { CalibrationScreen } from './src/screens/client/CalibrationScreen';
 import { ActiveSetScreen } from './src/screens/client/ActiveSetScreen';
+import { WorkoutSummaryScreen } from './src/screens/client/WorkoutSummaryScreen';
 import { VisionAnalysisLabScreen } from './src/screens/client/VisionAnalysisLabScreen';
 import { MealsScreen } from './src/screens/client/MealsScreen';
 import { ExerciseDetailScreen } from './src/screens/client/ExerciseDetailScreen';
@@ -148,6 +149,7 @@ function AppNavigator() {
       <Stack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <Stack.Screen name="Calibration" component={CalibrationScreen} />
       <Stack.Screen name="ActiveSet" component={ActiveSetScreen} />
+      <Stack.Screen name="WorkoutSummary" component={WorkoutSummaryScreen} />
       <Stack.Screen name="AddFood" component={AddFoodScreen} />
       <Stack.Screen name="FoodLibrary" component={FoodLibraryScreen} />
       <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />

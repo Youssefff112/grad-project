@@ -220,6 +220,48 @@ export const notificationService = {
     }
   },
 
+  /**
+   * Notify the client's assigned coach (Elite / CoachAssisted plans) that
+   * the client has completed a workout session.
+   *
+   * @param {number} coachUserId  - User ID of the coach to notify
+   * @param {{ clientDisplayName: string, exerciseName: string, reps: number,
+   *           durationMinutes: number, formScore: number, clientUserId: number }} details
+   */
+  async notifyCoachClientWorkoutDone(coachUserId, { clientDisplayName, exerciseName, reps, durationMinutes, formScore, clientUserId } = {}) {
+    const cid = coachUserId != null ? Number(coachUserId) : NaN;
+    if (!Number.isFinite(cid) || cid <= 0) return;
+    try {
+      const name   = (clientDisplayName || '').trim() || 'A client';
+      const exName = (exerciseName     || '').trim() || 'a workout';
+      const repStr = reps > 0 ? ` · ${reps} reps` : '';
+      const durStr = durationMinutes > 0 ? ` · ${durationMinutes} min` : '';
+      const formStr = formScore > 0 ? ` · Form ${formScore}%` : '';
+      const message = `${name} completed ${exName}${repStr}${durStr}${formStr}.`;
+
+      await Notification.create({
+        userId: cid,
+        channel: 'in_app',
+        title: 'Client workout completed',
+        message,
+        type: 'workout',
+        icon: 'fitness_center',
+        read: false,
+        status: 'sent',
+      });
+
+      await this.sendExpoPushIfEnabled(
+        cid,
+        undefined,
+        'Client workout completed',
+        message,
+        { type: 'client_workout_done', clientUserId: String(clientUserId ?? ''), exerciseName: String(exName) },
+      );
+    } catch (e) {
+      console.warn('[notifyCoachClientWorkoutDone]', e?.message || e);
+    }
+  },
+
   /** Client generated an AI meal plan that needs coach approval (in-app + optional push). */
   async notifyCoachPendingClientDietPlan(coachUserId, { clientUserId, clientDisplayName, planId }) {
     const cid = coachUserId != null ? Number(coachUserId) : NaN;

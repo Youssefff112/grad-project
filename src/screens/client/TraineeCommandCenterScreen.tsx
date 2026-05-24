@@ -549,7 +549,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               <TouchableOpacity
                 activeOpacity={0.9}
                 style={[tw`overflow-hidden rounded-2xl h-60 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
-                onPress={() => navigation.navigate('Calibration')}
+                onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout" })}
               >
                 <ImageBackground
                   source={{ uri: getWorkoutImage(todayWorkoutDay.focus) }}
@@ -574,7 +574,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                     </Text>
                     <View style={tw`flex-row items-center gap-2`}>
                       <TouchableOpacity
-                        onPress={() => navigation.navigate('Calibration')}
+                        onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout" })}
                         style={[tw`flex-row items-center gap-2 px-5 py-2.5 rounded-xl`, { backgroundColor: accent }]}
                       >
                         <MaterialIcons name="play-arrow" size={18} color="white" />

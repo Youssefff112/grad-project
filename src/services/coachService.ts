@@ -369,3 +369,20 @@ export const getClientDietLogs = async (
   const response: any = await apiGet(`/coach/clients/${clientId}/diet-logs?days=${days}`);
   return { logs: Array.isArray(response.data?.logs) ? response.data.logs : [] };
 };
+
+/**
+ * Full workout session history for a client, readable by their assigned coach.
+ */
+export const getClientWorkoutLogs = async (
+  clientId: number,
+  page = 1,
+  limit = 20
+): Promise<{ logs: any[]; pagination: any }> => {
+  const response: any = await apiGet(
+    `/coach/clients/${clientId}/workout-logs?page=${page}&limit=${limit}`
+  );
+  return {
+    logs: Array.isArray(response.data) ? response.data : [],
+    pagination: response.pagination ?? null,
+  };
+};

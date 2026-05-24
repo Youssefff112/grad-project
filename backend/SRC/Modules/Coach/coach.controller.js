@@ -468,6 +468,20 @@ export const coachController = {
     }
   },
 
+  /** Full workout log history for a client — for the coach's workouts tab */
+  async getClientWorkoutLogs(req, res, next) {
+    try {
+      await coachService.requireApprovedCoach(req.user.id);
+      const userId = await resolveUserId(Number(req.params.clientId));
+      const page  = parseInt(req.query.page,  10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 20;
+      const result = await coachService.getClientWorkoutLogs(req.user.id, userId, { page, limit });
+      successResponse(res, 200, 'Client workout logs retrieved', result.logs, result.pagination);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   /** Per-day meal completion history with named meals — for the coach's client detail view */
   async getClientDietLogs(req, res, next) {
     try {

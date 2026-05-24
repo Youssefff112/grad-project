@@ -71,14 +71,21 @@ export interface FinishSessionRequest {
   endTime?: string;
 }
 
+export type WeekdayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
 export interface LogWorkoutRequest {
   date?: string;
-  day?: string;
+  /** Must be a weekday name — the DB column is an ENUM */
+  day?: WeekdayName;
   exercises?: WorkoutExercise[];
   duration?: number;
   calories?: number;
   notes?: string;
   rating?: number;
+  /** AI form score (0-100) — forwarded to coach notifications */
+  formScore?: number;
+  /** Total reps counted by the AI rep detector */
+  totalReps?: number;
 }
 
 /**

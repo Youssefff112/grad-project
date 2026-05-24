@@ -7,6 +7,7 @@ import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import * as coachService from '../../services/coachService';
 import type { ClientActivitySnapshot, AdherenceSummary, DetailedDietLog } from '../../services/coachService';
+import type { WorkoutSession } from '../../services/workoutService';
 
 interface Measurement {
   date: string;
@@ -48,7 +49,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   // Fall back to clientId if userId wasn't passed (older nav paths)
   const planClientId = clientUserId || clientId;
   const { isDark, accent } = useTheme();
-  const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'checkins'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'workouts' | 'checkins'>('overview');
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [workoutPlan, setWorkoutPlan] = useState<any>(null);
   const [dietPlan, setDietPlan] = useState<any>(null);
@@ -62,6 +63,8 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
   const [mealLogs, setMealLogs] = useState<DetailedDietLog[]>([]);
   const [mealLogsLoading, setMealLogsLoading] = useState(false);
   const [mealLogsExpanded, setMealLogsExpanded] = useState(false);
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutSession[]>([]);
+  const [workoutLogsLoading, setWorkoutLogsLoading] = useState(false);
 
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -165,6 +168,23 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
       setMealLogsLoading(false);
     }
   }, [planClientId]);
+
+  const loadWorkoutLogs = useCallback(async () => {
+    if (!planClientId) return;
+    setWorkoutLogsLoading(true);
+    try {
+      const { logs } = await coachService.getClientWorkoutLogs(Number(planClientId));
+      setWorkoutLogs(logs as unknown as WorkoutSession[]);
+    } catch {
+      setWorkoutLogs([]);
+    } finally {
+      setWorkoutLogsLoading(false);
+    }
+  }, [planClientId]);
+
+  useEffect(() => {
+    if (activeTab === 'workouts') loadWorkoutLogs();
+  }, [activeTab, loadWorkoutLogs]);
 
   useFocusEffect(
     useCallback(() => {
@@ -664,7 +684,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
 
       {/* Tabs */}
       <View style={[tw`flex-row px-4 pt-3 pb-0 gap-2`, { borderBottomWidth: 1, borderColor }]}>
-        {(['overview', 'plans', 'checkins'] as const).map(tab => (
+        {(['overview', 'plans', 'workouts', 'checkins'] as const).map(tab => (
           <TouchableOpacity
             key={tab}
             onPress={() => setActiveTab(tab)}
@@ -984,6 +1004,140 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
 
                   <Text style={[tw`text-xs font-bold mb-2`, { color: subtextColor }]}>DIET PLAN</Text>
                   {dietPlan ? renderDietPlanCard() : renderEmptyPlanCard('diet')}
+                </>
+              )}
+            </View>
+          )}
+
+          {/* ── Workouts Tab ────────────────────────────────────────── */}
+          {activeTab === 'workouts' && (
+            <View style={tw`gap-3`}>
+              {workoutLogsLoading ? (
+                <View style={tw`py-12 items-center`}>
+                  <ActivityIndicator size="large" color={accent} />
+                  <Text style={[tw`text-xs mt-2`, { color: subtextColor }]}>Loading sessions…</Text>
+                </View>
+              ) : workoutLogs.length === 0 ? (
+                <View style={[tw`p-8 rounded-2xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
+                  <View style={[tw`w-14 h-14 rounded-full items-center justify-center mb-3`, { backgroundColor: accent + '14' }]}>
+                    <MaterialIcons name="fitness-center" size={28} color={accent} />
+                  </View>
+                  <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>No sessions yet</Text>
+                  <Text style={[tw`text-xs text-center mt-1`, { color: subtextColor }]}>
+                    Completed workout sessions will appear here once {clientName} finishes a tracked session.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={[tw`text-xs font-bold`, { color: subtextColor }]}>
+                    {workoutLogs.length} SESSION{workoutLogs.length !== 1 ? 'S' : ''} RECORDED
+                  </Text>
+                  {workoutLogs.map((session: any, i) => {
+                    const exerciseName =
+                      (Array.isArray(session.exercises) && session.exercises[0]?.name) ||
+                      capitalise(session.day || 'Workout');
+
+                    const dateLabel = session.date
+                      ? new Date(session.date).toLocaleDateString('en-US', {
+                          weekday: 'short', month: 'short', day: 'numeric',
+                        })
+                      : '--';
+
+                    // Parse form score from notes: "Form: 87%"
+                    const formMatch = String(session.notes || '').match(/Form:\s*(\d+(?:\.\d+)?)%/i);
+                    const formScore = formMatch ? Math.round(Number(formMatch[1])) : null;
+
+                    // Parse reps from notes: "Reps: 12 ·"
+                    const repsMatch = String(session.notes || '').match(/Reps:\s*(\d+)/i);
+                    const reps = repsMatch ? Number(repsMatch[1]) : null;
+
+                    const formColor =
+                      formScore == null ? subtextColor
+                        : formScore >= 80 ? '#22c55e'
+                        : formScore >= 60 ? '#eab308'
+                        : '#ef4444';
+
+                    return (
+                      <TouchableOpacity
+                        key={session.id || i}
+                        onPress={() =>
+                          navigation.navigate('WorkoutSessionDetail', { session, readOnly: true })
+                        }
+                        style={[
+                          tw`rounded-2xl overflow-hidden`,
+                          { backgroundColor: cardBg, borderWidth: 1, borderColor },
+                        ]}
+                      >
+                        {/* Header row */}
+                        <View style={[tw`p-4`, { backgroundColor: isDark ? '#1a1a2e' : '#f8faff', borderBottomWidth: 1, borderColor }]}>
+                          <View style={tw`flex-row items-center justify-between`}>
+                            <View style={tw`flex-row items-center gap-3 flex-1`}>
+                              <View style={[tw`w-10 h-10 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
+                                <MaterialIcons name="fitness-center" size={20} color={accent} />
+                              </View>
+                              <View style={tw`flex-1`}>
+                                <Text style={[tw`text-sm font-bold`, { color: textPrimary }]} numberOfLines={1}>
+                                  {exerciseName}
+                                </Text>
+                                <Text style={[tw`text-xs`, { color: subtextColor }]}>{dateLabel}</Text>
+                              </View>
+                            </View>
+                            {formScore != null && (
+                              <View style={tw`items-end`}>
+                                <Text style={[tw`text-xl font-black`, { color: formColor }]}>
+                                  {formScore}%
+                                </Text>
+                                <Text style={[tw`text-[9px] font-bold uppercase`, { color: subtextColor }]}>Form</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+
+                        {/* Stats row */}
+                        <View style={tw`flex-row px-4 py-3 gap-4`}>
+                          {[
+                            {
+                              icon: 'timer' as const,
+                              label: 'Duration',
+                              value: session.duration ? `${session.duration}m` : '--',
+                              color: '#3b82f6',
+                            },
+                            {
+                              icon: 'repeat' as const,
+                              label: 'Reps',
+                              value: reps != null ? String(reps) : '--',
+                              color: accent,
+                            },
+                            {
+                              icon: 'check-circle' as const,
+                              label: 'Status',
+                              value: session.status === 'completed' ? 'Done' : capitalise(session.status || '--'),
+                              color: '#22c55e',
+                            },
+                          ].map((stat) => (
+                            <View key={stat.label} style={tw`flex-1 items-center`}>
+                              <MaterialIcons name={stat.icon} size={16} color={stat.color} />
+                              <Text style={[tw`text-sm font-bold mt-0.5`, { color: textPrimary }]}>
+                                {stat.value}
+                              </Text>
+                              <Text style={[tw`text-[10px] uppercase font-bold`, { color: subtextColor }]}>
+                                {stat.label}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        {/* Notes snippet */}
+                        {session.notes ? (
+                          <View style={[tw`px-4 pb-3`, { borderTopWidth: 1, borderColor }]}>
+                            <Text style={[tw`text-xs leading-relaxed pt-2`, { color: subtextColor }]} numberOfLines={2}>
+                              {session.notes}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </>
               )}
             </View>

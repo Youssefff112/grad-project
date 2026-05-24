@@ -77,13 +77,29 @@ export const workoutService = {
   },
 
   async logWorkout(userId, logData) {
-    const { date, day, exercises, duration, calories, notes, rating } = logData;
+    const { date, exercises, duration, calories, notes, rating, formScore, totalReps } = logData;
+    // `day` from the CV screen is the exercise display name (e.g. "Jumping Jack").
+    // The WorkoutLog.day column is an ENUM of weekday names, so we always derive
+    // today's weekday and treat the passed value as the exercise name.
+    const VALID_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const rawDay = (logData.day || '').toLowerCase().trim();
+    const todayWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const safeDay = VALID_DAYS.includes(rawDay) ? rawDay : todayWeekday;
+
+    // If the caller passed an exercise name (non-weekday), preserve it in the
+    // exercises array so the coach dashboard and history can display it properly.
+    const exerciseName = VALID_DAYS.includes(rawDay) ? null : (logData.day || null);
+    const exercisesList = exercises && exercises.length > 0
+      ? exercises
+      : exerciseName
+        ? [{ name: exerciseName, sets: logData.completedSets || 1, reps: String(totalReps || 0), restTime: 60 }]
+        : [];
 
     const workoutLog = await WorkoutLog.create({
       userId,
       date: date || new Date(),
-      day,
-      exercises,
+      day: safeDay,
+      exercises: exercisesList,
       duration,
       calories,
       notes,
@@ -91,10 +107,41 @@ export const workoutService = {
       status: 'completed'
     });
 
+    // Push notification to the client
     void notificationService.onWorkoutLogged(userId, {
       day: workoutLog.day,
       duration: workoutLog.duration,
     });
+
+    // Notify the coach if this client has one (Elite / CoachAssisted plans)
+    void (async () => {
+      try {
+        const clientProfile = await ClientProfile.findOne({ where: { userId } });
+        const coachId = clientProfile?.selectedCoachId;
+        if (!coachId) return;
+
+        // Fetch the client's display name for the notification message
+        const clientUser = await User.findByPk(userId, { attributes: ['firstName', 'lastName', 'email'] });
+        const displayName = clientUser
+          ? `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim() || clientUser.email
+          : `Client #${userId}`;
+
+        // Use the first exercise name from the list; fall back to the weekday label
+        const notifyExerciseName =
+          (workoutLog.exercises && workoutLog.exercises[0]?.name) || workoutLog.day;
+
+        await notificationService.notifyCoachClientWorkoutDone(coachId, {
+          clientDisplayName: displayName,
+          exerciseName: notifyExerciseName,
+          reps: typeof totalReps === 'number' ? totalReps : 0,
+          durationMinutes: workoutLog.duration ?? 0,
+          formScore: typeof formScore === 'number' ? Math.round(formScore) : 0,
+          clientUserId: userId,
+        });
+      } catch (e) {
+        console.warn('[logWorkout coach notify]', e?.message || e);
+      }
+    })();
 
     return workoutLog;
   },

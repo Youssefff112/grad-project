@@ -128,7 +128,7 @@ export const ExerciseDetailScreen = ({ navigation, route }: any) => {
         <Button
           title="Start Exercise"
           variant="primary"
-          onPress={() => navigation.navigate('Calibration')}
+          onPress={() => navigation.navigate('Calibration', { exerciseName })}
           containerStyle={tw`w-full`}
         />
       </View>

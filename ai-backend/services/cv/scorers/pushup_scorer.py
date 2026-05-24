@@ -64,5 +64,9 @@ class PushUpScorer(FormScorer):
         if angle_diff > 15:
             feedback.append(f"Arms: L {int(el_l)}° vs R {int(el_r)}° - Keep elbows same depth")
 
-        score = 100 - min(100, angle_diff * 2 + abs(avg_elbow - 90) * 0.2)
+        # Heavy penalty for being in a fully extended (resting) arm position.
+        # Best score when elbow is around 90° (bottom of push-up).
+        extension_penalty = max(0, (avg_elbow - 140) * 0.7)
+        asym_penalty      = angle_diff * 1.5
+        score = 100 - min(100, extension_penalty + asym_penalty)
         return feedback, max(0, min(100, round(score, 1)))

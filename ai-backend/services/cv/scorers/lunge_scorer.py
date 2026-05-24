@@ -1,12 +1,16 @@
-"""Squat form scorer."""
+"""Lunge / split-squat family scorer.
+
+Covers: Forward Lunge, Reverse Lunge, Bulgarian Split Squat,
+        Step-up, Walking Lunge.
+"""
 from typing import Dict, List, Tuple
 
 from ..angle_calculator import angle_between_points, LANDMARK_INDEX, get_landmark_coords
 from .base import FormScorer
 
 
-class SquatScorer(FormScorer):
-    """Score squat form from pose landmarks."""
+class LungeScorer(FormScorer):
+    """Score lunge form from pose landmarks."""
 
     def get_angles(self, landmarks) -> Dict[str, float]:
         lh = get_landmark_coords(landmarks, LANDMARK_INDEX["left_hip"])
@@ -43,34 +47,42 @@ class SquatScorer(FormScorer):
 
         knee_l = angle_between_points(lh, lk, la)
         knee_r = angle_between_points(rh, rk, ra)
-        avg_knee = (knee_l + knee_r) / 2
-        hip_l = angle_between_points(ls, lh, lk)
-        hip_r = angle_between_points(rs, rh, rk)
-        avg_hip = (hip_l + hip_r) / 2
 
-        if avg_knee >= 160:
-            feedback.append(f"Knee angle: {int(avg_knee)}° - Standing. Bend knees to 70-90° at bottom")
-        elif avg_knee >= 120:
-            feedback.append(f"Knee angle: {int(avg_knee)}° - BEND MORE. Go deeper to 70-90°")
-        elif avg_knee <= 50:
-            feedback.append(f"Knee angle: {int(avg_knee)}° - Too low. Rise slightly to 70-90°")
-        elif 70 <= avg_knee <= 100:
-            feedback.append(f"Knee angle: {int(avg_knee)}° - Good depth!")
+        # Identify front leg (lower knee angle = more bent = front leg)
+        front_knee = min(knee_l, knee_r)
+        back_knee = max(knee_l, knee_r)
+        is_left_front = knee_l <= knee_r
+
+        # Front knee depth
+        if front_knee >= 150:
+            feedback.append("Barely bending — step further forward and lower your hips")
+        elif front_knee >= 120:
+            feedback.append(f"Front knee angle: {int(front_knee)}° - Lower until front knee is 90°")
+        elif 80 <= front_knee <= 100:
+            feedback.append(f"Front knee: {int(front_knee)}° - Good depth! 90° is the target")
+        elif front_knee < 70:
+            feedback.append(f"Front knee: {int(front_knee)}° - Too low, rise slightly to protect the knee")
+
+        # Back knee near ground (should approach 90°)
+        if back_knee > 110:
+            feedback.append(f"Back knee angle: {int(back_knee)}° - Lower your hips, back knee toward floor")
+        elif 80 <= back_knee <= 100:
+            feedback.append("Back knee close to ground — great depth!")
+
+        # Front knee over toe check
+        front_k = lk if is_left_front else rk
+        front_a = la if is_left_front else ra
+        if front_k[0] > front_a[0] + 0.07:
+            feedback.append("Front knee caving in — push knee outward, in line with toes")
+        elif front_k[1] < front_a[1] - 0.12:
+            feedback.append("Front knee too far forward past toes — shorten step or shift hips back")
+
+        # Torso upright
+        torso_lean = abs(ls[0] - lh[0] + rs[0] - rh[0]) / 2
+        if torso_lean > 0.12:
+            feedback.append("Leaning forward — keep torso upright, core tight")
         else:
-            feedback.append(f"Knee angle: {int(avg_knee)}° - Target: 70-90° at bottom")
+            feedback.append("Torso upright — good posture!")
 
-        if lk[0] > la[0] + 0.05:
-            feedback.append("Left knee: Push knees OUT, sit hips BACK - keep behind toes")
-        if rk[0] < ra[0] - 0.05:
-            feedback.append("Right knee: Push knees OUT, sit hips BACK - keep behind toes")
-
-        angle_diff = abs(knee_l - knee_r)
-        if angle_diff > 15:
-            feedback.append(f"Asymmetry: L {int(knee_l)}° vs R {int(knee_r)}° - Balance both legs")
-
-        # Score based on how close the user is to the target squat depth (85°),
-        # penalising asymmetry and being in a fully upright/resting position.
-        depth_penalty = max(0, (avg_knee - 150) * 0.6)   # heavy penalty for just standing
-        asym_penalty  = angle_diff * 1.5
-        score = 100 - min(100, depth_penalty + asym_penalty)
+        score = 100 - min(100, abs(front_knee - 90) * 0.6 + abs(back_knee - 90) * 0.4)
         return feedback, max(0, min(100, round(score, 1)))

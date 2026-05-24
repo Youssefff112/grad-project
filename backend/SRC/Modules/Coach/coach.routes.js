@@ -44,6 +44,8 @@ router.patch('/plans/diet/:planId', authenticate, restrictTo('coach'), requireAc
 router.get('/clients/:clientId/activity', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientActivity);
 // Coach reads per-day meal completion history with named meals
 router.get('/clients/:clientId/diet-logs', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientDietLogs);
+// Coach reads full workout session history for a client
+router.get('/clients/:clientId/workout-logs', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientWorkoutLogs);
 
 // Coach reads a client's measurements
 router.get('/clients/:clientId/measurements', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getClientMeasurements);

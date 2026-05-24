@@ -363,8 +363,15 @@ def get_pose_corrector():
 @app.post("/analyze-frame")
 def analyze_exercise_frame(req: FrameAnalysisRequest):
     """
-    Analyze a single frame - returns live angles (for client to correct form).
-    Frontend sends frames from webcam.
+    Analyze a single camera frame.
+
+    Returns:
+      - angles: joint angles (float values keyed by joint name)
+      - targets: ideal angle ranges per joint (strings)
+      - feedback: list of live correction messages shown on screen
+      - done_well: list of positive observations
+      - to_fix: list of form issues to correct
+      - score: form quality 0-100
     """
     try:
         raw = req.image_base64
@@ -381,11 +388,59 @@ def analyze_exercise_frame(req: FrameAnalysisRequest):
     if frame is None:
         raise HTTPException(400, "Could not decode image")
 
-    corrector = get_pose_corrector()
-    angles = corrector.get_frame_angles(frame, req.exercise_name)
-    if angles:
-        return {"angles": {k: v for k, v in angles.items() if k != "targets" and isinstance(v, (int, float))}, "targets": angles.get("targets", {})}
-    return {"angles": {}, "targets": {}}
+    try:
+        from services.cv.pipeline import analyze_frame_full
+        result = analyze_frame_full(frame, req.exercise_name)
+        return {
+            "angles": result.get("angles", {}),
+            "targets": _get_frame_targets(req.exercise_name),
+            "feedback": result.get("feedback", []),
+            "done_well": result.get("done_well", []),
+            "to_fix": result.get("to_fix", []),
+            "score": result.get("score", 0.0),
+        }
+    except Exception:
+        # Fallback to legacy corrector so the endpoint never hard-fails
+        corrector = get_pose_corrector()
+        angles = corrector.get_frame_angles(frame, req.exercise_name)
+        if angles:
+            return {
+                "angles": {k: v for k, v in angles.items() if k != "targets" and isinstance(v, (int, float))},
+                "targets": angles.get("targets", {}),
+                "feedback": [],
+                "done_well": [],
+                "to_fix": [],
+                "score": 0.0,
+            }
+        return {"angles": {}, "targets": {}, "feedback": [], "done_well": [], "to_fix": [], "score": 0.0}
+
+
+def _get_frame_targets(exercise_name: str) -> dict:
+    """Return ideal angle target strings for a given exercise (used by frontend form-score logic)."""
+    n = exercise_name.lower()
+    if "squat" in n or "lunge" in n or "leg press" in n:
+        return {"knee_bottom": "70-90°", "knee_top": "170°+", "hip": "varies"}
+    if "deadlift" in n or "rdl" in n:
+        return {"hip": "160°+ at top", "back": "170-180°", "knee": "140-165°"}
+    if "glute" in n or "hip thrust" in n:
+        return {"hip_top": "165-180°", "knee": "80-100°"}
+    if "push" in n or "bench" in n or "chest press" in n or "fly" in n:
+        return {"elbow_bottom": "80-90°", "elbow_top": "170°+", "body": "180° straight"}
+    if "curl" in n or "bicep" in n:
+        return {"elbow_top": "30-45°", "elbow_bottom": "165-180°"}
+    if "row" in n:
+        return {"elbow_peak": "70-90°", "elbow_extended": "160°+"}
+    if "dip" in n or "tricep" in n or "skull" in n:
+        return {"elbow_bottom": "80-100°", "elbow_top": "170°+"}
+    if "pull" in n or "chin" in n or "lat" in n:
+        return {"elbow_top": "40-60°", "elbow_bottom": "160°+"}
+    if "shoulder" in n or "overhead" in n or "ohp" in n or "press" in n:
+        return {"elbow_bottom": "80-90°", "elbow_top": "170°+", "shoulder": "varies"}
+    if "lateral" in n or "front raise" in n:
+        return {"shoulder_top": "80-100°", "shoulder_bottom": "0-20°"}
+    if "plank" in n:
+        return {"body": "170-180° straight line"}
+    return {}
 
 
 @app.post("/test-exercise")

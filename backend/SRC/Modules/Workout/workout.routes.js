@@ -12,7 +12,7 @@ router.get('/active', requireActiveSubscription('client'), workoutController.get
 router.delete('/active', requireActiveSubscription('client'), workoutController.deletePlan);
 router.post('/start', requireActiveSubscription('client'), workoutController.startSession);
 router.post('/finish/:id', requireActiveSubscription('client'), workoutController.finishSession);
-router.post('/log', requireActiveSubscription('client'), workoutController.logWorkout);
-router.get('/history', requireActiveSubscription('client'), workoutController.getHistory);
+router.post('/log', workoutController.logWorkout); // no subscription gate — every client can log sessions
+router.get('/history', workoutController.getHistory); // no subscription gate — every client can view their history
 
 export default router;
