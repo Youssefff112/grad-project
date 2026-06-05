@@ -53,6 +53,9 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   const [planExercises, setPlanExercises] = useState<PlanExercise[]>([]);
   const [planLoading, setPlanLoading] = useState(true);
   const [planName, setPlanName] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<number | undefined>(undefined);
+  const [activePlanDay, setActivePlanDay] = useState<string | undefined>(undefined);
+  const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   // Swap state
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
@@ -83,6 +86,8 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
 
       if (todaySchedule?.exercises?.length) {
         setPlanName(`${prettyLabel(todaySchedule.day)}: ${prettyLabel(todaySchedule.focus) || 'Workout'}`);
+        setActivePlanId(plan?.id);
+        setActivePlanDay(todaySchedule.day?.toLowerCase());
         setPlanExercises(
           todaySchedule.exercises.map((e: any) => ({
             name: e.name,
@@ -96,10 +101,14 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
         // No active plan (or plan has no exercises) — wipe stale state so the
         // UI doesn't keep showing the previously-deleted plan.
         setPlanName(null);
+        setActivePlanId(undefined);
+        setActivePlanDay(undefined);
         setPlanExercises([]);
       }
     } catch {
       setPlanName(null);
+      setActivePlanId(undefined);
+      setActivePlanDay(undefined);
       setPlanExercises([]);
     } finally {
       setPlanLoading(false);
@@ -112,6 +121,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
     useCallback(() => {
       loadActivePlanExercises();
       loadWorkoutHistory(); // always refresh history on screen focus
+      workoutService.getCompletedExercises().then(setCompletedExercises).catch(() => {});
     }, [loadActivePlanExercises]),
   );
 
@@ -279,37 +289,52 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
               </View>
             ) : planExercises.length > 0 ? (
               <View style={tw`gap-2`}>
-                {planExercises.map((ex, idx) => (
-                  <View
-                    key={idx}
-                    style={[tw`rounded-xl p-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
-                  >
-                    <View style={tw`flex-row items-center justify-between`}>
-                      <View style={tw`flex-1 mr-2`}>
-                        <Text style={[tw`font-bold text-sm`, { color: textPrimary }]}>{ex.name}</Text>
-                        <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
-                          {ex.sets} sets · {ex.reps} reps · {ex.rest}s rest
-                        </Text>
-                      </View>
-                      <View style={tw`flex-row gap-1`}>
-                        <TouchableOpacity
-                          onPress={() => { setSwapTarget(idx); setSwapSearch(''); }}
-                          style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: accent + '18' }]}
-                        >
-                          <MaterialIcons name="swap-horiz" size={14} color={accent} />
-                          <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => navigation.navigate('Calibration', { exerciseName: ex.name })}
-                          style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#4ade8018' }]}
-                        >
-                          <MaterialIcons name="videocam" size={14} color="#4ade80" />
-                          <Text style={[tw`text-xs font-bold`, { color: '#4ade80' }]}>Track</Text>
-                        </TouchableOpacity>
+                {planExercises.map((ex, idx) => {
+                  const isDone = completedExercises.includes(ex.name.toLowerCase());
+                  return (
+                    <View
+                      key={idx}
+                      style={[tw`rounded-xl p-3`, {
+                        backgroundColor: isDone ? '#22c55e0d' : cardBg,
+                        borderWidth: 1,
+                        borderColor: isDone ? '#22c55e40' : cardBorder,
+                      }]}
+                    >
+                      <View style={tw`flex-row items-center justify-between`}>
+                        <View style={tw`flex-1 mr-2`}>
+                          <View style={tw`flex-row items-center gap-2`}>
+                            <Text style={[tw`font-bold text-sm`, { color: isDone ? '#22c55e' : textPrimary }]}>{ex.name}</Text>
+                            {isDone && (
+                              <View style={[tw`flex-row items-center gap-0.5 px-1.5 py-0.5 rounded-full`, { backgroundColor: '#22c55e20' }]}>
+                                <MaterialIcons name="check" size={10} color="#22c55e" />
+                                <Text style={[tw`text-[9px] font-black`, { color: '#22c55e' }]}>Done</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
+                            {ex.sets} sets · {ex.reps} reps · {ex.rest}s rest
+                          </Text>
+                        </View>
+                        <View style={tw`flex-row gap-1`}>
+                          <TouchableOpacity
+                            onPress={() => { setSwapTarget(idx); setSwapSearch(''); }}
+                            style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: accent + '18' }]}
+                          >
+                            <MaterialIcons name="swap-horiz" size={14} color={accent} />
+                            <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => navigation.navigate('Calibration', { exerciseName: ex.name, workoutPlanId: activePlanId, workoutDay: activePlanDay })}
+                            style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: isDone ? '#22c55e20' : '#4ade8018' }]}
+                          >
+                            <MaterialIcons name={isDone ? 'replay' : 'videocam'} size={14} color={isDone ? '#22c55e' : '#4ade80'} />
+                            <Text style={[tw`text-xs font-bold`, { color: isDone ? '#22c55e' : '#4ade80' }]}>{isDone ? 'Redo' : 'Track'}</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ) : (
               <View style={[tw`rounded-xl p-5 items-center gap-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
@@ -419,8 +444,11 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
                     {session.exercises?.length ? ` · ${session.exercises.length} exercises` : ''}
                   </Text>
                 </View>
-                <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, { backgroundColor: accent + '20', color: accent }]}>
-                  {session.status === 'completed' ? 'Done' : session.status || '--'}
+                <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, {
+                  backgroundColor: session.status === 'completed' ? '#22c55e20' : session.status === 'cancelled' ? '#ef444420' : accent + '20',
+                  color: session.status === 'completed' ? '#22c55e' : session.status === 'cancelled' ? '#ef4444' : accent,
+                }]}>
+                  {session.status === 'completed' ? 'Done' : session.status === 'cancelled' ? 'Cancelled' : session.status || '--'}
                 </Text>
               </TouchableOpacity>
             ))

@@ -14,5 +14,7 @@ router.post('/start', requireActiveSubscription('client'), workoutController.sta
 router.post('/finish/:id', requireActiveSubscription('client'), workoutController.finishSession);
 router.post('/log', workoutController.logWorkout); // no subscription gate — every client can log sessions
 router.get('/history', workoutController.getHistory); // no subscription gate — every client can view their history
+router.get('/completed-days', workoutController.getCompletedDays); // returns completed weekday names for the current week
+router.get('/completed-exercises', workoutController.getCompletedExercises); // returns completed exercise names (lowercase) for the current week
 
 export default router;

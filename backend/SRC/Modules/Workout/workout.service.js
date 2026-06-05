@@ -77,7 +77,7 @@ export const workoutService = {
   },
 
   async logWorkout(userId, logData) {
-    const { date, exercises, duration, calories, notes, rating, formScore, totalReps } = logData;
+    const { date, exercises, duration, calories, notes, rating, formScore, totalReps, workoutPlanId } = logData;
     // `day` from the CV screen is the exercise display name (e.g. "Jumping Jack").
     // The WorkoutLog.day column is an ENUM of weekday names, so we always derive
     // today's weekday and treat the passed value as the exercise name.
@@ -97,6 +97,7 @@ export const workoutService = {
 
     const workoutLog = await WorkoutLog.create({
       userId,
+      workoutPlanId: workoutPlanId || null,
       date: date || new Date(),
       day: safeDay,
       exercises: exercisesList,
@@ -498,6 +499,61 @@ export const workoutService = {
     if (g.includes('endur') || g.includes('cardio') || g.includes('stamina')) return 'endurance';
     if (['weight_loss', 'muscle_gain', 'maintenance', 'endurance'].includes(g)) return g;
     return 'maintenance';
+  },
+
+  async getCompletedDaysThisWeek(userId) {
+    const now = new Date();
+    // Find the Monday of the current week (ISO week: Mon = 1, Sun = 0 → map Sun to 7)
+    const dayOfWeek = now.getDay(); // 0 = Sun
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const logs = await WorkoutLog.findAll({
+      where: {
+        userId,
+        status: 'completed',
+        date: { [Op.between]: [monday, sunday] }
+      },
+      attributes: ['day']
+    });
+
+    return [...new Set(logs.map((l) => l.day))];
+  },
+
+  async getCompletedExercisesThisWeek(userId) {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const logs = await WorkoutLog.findAll({
+      where: {
+        userId,
+        status: 'completed',
+        date: { [Op.between]: [monday, sunday] }
+      },
+      attributes: ['exercises']
+    });
+
+    const names = new Set();
+    for (const log of logs) {
+      if (Array.isArray(log.exercises)) {
+        for (const ex of log.exercises) {
+          if (ex?.name) names.add(ex.name.toLowerCase());
+        }
+      }
+    }
+    return [...names];
   },
 
   // Maps any experience string to the DB enum

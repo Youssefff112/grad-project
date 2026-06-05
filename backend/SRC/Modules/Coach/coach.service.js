@@ -96,6 +96,26 @@ function trainingDayKeysFromSchedule(weeklySchedule) {
 }
 
 /**
+ * Build a map from lowercase day-name → array of planned exercise names (lowercase).
+ * e.g. { friday: ['jumping jacks', 'burpees', 'mountain climbers', 'jump rope'] }
+ * Rest-days are excluded.
+ */
+function buildDayExerciseMap(weeklySchedule) {
+  const map = {};
+  if (!Array.isArray(weeklySchedule)) return map;
+  for (const day of weeklySchedule) {
+    if (!day || day.isRestDay || !day.day) continue;
+    const key = String(day.day).toLowerCase();
+    if (Array.isArray(day.exercises) && day.exercises.length > 0) {
+      map[key] = day.exercises
+        .map((e) => String(e.name || '').toLowerCase().trim())
+        .filter(Boolean);
+    }
+  }
+  return map;
+}
+
+/**
  * Build a map from lowercase day-name → total meals planned for that day.
  * e.g. { monday: 4, tuesday: 4, ... }
  */
@@ -128,6 +148,7 @@ function buildAdherenceSummary(
   trainingDayKeys,
   weeklyMealPlan,
   hasActiveDietPlan,
+  weeklyWorkoutSchedule,   // ← new: used to score per-exercise completion
 ) {
   // Only use a numeric goal if a plan exists; null suppresses water scores.
   const goal =
@@ -137,6 +158,8 @@ function buildAdherenceSummary(
 
   const trainSet = new Set((trainingDayKeys || []).map((k) => String(k).toLowerCase()));
   const dayMealCount = buildDayMealCountMap(hasActiveDietPlan ? weeklyMealPlan : []);
+  // Map of day-name → planned exercise names; used to compute per-exercise completion ratio.
+  const dayExerciseMap = buildDayExerciseMap(weeklyWorkoutSchedule);
 
   const dietByYmd = new Map();
   for (const row of dietLogs) {
@@ -165,7 +188,29 @@ function buildAdherenceSummary(
     let workout = null;
     if (dayName && trainSet.size > 0 && trainSet.has(dayName)) {
       const logs = woByYmd.get(ymd) || [];
-      workout = logs.length > 0 ? 100 : 0;
+      if (logs.length === 0) {
+        // Training day with no logs at all → 0 %
+        workout = 0;
+      } else {
+        const plannedExercises = dayExerciseMap[dayName] || [];
+        if (plannedExercises.length === 0) {
+          // Plan exists but has no named exercises for this day (edge-case).
+          // Fall back to binary: any log = full credit.
+          workout = 100;
+        } else {
+          // Collect every exercise name the client actually logged today.
+          const loggedNames = new Set(
+            logs.flatMap((log) =>
+              Array.isArray(log.exercises)
+                ? log.exercises.map((e) => String(e.name || '').toLowerCase().trim())
+                : []
+            ).filter(Boolean)
+          );
+          // Count how many planned exercises appear in the logged set.
+          const completedCount = plannedExercises.filter((name) => loggedNames.has(name)).length;
+          workout = Math.round((completedCount / plannedExercises.length) * 100);
+        }
+      }
     }
     const combined = averageIgnoreNull([meal, water, workout]);
     return { meal, water, workout, combined };
@@ -470,7 +515,7 @@ export const coachService = {
       WorkoutPlan.findOne({
         where: { userId: clientUserId, isActive: true },
         order: [['updatedAt', 'DESC']],
-        attributes: ['weeklySchedule'],
+        attributes: ['weeklySchedule'],   // needed for training-day keys AND per-exercise scoring
       }),
     ]);
 
@@ -495,6 +540,7 @@ export const coachService = {
       trainingDayKeys,
       weeklyMealPlan,
       hasActiveDietPlan,
+      activeWorkout?.weeklySchedule || [],
     );
 
     return {

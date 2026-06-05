@@ -56,6 +56,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [weightInput, setWeightInput] = useState('');
   const [bodyFatInput, setBodyFatInput] = useState('');
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
+  const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   // Daily progress
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
@@ -72,11 +73,16 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     try {
       const { plan } = await workoutService.getActiveWorkoutPlan();
       // Always reflect the server-side truth, including null (no plan).
-      // Without this, deleting / regenerating the plan elsewhere would leave
-      // the stale plan stuck on the home page.
       setActivePlan(plan ?? null);
     } catch {
       setActivePlan(null);
+    }
+    // Load completed exercises so per-exercise Done badges show on focus.
+    try {
+      const exercises = await workoutService.getCompletedExercises();
+      setCompletedExercises(exercises);
+    } catch {
+      // Non-critical — badges simply won't show if the request fails.
     }
   }, []);
 
@@ -184,6 +190,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       null
     );
   }, [activePlan]);
+
 
   // Check if plan review is due (every 7 days)
   const shouldShowPlanReview = useMemo(() => {
@@ -549,7 +556,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
               <TouchableOpacity
                 activeOpacity={0.9}
                 style={[tw`overflow-hidden rounded-2xl h-60 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
-                onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout" })}
+                onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout", workoutPlanId: activePlan?.id, workoutDay: todayWorkoutDay.day?.toLowerCase() })}
               >
                 <ImageBackground
                   source={{ uri: getWorkoutImage(todayWorkoutDay.focus) }}
@@ -574,7 +581,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                     </Text>
                     <View style={tw`flex-row items-center gap-2`}>
                       <TouchableOpacity
-                        onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout" })}
+                        onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout", workoutPlanId: activePlan?.id, workoutDay: todayWorkoutDay.day?.toLowerCase() })}
                         style={[tw`flex-row items-center gap-2 px-5 py-2.5 rounded-xl`, { backgroundColor: accent }]}
                       >
                         <MaterialIcons name="play-arrow" size={18} color="white" />
@@ -596,26 +603,41 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                   <Text style={[tw`text-xs font-semibold uppercase tracking-wider px-1 mb-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
                     {"Today's Exercises"}
                   </Text>
-                  {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
-                      style={[tw`flex-row items-center justify-between px-4 py-3 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}
-                    >
-                      <View style={tw`flex-row items-center gap-3`}>
-                        <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: accent + '18' }]}>
-                          <Text style={[tw`text-xs font-black`, { color: accent }]}>{i + 1}</Text>
+                  {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => {
+                    const exDone = completedExercises.includes(exercise.name.toLowerCase());
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
+                        style={[tw`flex-row items-center justify-between px-4 py-3 rounded-xl`, {
+                          backgroundColor: exDone ? '#22c55e0d' : (isDark ? '#111128' : '#ffffff'),
+                          borderWidth: 1,
+                          borderColor: exDone ? '#22c55e40' : (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'),
+                        }]}
+                      >
+                        <View style={tw`flex-row items-center gap-3`}>
+                          <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: exDone ? '#22c55e20' : accent + '18' }]}>
+                            {exDone
+                              ? <MaterialIcons name="check" size={16} color="#22c55e" />
+                              : <Text style={[tw`text-xs font-black`, { color: accent }]}>{i + 1}</Text>
+                            }
+                          </View>
+                          <View>
+                            <Text style={[tw`text-sm font-bold`, { color: exDone ? '#22c55e' : (isDark ? '#f1f5f9' : '#1e293b') }]}>{exercise.name}</Text>
+                            <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                              {exercise.sets} sets · {exercise.reps} reps · {exercise.restTime}s rest
+                            </Text>
+                          </View>
                         </View>
-                        <View>
-                          <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{exercise.name}</Text>
-                          <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                            {exercise.sets} sets · {exercise.reps} reps · {exercise.restTime}s rest
-                          </Text>
-                        </View>
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color={isDark ? '#334155' : '#cbd5e1'} />
-                    </TouchableOpacity>
-                  ))}
+                        {exDone
+                          ? <View style={[tw`px-2 py-0.5 rounded-full`, { backgroundColor: '#22c55e20' }]}>
+                              <Text style={[tw`text-[10px] font-black`, { color: '#22c55e' }]}>Done</Text>
+                            </View>
+                          : <MaterialIcons name="chevron-right" size={20} color={isDark ? '#334155' : '#cbd5e1'} />
+                        }
+                      </TouchableOpacity>
+                    );
+                  })}
                   {(todayWorkoutDay.exercises || []).length > 3 && (
                     <TouchableOpacity
                       onPress={() => navigation.navigate('VisionAnalysisLab')}

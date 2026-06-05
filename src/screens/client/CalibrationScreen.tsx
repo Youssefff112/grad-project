@@ -240,6 +240,8 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
 
   const exerciseName: string | undefined = route?.params?.exerciseName;
   const workoutName: string | undefined = route?.params?.workoutName;
+  const workoutPlanId: number | undefined = route?.params?.workoutPlanId;
+  const workoutDay: string | undefined = route?.params?.workoutDay;
   const displayName = exerciseName || workoutName || 'Exercise';
   const instructions = getExerciseInstructions(displayName);
 
@@ -252,11 +254,12 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
       }
     }
 
-    // Forward exercise context to the live tracking screen so it can render
-    // the right exercise name and use the right CV target ranges.
+    // Forward exercise context (including plan linkage) to the live tracking screen.
     navigation.navigate('ActiveSet', {
       exerciseName: exerciseName ?? workoutName,
       workoutName,
+      workoutPlanId,
+      workoutDay,
     });
   };
 

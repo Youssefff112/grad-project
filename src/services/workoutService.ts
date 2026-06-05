@@ -86,6 +86,8 @@ export interface LogWorkoutRequest {
   formScore?: number;
   /** Total reps counted by the AI rep detector */
   totalReps?: number;
+  /** Links this log entry to the parent WorkoutPlan */
+  workoutPlanId?: number;
 }
 
 /**
@@ -167,6 +169,25 @@ export const getWorkoutHistory = async (
   };
 };
 
+/**
+ * Returns the weekday names (e.g. ['monday', 'wednesday']) that have at least
+ * one completed WorkoutLog in the current Mon–Sun week for the signed-in user.
+ */
+export const getCompletedDays = async (): Promise<string[]> => {
+  const response: any = await apiGet('/workout/completed-days');
+  return response.data?.completedDays ?? [];
+};
+
+/**
+ * Returns lowercase exercise names that have been completed (i.e. logged with
+ * status = 'completed') in the current Mon–Sun week.
+ * Example: ['jumping jacks', 'burpees']
+ */
+export const getCompletedExercises = async (): Promise<string[]> => {
+  const response: any = await apiGet('/workout/completed-exercises');
+  return response.data?.completedExercises ?? [];
+};
+
 export default {
   generateWorkoutPlan,
   getActiveWorkoutPlan,
@@ -174,4 +195,6 @@ export default {
   finishWorkoutSession,
   logWorkout,
   getWorkoutHistory,
+  getCompletedDays,
+  getCompletedExercises,
 };

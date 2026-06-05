@@ -69,5 +69,23 @@ export const workoutController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async getCompletedDays(req, res, next) {
+    try {
+      const completedDays = await workoutService.getCompletedDaysThisWeek(req.user.id);
+      successResponse(res, 200, 'Completed days retrieved', { completedDays });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getCompletedExercises(req, res, next) {
+    try {
+      const completedExercises = await workoutService.getCompletedExercisesThisWeek(req.user.id);
+      successResponse(res, 200, 'Completed exercises retrieved', { completedExercises });
+    } catch (error) {
+      next(error);
+    }
   }
 };

@@ -25,6 +25,10 @@ interface RouteParams {
   targetReps?: number;
   targetSets?: number;
   targetHoldSeconds?: number;
+  /** ID of the WorkoutPlan this session belongs to — used to record completion */
+  workoutPlanId?: number;
+  /** Weekday name for this session's plan day (e.g. 'monday') */
+  workoutDay?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,6 +44,8 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const targetReps = params.targetReps ?? 12;
   const targetSets = params.targetSets ?? 4;
   const targetHoldSeconds = params.targetHoldSeconds ?? 60;
+  const workoutPlanId: number | undefined = params.workoutPlanId;
+  const workoutDay: string | undefined = params.workoutDay;
 
   // Camera refs
   const cameraRef = useRef<CameraView | null>(null);
@@ -47,13 +53,14 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const inFlightRef = useRef(false);
   const lastPoseAtRef = useRef<number>(0);
 
-  // Tracking helpers
-  const repDetectorRef = useRef(new aiVisionService.RepDetector(profile));
-  const smootherRef = useRef(new aiVisionService.AngleSmoother(0.45));
+  // Tracking helpers — alpha=0.65 gives ~3-frame EMA settling at 2.5 fps,
+  // fast enough to track normal workout tempo without excessive noise.
+  const repDetectorRef = useRef(new aiVisionService.RepDetector(profile, 350));
+  const smootherRef = useRef(new aiVisionService.AngleSmoother(0.65));
 
   useEffect(() => {
-    repDetectorRef.current = new aiVisionService.RepDetector(profile);
-    smootherRef.current = new aiVisionService.AngleSmoother(0.45);
+    repDetectorRef.current = new aiVisionService.RepDetector(profile, 350);
+    smootherRef.current = new aiVisionService.AngleSmoother(0.65);
   }, [profile]);
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -198,6 +205,23 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
           if (nowHolding) setHasStartedMoving(true);
         } else {
           const counted = repDetectorRef.current.update(smoothed);
+
+          // ── Debug logging (dev builds only) ─────────────────────────────
+          if (__DEV__) {
+            const repKey = profile.rep?.angleKey ?? '';
+            const raw  = result.angles[repKey];
+            const sm   = smoothed[repKey];
+            const phase = repDetectorRef.current.getPhase();
+            console.log(
+              `[CV] ${rawExerciseName} | key=${repKey}` +
+              ` raw=${raw != null ? raw.toFixed(1) : 'n/a'}°` +
+              ` smooth=${sm != null ? sm.toFixed(1) : 'n/a'}°` +
+              ` phase=${phase}` +
+              (counted ? ' ✓ REP' : '')
+            );
+          }
+          // ────────────────────────────────────────────────────────────────
+
           // Mark as started once the detector enters any phase (i.e. user moved)
           if (!hasStartedMoving && repDetectorRef.current.isActive()) {
             setHasStartedMoving(true);
@@ -342,10 +366,13 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     setSaving(true);
     try {
       await workoutService.logWorkout({
-        day: todayWeekday,
+        day: (workoutDay as workoutService.LogWorkoutRequest['day']) || todayWeekday,
         duration: Math.max(1, Math.round(elapsedSeconds / 60)),
         exercises: [{
-          name: exerciseDisplay,
+          // Use the original name from params so it matches the plan exactly.
+          // exerciseDisplay is an AI-profile display variant (e.g. "Jumping Jack"
+          // vs the plan's "Jumping Jacks") and would break the Done badge lookup.
+          name: rawExerciseName,
           sets: currentSet,
           reps: String(totalRepsRef.current),
           restTime: 60,
@@ -356,6 +383,7 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
         rating: Math.min(5, Math.max(1, Math.round(avgFormScore / 20))),
         formScore: avgFormScore,
         totalReps: totalRepsRef.current,
+        workoutPlanId,
       });
     } catch {
       // Network failure — summary screen still shows; log will be retried by sync queue

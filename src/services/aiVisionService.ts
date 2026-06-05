@@ -517,7 +517,14 @@ export class AngleSmoother {
   private values: FrameAngles = {};
   private alpha: number;
 
-  constructor(alpha: number = 0.45) {
+  /**
+   * @param alpha  EMA weight for the newest sample (0–1).
+   *               Higher = faster response to real movement, more noise.
+   *               Lower  = smoother but lags behind fast movements.
+   *               0.65 gives ~3-frame settling time at 2.5 fps — good for
+   *               typical workout speeds without losing fast reps.
+   */
+  constructor(alpha: number = 0.65) {
     this.alpha = alpha;
   }
 
@@ -543,7 +550,12 @@ export class RepDetector {
   private lastRepAt: number = 0;
   private cooldownMs: number;
 
-  constructor(profile: ExerciseProfile, cooldownMs: number = 600) {
+  /**
+   * @param cooldownMs  Minimum ms between counted reps.
+   *                    350 ms allows up to ~2.9 reps/sec while blocking
+   *                    double-counts within a single movement cycle.
+   */
+  constructor(profile: ExerciseProfile, cooldownMs: number = 350) {
     this.profile = profile;
     this.cooldownMs = cooldownMs;
   }
@@ -552,10 +564,17 @@ export class RepDetector {
    * Feed the latest smoothed angles; returns 1 when a rep is completed, else 0.
    *
    * Phase machine:
-   *   unknown → top (seed phase on first frame so user doesn't need a "bottom" first)
-   *   unknown → bottom
+   *   unknown → bottom  (seeds on first detectable position)
+   *   unknown → top
    *   top     → bottom
    *   bottom  → top  ← REP COUNTED here
+   *
+   * Hysteresis bands (40 % of the exercise's angle range, capped at 25°):
+   *   Instead of requiring the angle to cross the exact profile threshold,
+   *   a "bottom" is detected once the angle enters the bottom-side zone and
+   *   a "top" is detected once the angle enters the top-side zone.  This
+   *   means the user does not need perfect form or full range-of-motion for
+   *   reps to be counted — natural workout movement is sufficient.
    */
   update(angles: FrameAngles): number {
     const rep = this.profile.rep;
@@ -564,17 +583,36 @@ export class RepDetector {
     if (typeof value !== 'number') return 0;
 
     const inverted = !!rep.inverted;
-    // For normal exercises: bottom = bent/deep position (small angle)
-    // For inverted (curls, rows): bottom = extended position (large angle)
-    const isBottom = inverted ? value >= rep.up : value <= rep.down;
-    const isTop    = inverted ? value <= rep.down : value >= rep.up;
+    // Hysteresis: 40 % of the exercise's total angle range, capped at 25°.
+    // Example — squat (range 33°): hyst ≈ 13° → top zone starts at 145° not 158°.
+    // Example — jumping jack (range 65°): hyst = 25° → top zone starts at 85°.
+    // Example — curl (range 118°): hyst = 25° → contracted zone is ≤ 65°.
+    const range = Math.abs(rep.up - rep.down);
+    const hyst  = Math.min(25, range * 0.40);
+
+    let enterBottom: boolean;
+    let enterTop: boolean;
+
+    if (inverted) {
+      // Inverted exercises (curls, rows, pull-ups):
+      //   bottom phase = arm extended   (large angle, near rep.up)
+      //   top    phase = arm contracted (small angle, near rep.down)
+      enterBottom = value >= (rep.up   - hyst);  // arm mostly extended
+      enterTop    = value <= (rep.down + hyst);  // arm mostly contracted
+    } else {
+      // Normal exercises (squats, push-ups, overhead press, jumping jacks…):
+      //   bottom phase = bent / deep position (small angle, near rep.down)
+      //   top    phase = extended / standing  (large angle, near rep.up)
+      enterBottom = value <= (rep.down + hyst);  // reached lower position
+      enterTop    = value >= (rep.up   - hyst);  // reached upper position
+    }
 
     let counted = 0;
     const now = Date.now();
 
-    if (isBottom) {
+    if (enterBottom) {
       this.phase = 'bottom';
-    } else if (isTop) {
+    } else if (enterTop) {
       if (this.phase === 'bottom' && now - this.lastRepAt > this.cooldownMs) {
         counted = 1;
         this.lastRepAt = now;
@@ -587,6 +625,11 @@ export class RepDetector {
   /** True once the detector has left the 'unknown' seed state. */
   isActive(): boolean {
     return this.phase !== 'unknown';
+  }
+
+  /** Returns current phase for debug logging. */
+  getPhase(): string {
+    return this.phase;
   }
 
   reset() {
