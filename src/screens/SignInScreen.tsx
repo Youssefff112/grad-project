@@ -16,14 +16,11 @@ import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
-import { MOCK_USERS, MockUser } from '../data/mockUsers';
 import * as authService from '../services/auth.service';
-import * as subscriptionService from '../services/subscriptionService';
 import { getClientSubscriptionStatus } from '../services/clientService';
-import { PLAN_FEATURES } from '../constants/plans';
 import { resolveCoachGate } from '../utils/coachGate';
 import { environment } from '../config/environment';
-import { validateEmail, validatePassword } from '../utils/validation';
+import { validateLoginEmail, validateLoginPassword } from '../utils/validation';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -37,54 +34,11 @@ export const SignInScreen = ({ navigation }: any) => {
 
   const validateForm = (): Record<string, string> => {
     const newErrors: Record<string, string> = {};
-    const emailErr = validateEmail(email);
+    const emailErr = validateLoginEmail(email);
     if (emailErr) newErrors.email = emailErr;
-    const passErr = validatePassword(password);
+    const passErr = validateLoginPassword(password);
     if (passErr) newErrors.password = passErr;
     return newErrors;
-  };
-
-  // Ensures a demo quick-login user has an active subscription for their plan tier in the DB.
-  // Called after successful login/auto-register so AI features work immediately.
-  const _bootstrapDemoAccount = async (mockUser: MockUser) => {
-    if (mockUser.role === 'client') {
-      await authService.updateProfile({
-        profile: {
-          goal: 'maintenance',
-          experienceLevel: 'beginner',
-          age: 28,
-          height: 175,
-          currentWeight: 75,
-          gender: 'male',
-          waterGoalMl: 2000,
-        },
-      }).catch(() => {});
-    }
-    await _ensureDemoQuickLoginSubscription(mockUser);
-    await syncProfileFromServer().catch(() => {});
-  };
-
-  const _ensureDemoQuickLoginSubscription = async (mockUser: MockUser) => {
-    const subRole: 'client' | 'coach' = mockUser.role === 'coach' ? 'coach' : 'client';
-    const planName = mockUser.role === 'coach' ? 'ProCoach' : mockUser.subscriptionPlan;
-
-    const { subscription: existing } = await subscriptionService.getActiveSubscription(subRole).catch(() => ({ subscription: null }));
-    if (existing?.status === 'active') return; // already active — nothing to do
-
-    const planData = PLAN_FEATURES[planName] ?? PLAN_FEATURES[mockUser.subscriptionPlan];
-    const price = planData?.price ?? 0;
-
-    const { subscription } = await subscriptionService.createSubscription({
-      role: subRole,
-      planName,
-      price,
-      autoRenew: true,
-    });
-    await subscriptionService.recordPayment(subscription.id, {
-      amount: price,
-      provider: 'demo',
-      status: 'paid',
-    });
   };
 
   const handleSignIn = async () => {
@@ -165,7 +119,8 @@ export const SignInScreen = ({ navigation }: any) => {
       let errorMessage = 'Sign in failed. Please try again.';
 
       if (error.response?.status === 401) {
-        errorMessage = 'Invalid email or password';
+        errorMessage = 'The password is incorrect. Please try again.';
+        setErrors({ password: errorMessage });
       } else if (error.response?.status === 429) {
         errorMessage = 'Too many login attempts. Please try again later.';
       } else if (error.message === 'Network Error' || !error.response) {
@@ -207,170 +162,6 @@ export const SignInScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`flex-col gap-5`}>
-          {/* Demo quick-login — development builds only */}
-          {__DEV__ && environment.isDevelopment && (
-          <View>
-            <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
-              Demo: Quick Login
-            </Text>
-
-            {(() => {
-              // Colors per role so it's instantly obvious which chip logs you
-              // into which kind of account.
-              const colorFor = (role: MockUser['role']) => {
-                if (role === 'admin') return '#ef4444';
-                if (role === 'coach') return '#f59e0b';
-                return accent;
-              };
-              const iconFor = (role: MockUser['role']) => {
-                if (role === 'admin') return 'admin-panel-settings';
-                if (role === 'coach') return 'sports';
-                return 'person';
-              };
-
-              const handleQuickLogin = async (user: MockUser) => {
-                setEmail(user.email);
-                setPassword(user.password);
-                setIsLoading(true);
-                try {
-                  // Try real login first so the device gets a JWT for all protected endpoints
-                  const loginResp = await authService.login({ email: user.email, password: user.password }).catch(async (err: any) => {
-                    // User doesn't exist in DB yet — auto-register them
-                    if (err?.response?.status === 401) {
-                      const [first, ...rest] = user.fullName.split(' ');
-                      await authService.register({
-                        firstName: first,
-                        lastName: rest.join(' ') || 'Demo',
-                        email: user.email,
-                        password: user.password,
-                        confirmPassword: user.password,
-                        userType: 'onsite',
-                        role: user.role,
-                      });
-                      return authService.login({ email: user.email, password: user.password });
-                    }
-                    throw err;
-                  });
-
-                  if (loginResp?.success && loginResp.data?.user && loginResp.data?.token) {
-                    const u = loginResp.data.user;
-                    const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
-                    await setAuthTokens(loginResp.data.token, loginResp.data.refreshToken);
-                    if (u.id) await setUserId(String(u.id));
-                    setFullName(fullName);
-                    saveEmail(u.email);
-                    setRole(u.role as any);
-
-                    const coachGate = u.role === 'coach' ? resolveCoachGate((u as any).coachProfile) : null;
-                    if (u.role === 'coach' && coachGate) {
-                      await setCoachApplicationStatus(coachGate);
-                    } else {
-                      await setCoachApplicationStatus(null);
-                    }
-
-                    hydrateFromAuthUser(u);
-
-                    if (u.role === 'admin') {
-                      navigation.navigate('AdminDashboard');
-                    } else if (u.role === 'coach' && coachGate) {
-                      if (coachGate === 'pending') {
-                        setSubscriptionPlan('Free');
-                        navigation.navigate('CoachPendingApproval');
-                      } else if (coachGate === 'rejected') {
-                        setSubscriptionPlan('Free');
-                        navigation.navigate('CoachApplicationRejected');
-                      } else {
-                        await _bootstrapDemoAccount(user);
-                        setSubscriptionPlan('ProCoach');
-                        navigation.navigate('CoachCommandCenter');
-                      }
-                    } else {
-                      await _bootstrapDemoAccount(user);
-                      try {
-                        const { subscription } = await getClientSubscriptionStatus();
-                        if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
-                        else setSubscriptionPlan(user.subscriptionPlan as any);
-                      } catch {
-                        setSubscriptionPlan(user.subscriptionPlan as any);
-                      }
-                      navigation.navigate('TraineeCommandCenter');
-                    }
-                  }
-                } catch (err: any) {
-                  const msg =
-                    err?.response?.data?.message ||
-                    (err?.message === 'Network Error' || !err?.response
-                      ? `Cannot reach the server at ${environment.API_BASE_URL}.\n\n• Backend running? (npm run dev in /backend)\n• Phone on the same Wi-Fi as this PC\n• Reload Expo after network changes (npx expo start --clear)`
-                      : err?.message || 'Quick login failed. Please try again.');
-                  Alert.alert('Quick Login Error', msg);
-                  console.error('Quick login error:', err);
-                } finally {
-                  setIsLoading(false);
-                }
-              };
-
-              const renderChip = (user: MockUser) => {
-                const color = colorFor(user.role);
-                // Client chips show the *plan display name* (e.g. "AI Plan").
-                // Staff chips show the role itself ("Coach" / "Admin") to
-                // make it obvious they're not a client tier.
-                const label =
-                  user.role === 'admin'
-                    ? 'Admin'
-                    : user.role === 'coach'
-                      ? user.fullName.split(' ')[0] || 'Coach'
-                      : PLAN_FEATURES[user.subscriptionPlan].name;
-
-                return (
-                  <TouchableOpacity
-                    key={user.id}
-                    onPress={() => handleQuickLogin(user)}
-                    style={[
-                      tw`px-4 py-2 rounded-lg border`,
-                      { backgroundColor: color + '14', borderColor: color + '55' },
-                    ]}
-                  >
-                    <View style={tw`flex-row items-center gap-2`}>
-                      <MaterialIcons name={iconFor(user.role) as any} size={14} color={color} />
-                      <View>
-                        <Text style={[tw`text-xs font-bold`, { color }]}>{label}</Text>
-                        <Text style={[tw`text-xs`, { color: '#94a3b8' }]} numberOfLines={1}>
-                          {user.fullName.split(' ')[0]}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              };
-
-              const clientUsers = MOCK_USERS.filter((u) => u.role === 'client');
-              const staffUsers = MOCK_USERS.filter((u) => u.role !== 'client');
-
-              return (
-                <View style={tw`gap-3`}>
-                  <View>
-                    <Text style={[tw`text-[10px] font-semibold uppercase tracking-wider mb-2`, { color: subtextColor }]}>
-                      Clients
-                    </Text>
-                    <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
-                      <View style={tw`flex-row gap-2`}>{clientUsers.map(renderChip)}</View>
-                    </ScrollView>
-                  </View>
-
-                  <View>
-                    <Text style={[tw`text-[10px] font-semibold uppercase tracking-wider mb-2`, { color: subtextColor }]}>
-                      Staff (Coach & Admin)
-                    </Text>
-                    <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
-                      <View style={tw`flex-row gap-2`}>{staffUsers.map(renderChip)}</View>
-                    </ScrollView>
-                  </View>
-                </View>
-              );
-            })()}
-          </View>
-          )}
-
           <FormInput
             label="Email Address"
             placeholder="you@email.com"

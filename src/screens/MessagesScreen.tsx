@@ -16,8 +16,8 @@ import {
   sendMessage,
   getCoachClients,
   CoachClient,
-  Conversation as ApiConversation,
 } from '../services/messaging.service';
+import { canClientSelectPersonalCoach } from '../utils/planUtils';
 
 // We map the backend schema to this UI schema on load
 interface UIConversation {
@@ -37,11 +37,10 @@ interface UIConversation {
 export const MessagesScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { totalUnread, syncUnreadFromServer } = useNotifications();
-  const { userId, userMode, isCoach, coachId, coachName } = useUser();
+  const { userId, isCoach, coachId, coachName, subscriptionPlan } = useUser();
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [searchText, setSearchText] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'ai' | 'people'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [newMessageText, setNewMessageText] = useState('');
@@ -125,30 +124,46 @@ export const MessagesScreen = ({ navigation }: any) => {
     }, [userId, syncUnreadFromServer])
   );
 
-  // Filter conversations
   const filteredConversations = useMemo(() => {
-    let result = conversations;
+    if (!searchText.trim()) return conversations;
+    const q = searchText.toLowerCase();
+    return conversations.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.lastMessage.toLowerCase().includes(q),
+    );
+  }, [conversations, searchText]);
 
-    // Apply category filter
-    if (filter === 'unread') {
-      result = result.filter((c) => c.unread > 0);
-    } else if (filter === 'ai') {
-      result = result.filter((c) => c.isAI);
-    } else if (filter === 'people') {
-      result = result.filter((c) => !c.isAI);
+  const coachConversation = useMemo(() => {
+    if (!coachId) return null;
+    const coachUserId = Number(coachId);
+    return conversations.find((c) => c.otherUserId === coachUserId) ?? null;
+  }, [conversations, coachId]);
+
+  const handleMessageCoach = () => {
+    if (!coachId) {
+      if (canClientSelectPersonalCoach(subscriptionPlan)) {
+        navigation.navigate('CoachBrowsing');
+      } else {
+        Alert.alert(
+          'No coach assigned',
+          'Upgrade to Premium or Elite to message a personal coach.',
+        );
+      }
+      return;
     }
 
-    // Apply search filter
-    if (searchText.trim()) {
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(searchText.toLowerCase()) ||
-          c.lastMessage.toLowerCase().includes(searchText.toLowerCase())
-      );
+    if (coachConversation) {
+      handleOpenChat(coachConversation);
+      return;
     }
 
-    return result;
-  }, [conversations, filter, searchText]);
+    navigation.navigate('Chat', {
+      conversationName: coachName || 'Coach',
+      receiverId: Number(coachId),
+      conversationId: null,
+    });
+  };
 
   const handleOpenChat = (conversation: UIConversation) => {
     navigation.navigate('Chat', {
@@ -226,8 +241,7 @@ export const MessagesScreen = ({ navigation }: any) => {
               <Text style={[tw`text-2xl font-black mt-1`, { color: textPrimary }]}>Inbox</Text>
             </View>
             <View style={tw`flex-row items-center gap-3`}>
-
-              {isCoach && (
+              {isCoach ? (
                 <TouchableOpacity onPress={openNewMessage}>
                   <View
                     style={[
@@ -238,7 +252,18 @@ export const MessagesScreen = ({ navigation }: any) => {
                     <MaterialIcons name="edit" size={20} color={accent} />
                   </View>
                 </TouchableOpacity>
-              )}
+              ) : coachId ? (
+                <TouchableOpacity onPress={handleMessageCoach}>
+                  <View
+                    style={[
+                      tw`w-12 h-12 rounded-full items-center justify-center`,
+                      { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' },
+                    ]}
+                  >
+                    <MaterialIcons name="chat" size={20} color={accent} />
+                  </View>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </View>
@@ -262,29 +287,41 @@ export const MessagesScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Filter Tabs */}
-        <View style={tw`px-5 mb-5 flex-row gap-2`}>
-          {['all', 'unread', 'ai', 'people'].map((tab) => (
+        {/* Message coach — clients only */}
+        {!isCoach && (
+          <View style={tw`px-5 mb-5`}>
             <TouchableOpacity
-              key={tab}
-              onPress={() => setFilter(tab as any)}
+              onPress={handleMessageCoach}
+              activeOpacity={0.85}
               style={[
-                tw`px-4 py-2 rounded-full`,
-                {
-                  backgroundColor: filter === tab ? accent : isDark ? '#1e293b' : '#f1f5f9' },
+                tw`flex-row items-center gap-3 px-4 py-4 rounded-2xl`,
+                { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '35' },
               ]}
             >
-              <Text
+              <View
                 style={[
-                  tw`text-xs font-bold capitalize`,
-                  { color: filter === tab ? '#ffffff' : textSecondary },
+                  tw`w-11 h-11 rounded-full items-center justify-center`,
+                  { backgroundColor: accent + '22' },
                 ]}
               >
-                {tab}
-              </Text>
+                <MaterialIcons name="fitness-center" size={22} color={accent} />
+              </View>
+              <View style={tw`flex-1`}>
+                <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: accent }]}>
+                  Your coach
+                </Text>
+                <Text style={[tw`text-base font-bold mt-0.5`, { color: textPrimary }]}>
+                  {coachId
+                    ? `Message ${coachName || 'Coach'}`
+                    : canClientSelectPersonalCoach(subscriptionPlan)
+                      ? 'Find a coach to message'
+                      : 'No coach assigned'}
+                </Text>
+              </View>
+              <MaterialIcons name="chat-bubble" size={22} color={accent} />
             </TouchableOpacity>
-          ))}
-        </View>
+          </View>
+        )}
 
         {/* Conversations List */}
         <View style={tw`px-5`}>

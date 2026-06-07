@@ -56,7 +56,7 @@ async function main() {
   console.log('Dropping and recreating all tables (force sync)…');
   await sequelize.sync({ force: true });
   console.log('✅ Database cleared and schema recreated.');
-  console.log('   Next: run `npm run seed` if you want demo users again.\n');
+  console.log('   Database is empty. Register new users through the app.\n');
   await sequelize.close();
 }
 

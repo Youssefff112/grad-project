@@ -30,6 +30,18 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
+/** Sign-in only — no strength rules; those apply at registration. */
+export function validateLoginEmail(email: string): string | null {
+  const v = email.trim();
+  if (!v) return 'Please enter your email address';
+  return null;
+}
+
+export function validateLoginPassword(password: string): string | null {
+  if (!password) return 'Please enter your password';
+  return null;
+}
+
 export function validateName(fullName: string): string | null {
   const v = fullName.trim();
   if (!v) return 'Please enter your full name';
