@@ -97,9 +97,10 @@ const startServer = async () => {
   try {
     await connectDB();
     startNotificationScheduler();
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ FitCore Backend running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📡 Listening on 0.0.0.0:${PORT} (LAN devices can connect)`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

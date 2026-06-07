@@ -11,64 +11,64 @@
 
 export const lightColors = {
   // Backgrounds
-  bg: '#f8f7f5',
-  bgSurface: '#f1f5f9',
+  bg: '#ffffff',
+  bgSurface: '#f8f9fa',
   // Cards
   card: '#ffffff',
-  cardBorder: 'rgba(0,0,0,0.06)',
-  cardBorderStrong: 'rgba(0,0,0,0.10)',
+  cardBorder: 'rgba(0,0,0,0.05)',
+  cardBorderStrong: 'rgba(0,0,0,0.12)',
   // Typography
-  text: '#0f172a',
+  text: '#000000',
   textSecondary: '#475569',
   textMuted: '#94a3b8',
   // Navigation
-  navBg: '#ffffff',
-  navBorder: 'rgba(0,0,0,0.07)',
+  navBg: 'rgba(255,255,255,0.85)',
+  navBorder: 'rgba(0,0,0,0.08)',
   // Inputs
-  inputBg: '#ffffff',
-  inputBorder: 'rgba(0,0,0,0.10)',
+  inputBg: '#f1f5f9',
+  inputBorder: 'rgba(0,0,0,0.08)',
   // Semantic
-  success: '#10b981',
-  successSurface: 'rgba(16,185,129,0.10)',
-  warning: '#f59e0b',
-  warningSurface: 'rgba(245,158,11,0.10)',
-  error: '#ef4444',
-  errorSurface: '#fef2f2',
+  success: '#34c759', // Apple green
+  successSurface: 'rgba(52,199,89,0.12)',
+  warning: '#ff9500', // Apple orange
+  warningSurface: 'rgba(255,149,0,0.12)',
+  error: '#ff3b30', // Apple red
+  errorSurface: 'rgba(255,59,48,0.12)',
   // Overlay / modals
-  overlay: 'rgba(0,0,0,0.45)',
+  overlay: 'rgba(0,0,0,0.4)',
   // Dividers
   divider: 'rgba(0,0,0,0.06)',
 };
 
 export const darkColors = {
-  // Backgrounds — a hair deeper and more blue-tinted than the previous #0a0a12
-  bg: '#08080f',
-  bgSurface: '#0f0f1e',
-  // Cards — slightly warmer than #111128 for depth
-  card: '#12121f',
+  // Backgrounds — Deep OLED Black
+  bg: '#000000',
+  bgSurface: '#0c0c0e',
+  // Cards — subtle elevation
+  card: '#121214',
   cardBorder: 'rgba(255,255,255,0.08)',
-  cardBorderStrong: 'rgba(255,255,255,0.14)',
+  cardBorderStrong: 'rgba(255,255,255,0.16)',
   // Typography
-  text: '#f1f5f9',
-  textSecondary: '#cbd5e1',
-  textMuted: '#64748b',
+  text: '#ffffff',
+  textSecondary: '#a1a1aa',
+  textMuted: '#52525b',
   // Navigation
-  navBg: '#0c0c1a',
-  navBorder: 'rgba(255,255,255,0.07)',
+  navBg: 'rgba(0,0,0,0.85)',
+  navBorder: 'rgba(255,255,255,0.1)',
   // Inputs
-  inputBg: '#1a1a2e',
+  inputBg: '#18181b',
   inputBorder: 'rgba(255,255,255,0.10)',
   // Semantic
-  success: '#10b981',
-  successSurface: 'rgba(16,185,129,0.12)',
-  warning: '#f59e0b',
-  warningSurface: 'rgba(245,158,11,0.12)',
-  error: '#ef4444',
-  errorSurface: 'rgba(239,68,68,0.12)',
+  success: '#30d158', // iOS dark green
+  successSurface: 'rgba(48,209,88,0.15)',
+  warning: '#ff9f0a', // iOS dark orange
+  warningSurface: 'rgba(255,159,10,0.15)',
+  error: '#ff453a', // iOS dark red
+  errorSurface: 'rgba(255,69,58,0.15)',
   // Overlay / modals
-  overlay: 'rgba(0,0,0,0.65)',
+  overlay: 'rgba(0,0,0,0.7)',
   // Dividers
-  divider: 'rgba(255,255,255,0.06)',
+  divider: 'rgba(255,255,255,0.1)',
 };
 
 export type AppColors = typeof lightColors;

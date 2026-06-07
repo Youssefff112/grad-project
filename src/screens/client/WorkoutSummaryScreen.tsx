@@ -8,8 +8,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SummaryData {
@@ -46,6 +49,9 @@ const scoreGrade = (score: number): { label: string; color: string; emoji: strin
 const ScoreRing = ({ score, size = 96, dark = true }: { score: number; size?: number; dark?: boolean }) => {
   const animValue = useRef(new Animated.Value(0)).current;
   const grade = scoreGrade(score);
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
 
   useEffect(() => {
     Animated.timing(animValue, {
@@ -56,24 +62,34 @@ const ScoreRing = ({ score, size = 96, dark = true }: { score: number; size?: nu
     }).start();
   }, [score, animValue]);
 
+  const strokeDashoffset = animValue.interpolate({
+    inputRange: [0, 100],
+    outputRange: [circumference, 0],
+  });
+
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Background ring */}
-      <View style={{
-        width: size, height: size, borderRadius: size / 2,
-        borderWidth: 8, borderColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-        position: 'absolute',
-      }} />
-      {/* Colored ring approximation */}
-      <View style={{
-        width: size, height: size, borderRadius: size / 2,
-        borderWidth: 8,
-        borderColor: grade.color,
-        borderRightColor: score < 50 ? 'transparent' : grade.color,
-        borderBottomColor: score < 75 ? 'transparent' : grade.color,
-        position: 'absolute',
-        opacity: 0.9,
-      }} />
+      <Svg width={size} height={size} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={grade.color}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+        />
+      </Svg>
       <Text style={{ color: grade.color, fontSize: size * 0.28, fontWeight: '900', lineHeight: size * 0.32 }}>
         {score}
       </Text>
@@ -87,14 +103,14 @@ const ScoreRing = ({ score, size = 96, dark = true }: { score: number; size?: nu
 const StatCard = ({ label, value, sub, accent, isDark }: {
   label: string; value: string; sub?: string; accent?: string; isDark: boolean;
 }) => (
-  <View style={[tw`flex-1 rounded-2xl px-3 py-4 items-center`, {
+  <View style={[tw`flex-1 rounded-2xl px-2 py-4 items-center justify-center`, {
     backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     borderWidth: 1,
     borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
   }]}>
-    <Text style={[tw`text-xl font-black`, { color: accent ?? (isDark ? 'white' : '#1e293b') }]}>{value}</Text>
-    {sub && <Text style={[tw`text-[10px] font-semibold mt-0.5`, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>{sub}</Text>}
-    <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mt-1`, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }]}>{label}</Text>
+    <Text style={[tw`text-xl font-black text-center`, { color: accent ?? (isDark ? 'white' : '#1e293b') }]}>{value}</Text>
+    {sub && <Text style={[tw`text-[10px] font-semibold mt-0.5 text-center`, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>{sub}</Text>}
+    <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mt-1 text-center`, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }]}>{label}</Text>
   </View>
 );
 
@@ -164,7 +180,7 @@ export const WorkoutSummaryScreen = ({ navigation, route }: any) => {
             <View style={tw`items-center pb-4`}>
               <ScoreRing score={summary.performanceScore} size={108} dark={isDark} />
               <Text style={[tw`text-base font-black mt-3 uppercase tracking-widest`, { color: grade.color }]}>
-                {grade.label} Performance
+                Performance: {grade.label}
               </Text>
             </View>
           </Animated.View>
@@ -307,7 +323,7 @@ export const WorkoutSummaryScreen = ({ navigation, route }: any) => {
                   <Text style={{ fontSize: 20 }}>{grade.emoji}</Text>
                 </View>
                 <View>
-                  <Text style={[tw`text-base font-black`, { color: grade.color }]}>{grade.label} Level</Text>
+                  <Text style={[tw`text-base font-black`, { color: grade.color }]}>Level: {grade.label}</Text>
                   <Text style={[tw`text-xs`, { color: textSecondary }]}>Performance score: {summary.performanceScore}/100</Text>
                 </View>
               </View>
@@ -332,21 +348,21 @@ export const WorkoutSummaryScreen = ({ navigation, route }: any) => {
           </Section>
 
           {/* ── CTA buttons ───────────────────────────────────────────────── */}
-          <View style={tw`flex-row gap-3 mt-8`}>
-            <TouchableOpacity
-              onPress={handleDoAgain}
-              style={[tw`flex-1 py-4 rounded-2xl items-center`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
-            >
-              <MaterialIcons name="replay" size={20} color={textPrimary} />
-              <Text style={[tw`text-sm font-bold mt-1`, { color: textPrimary }]}>Do again</Text>
-            </TouchableOpacity>
-
+          <View style={tw`gap-3 mt-8`}>
             <TouchableOpacity
               onPress={handleDone}
-              style={[tw`flex-[2] py-4 rounded-2xl items-center justify-center flex-row gap-2`, { backgroundColor: accent }]}
+              style={[tw`w-full py-4 rounded-2xl items-center justify-center flex-row gap-2`, { backgroundColor: accent }]}
             >
               <MaterialIcons name="check" size={20} color="white" />
               <Text style={tw`text-white text-base font-black`}>Done</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleDoAgain}
+              style={[tw`w-full py-4 rounded-2xl items-center flex-row justify-center gap-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
+            >
+              <MaterialIcons name="replay" size={20} color={textPrimary} />
+              <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Do again</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

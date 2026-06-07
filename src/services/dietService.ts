@@ -9,7 +9,6 @@
  */
 
 import { apiGet, apiPost, apiDelete } from './api';
-import { invalidateCachedResponse } from './offlineService';
 
 export interface MacroNutrients {
   protein: number;
@@ -83,9 +82,8 @@ export interface DietLogRequest {
  * Requires: active subscription + complete user profile with goal.
  */
 export const generateDietPlan = async (): Promise<{ plan: DietPlan }> => {
-  const response: any = await apiPost('/diet/generate', {});
-  // Old plan is now deactivated server-side; drop any cached GET.
-  await invalidateCachedResponse(['/diet/active', '/diet/history']);
+  // AI generation can take 60-120 s on a cold start — use a generous timeout.
+  const response: any = await apiPost('/diet/generate', {}, { timeout: 120000 });
   return { plan: response.data?.plan };
 };
 
@@ -100,7 +98,6 @@ export const getActiveDietPlan = async (): Promise<{ plan: DietPlan | null }> =>
 
 export const deleteActiveDietPlan = async (): Promise<void> => {
   await apiDelete('/diet/active');
-  await invalidateCachedResponse(['/diet/active', '/diet/history']);
 };
 
 /**

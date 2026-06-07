@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import tw from '../tw';
 import { useTheme } from './ThemeContext';
+import { FitnessLoader } from '../components/FitnessLoader';
 
 interface LoadingContextType {
   isLoading: boolean;
@@ -44,7 +45,7 @@ const LoadingOverlay: React.FC = () => {
         { backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999 },
       ]}
     >
-      <ActivityIndicator size="large" color={accent} />
+      <FitnessLoader size={60} color={accent} />
     </View>
   );
 };

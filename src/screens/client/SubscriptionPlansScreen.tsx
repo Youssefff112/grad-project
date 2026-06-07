@@ -8,7 +8,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
@@ -57,14 +57,13 @@ const plans: Plan[] = [
   {
     id: 'Standard',
     name: 'AI Plan',
-    price: 9.99,
+    price: 14.99,
     billing: '/month',
     description: 'Let AI run your training & nutrition',
     features: [
       'Everything in Free',
       'AI-generated workout plans',
       'AI-generated meal plans',
-      'AI chatbot for recommendations',
       'Computer vision form check',
       'Swap exercises & meals dynamically',
     ],
@@ -76,7 +75,7 @@ const plans: Plan[] = [
   {
     id: 'Premium',
     name: 'Coach Plan',
-    price: 19.99,
+    price: 49.99,
     billing: '/month',
     description: 'Work with a real human coach',
     features: [
@@ -101,7 +100,7 @@ const plans: Plan[] = [
     description: 'AI + dedicated coach, everything unlocked',
     features: [
       'Everything in AI Plan and Coach Plan',
-      'AI workouts, meals & chatbot',
+      'AI workouts & meals',
       'Dedicated coach + messaging',
       'Shared progress dashboard',
       'Advanced computer vision',
@@ -114,6 +113,7 @@ const plans: Plan[] = [
 
 export const SubscriptionPlansScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  const insets = useSafeAreaInsets();
   const { subscriptionPlan, setSubscriptionPlan, updateLastPlanReview } = useUser();
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -219,64 +219,68 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
         </View>
 
         {/* Plans Grid */}
-        <View style={tw`flex-col gap-4`}>
+        <View style={tw`flex-col gap-6`}>
           {plans.map((plan) => (
             <TouchableOpacity
               key={plan.id}
               onPress={() => handleSelectPlan(plan.id)}
               style={[
-                tw`rounded-2xl p-5 border-2`,
+                tw`rounded-2xl border-2 overflow-hidden`,
                 {
                   backgroundColor: isDark ? '#111128' : '#ffffff',
                   borderColor: subscriptionPlan === plan.id ? accent : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                  borderWidth: 2,
+                  borderWidth: subscriptionPlan === plan.id ? 2 : 1,
+                  shadowColor: accent,
+                  shadowOffset: { width: 0, height: subscriptionPlan === plan.id ? 8 : 2 },
+                  shadowOpacity: subscriptionPlan === plan.id ? 0.3 : 0.05,
+                  shadowRadius: subscriptionPlan === plan.id ? 12 : 4,
+                  elevation: subscriptionPlan === plan.id ? 8 : 2,
                 },
               ]}
             >
               {plan.recommended && (
-                <View style={[tw`absolute -top-3 left-4 px-3 py-1 rounded-full`, { backgroundColor: accent }]}>
+                <View style={[tw`w-full py-1.5 items-center justify-center`, { backgroundColor: accent }]}>
                   <Text style={tw`text-xs font-bold text-white tracking-wider uppercase`}>Recommended</Text>
                 </View>
               )}
 
-              <View style={tw`flex-row items-start justify-between mb-3`}>
-                <View>
-                  <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+              <View style={tw`p-6`}>
+                <View style={tw`flex-row items-start justify-between mb-2`}>
+                  <Text style={[tw`text-2xl font-black uppercase tracking-wide`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                     {plan.name}
                   </Text>
-                  <Text style={[tw`text-sm mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-                    {plan.description}
+                  {subscriptionPlan === plan.id && <MaterialIcons name="check-circle" size={28} color={accent} />}
+                </View>
+                
+                <Text style={[tw`text-sm mb-6 leading-relaxed`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                  {plan.description}
+                </Text>
+
+                <View style={tw`mb-6 flex-row items-baseline gap-1`}>
+                  <Text style={[tw`text-4xl font-black`, { color: accent }]}>
+                    ${plan.price.toFixed(2)}
+                  </Text>
+                  <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                    {plan.billing}
                   </Text>
                 </View>
-                {subscriptionPlan === plan.id && <MaterialIcons name="check-circle" size={28} color={accent} />}
-              </View>
 
-              <View style={tw`mb-4`}>
-                <Text style={[tw`text-3xl font-bold`, { color: accent }]}>
-                  ${plan.price.toFixed(2)}
-                </Text>
-                <Text style={[tw`text-xs mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-                  {plan.billing}
-                </Text>
-              </View>
-
-              <View style={[tw`my-3 h-px`, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} />
-
-              {/* Key Features Preview */}
-              <View style={tw`gap-2`}>
-                {plan.features.slice(0, 3).map((feature, idx) => (
-                  <View key={idx} style={tw`flex-row items-center gap-2`}>
-                    <MaterialIcons name="check" size={16} color={accent} />
-                    <Text style={[tw`text-sm flex-1`, { color: isDark ? '#e2e8f0' : '#1e293b' }]}>
-                      {feature}
+                {/* Key Features Preview */}
+                <View style={tw`gap-3`}>
+                  {plan.features.slice(0, 4).map((feature, idx) => (
+                    <View key={idx} style={tw`flex-row items-start gap-3`}>
+                      <MaterialIcons name="check" size={18} color={accent} style={tw`mt-0.5`} />
+                      <Text style={[tw`text-sm flex-1 font-medium`, { color: isDark ? '#e2e8f0' : '#1e293b' }]}>
+                        {feature}
+                      </Text>
+                    </View>
+                  ))}
+                  {plan.features.length > 4 && (
+                    <Text style={[tw`text-xs font-bold mt-2 ml-7`, { color: accent }]}>
+                      + {plan.features.length - 4} more features (see below)
                     </Text>
-                  </View>
-                ))}
-                {plan.features.length > 3 && (
-                  <Text style={[tw`text-xs ml-6`, { color: isDark ? '#94a3b8' : '#64748b' }]}>
-                    +{plan.features.length - 3} more features
-                  </Text>
-                )}
+                  )}
+                </View>
               </View>
             </TouchableOpacity>
           ))}
@@ -287,6 +291,48 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
           <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             Feature Comparison
           </Text>
+
+          {/* Legend */}
+          <View style={tw`mb-4 flex-row items-center justify-between`}>
+            <View style={tw`flex-row items-center gap-4`}>
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <View style={[tw`w-4 h-4 rounded items-center justify-center`, { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' }]}>
+                  <MaterialIcons name="check" size={10} color={accent} />
+                </View>
+                <Text style={[tw`text-xs font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Included</Text>
+              </View>
+              <View style={tw`flex-row items-center gap-1.5`}>
+                <View style={[tw`w-4 h-4 rounded items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}>
+                  <MaterialIcons name="close" size={10} color={isDark ? '#64748b' : '#94a3b8'} />
+                </View>
+                <Text style={[tw`text-xs font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Not Included</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Plan Header */}
+          <View style={tw`flex-row gap-1 mb-2 px-3`}>
+            <View style={tw`flex-1`} />
+            {['Free', 'AI', 'Coach', 'Elite'].map((plan) => {
+              const currentAlias = subscriptionPlan === 'Standard' || subscriptionPlan === 'AI Plan' ? 'AI' : 
+                                   subscriptionPlan === 'Premium' || subscriptionPlan === 'Coach Plan' ? 'Coach' : 
+                                   subscriptionPlan;
+              const isCurrent = currentAlias === plan;
+              
+              return (
+                <View key={plan} style={tw`w-11 items-center justify-end pb-1`}>
+                  {isCurrent && (
+                    <View style={[tw`px-1 py-0.5 rounded-md mb-1`, { backgroundColor: accent + '20' }]}>
+                      <Text style={[tw`text-[6px] font-black uppercase tracking-wider text-center`, { color: accent }]}>Your{'\n'}Plan</Text>
+                    </View>
+                  )}
+                  <Text style={[tw`text-[9px] uppercase tracking-tight font-bold text-center`, { color: isCurrent ? accent : isDark ? '#cbd5e1' : '#475569' }]} numberOfLines={1}>
+                    {plan}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
           
           {/* Comparison Rows — booleans MUST mirror PLAN_FEATURES in
               ``src/constants/plans.ts`` so the marketing matches the gates. */}
@@ -332,16 +378,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                   { plan: 'Elite', included: true },
                 ],
               },
-              {
-                label: 'AI Chatbot',
-                icon: 'smart-toy',
-                rows: [
-                  { plan: 'Free', included: false },
-                  { plan: 'Standard', included: true },
-                  { plan: 'Premium', included: false },
-                  { plan: 'Elite', included: true },
-                ],
-              },
+
               {
                 label: 'Dedicated Coach',
                 icon: 'school',
@@ -406,7 +443,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
               <View 
                 key={idx}
                 style={[
-                  tw`rounded-xl p-3 flex-row items-center gap-3`,
+                  tw`rounded-xl p-2 flex-row items-center gap-2`,
                   { 
                     backgroundColor: isDark ? '#111128' : '#ffffff',
                     borderWidth: 1,
@@ -418,13 +455,13 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                 <View style={tw`flex-row items-center gap-2 flex-1`}>
                   <View 
                     style={[
-                      tw`p-2 rounded-lg`,
+                      tw`p-1.5 rounded-lg`,
                       { backgroundColor: accent + '15' }
                     ]}
                   >
-                    <MaterialIcons name={row.icon as any} size={18} color={accent} />
+                    <MaterialIcons name={row.icon as any} size={16} color={accent} />
                   </View>
-                  <Text style={[tw`text-sm font-bold`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
+                  <Text style={[tw`text-xs font-bold flex-1 flex-wrap`, { color: isDark ? '#cbd5e1' : '#475569' }]} numberOfLines={2}>
                     {row.label}
                   </Text>
                 </View>
@@ -435,7 +472,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                     <View 
                       key={i}
                       style={[
-                        tw`w-9 h-9 rounded-lg items-center justify-center`,
+                        tw`w-11 h-7 rounded-md items-center justify-center`,
                         item.included 
                           ? { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' }
                           : { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }
@@ -443,7 +480,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
                     >
                       <MaterialIcons 
                         name={item.included ? 'check' : 'close'} 
-                        size={16} 
+                        size={14} 
                         color={item.included ? accent : isDark ? '#64748b' : '#94a3b8'}
                       />
                     </View>
@@ -453,33 +490,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
             ))}
           </View>
 
-          {/* Legend */}
-          <View style={tw`mt-4 flex-row items-center justify-center gap-8`}>
-            <View style={tw`flex-row items-center gap-2`}>
-              <View style={[tw`w-6 h-6 rounded items-center justify-center`, { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' }]}>
-                <MaterialIcons name="check" size={14} color={accent} />
-              </View>
-              <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Included</Text>
-            </View>
-            <View style={tw`flex-row items-center gap-2`}>
-              <View style={[tw`w-6 h-6 rounded items-center justify-center`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}>
-                <MaterialIcons name="close" size={14} color={isDark ? '#64748b' : '#94a3b8'} />
-              </View>
-              <Text style={[tw`text-xs`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Not Included</Text>
-            </View>
-          </View>
 
-          {/* Plan Header */}
-          <View style={tw`mt-6 flex-row gap-1 px-0`}>
-            <View style={tw`flex-1`} />
-            {['Free', 'Standard', 'Premium', 'Elite'].map((plan) => (
-              <View key={plan} style={tw`w-9 items-center`}>
-                <Text style={[tw`text-xs font-bold text-center`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  {plan}
-                </Text>
-              </View>
-            ))}
-          </View>
         </View>
 
         {/* Current Subscription Management */}
@@ -690,13 +701,13 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
 
       {/* Plan Disclaimer Modal */}
       <Modal visible={showDisclaimer} animationType="slide" transparent>
-        <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
+        <View style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', paddingTop: Math.max(insets.top, 20), paddingBottom: insets.bottom }]}>
           <View style={[tw`flex-row items-center p-4 gap-4`, { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
             <TouchableOpacity onPress={() => setShowDisclaimer(false)} style={tw`flex size-10 items-center justify-center`}>
               <MaterialIcons name="close" size={24} color={accent} />
             </TouchableOpacity>
             <Text style={[tw`text-xl font-bold flex-1`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              {selectedPlanData?.name} Plan
+              {selectedPlanData?.name.endsWith('Plan') ? selectedPlanData.name : `${selectedPlanData?.name} Plan`}
             </Text>
           </View>
 
@@ -769,7 +780,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
 
           <View style={[tw`p-6 gap-3`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
             <Button
-              title={isConfirming ? 'Processing...' : `Confirm ${selectedPlanData?.name} Plan`}
+              title={isConfirming ? 'Processing...' : `Confirm ${selectedPlanData?.name.endsWith('Plan') ? selectedPlanData.name : `${selectedPlanData?.name} Plan`}`}
               size="lg"
               onPress={handleConfirmPlan}
               icon={isConfirming
@@ -780,7 +791,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
               <Text style={[tw`text-base font-semibold`, { color: accent }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

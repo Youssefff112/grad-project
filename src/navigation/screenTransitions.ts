@@ -1,46 +1,47 @@
-import { Easing } from 'react-native';
-import type {
-  StackCardStyleInterpolator,
+import { Easing, Platform } from 'react-native';
+import {
   StackNavigationOptions,
+  TransitionPresets,
 } from '@react-navigation/stack';
 
-/** Fade duration — stack transitions (push, pop, left-edge swipe) */
-export const STACK_TRANSITION_MS = 250;
-
-const easeOut = Easing.out(Easing.cubic);
-
-const timingSpec = {
-  animation: 'timing' as const,
-  config: {
-    duration: STACK_TRANSITION_MS,
-    easing: easeOut,
-  },
-};
-
-/**
- * Pure cross-fade — used for buttons AND interactive horizontal back-swipe
- * (requires @react-navigation/stack, not native-stack).
- */
-export const fadeCardInterpolator: StackCardStyleInterpolator = ({
-  current: { progress },
-}) => ({
-  cardStyle: {
-    opacity: progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-      extrapolate: 'clamp',
-    }),
-  },
-});
-
+/** Cross-fade transition for the entire app */
 export const stackScreenOptions: StackNavigationOptions = {
-  cardStyleInterpolator: fadeCardInterpolator,
+  cardStyleInterpolator: ({ current }) => ({
+    cardStyle: {
+      opacity: current.progress,
+    },
+  }),
   transitionSpec: {
-    open: timingSpec,
-    close: timingSpec,
+    open: {
+      animation: 'timing',
+      config: { duration: 250, easing: Easing.out(Easing.poly(4)) },
+    },
+    close: {
+      animation: 'timing',
+      config: { duration: 250, easing: Easing.in(Easing.poly(4)) },
+    },
   },
-  gestureEnabled: true,
-  gestureDirection: 'horizontal',
-  gestureVelocityImpact: 0.3,
-  cardOverlayEnabled: false,
+  gestureEnabled: false,
+  cardOverlayEnabled: true,
+  headerMode: 'screen',
+  presentation: 'card',
 };
+
+/** Modal style sliding up from bottom */
+export const modalScreenOptions: StackNavigationOptions = {
+  ...TransitionPresets.ModalPresentationIOS,
+  gestureEnabled: true,
+  gestureDirection: 'vertical',
+  presentation: 'modal',
+};
+
+/** Fast cross-fade for specific tabs or deep-links */
+export const fadeScreenOptions: StackNavigationOptions = {
+  cardStyleInterpolator: ({ current }) => ({
+    cardStyle: {
+      opacity: current.progress,
+    },
+  }),
+  gestureEnabled: false,
+};
+

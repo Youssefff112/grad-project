@@ -97,6 +97,11 @@ WorkoutLog.init({
   notes: {
     type: DataTypes.TEXT
   },
+  /** Structured CV session payload (exercise, plan day, redo #, scores, rep breakdown). */
+  sessionMeta: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+  },
   rating: {
     type: DataTypes.INTEGER
   },

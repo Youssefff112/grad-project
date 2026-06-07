@@ -1,15 +1,16 @@
 import React, { useRef, useCallback } from 'react';
 import {
-  Animated,
   TouchableOpacity,
   Text,
   TouchableOpacityProps,
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { FitnessLoader } from './FitnessLoader';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -20,6 +21,8 @@ interface ButtonProps extends TouchableOpacityProps {
   icon?: React.ReactNode;
   loading?: boolean;
 }
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export const Button: React.FC<ButtonProps> = ({
   title,
@@ -33,25 +36,25 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const { isDark, accent, colors } = useTheme();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
 
-  const handlePressIn = useCallback(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      tension: 300,
-      friction: 10,
-    }).start();
-  }, [scaleAnim]);
+  const handlePressIn = useCallback((e: any) => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 0.96, friction: 5, tension: 300, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.85, duration: 150, useNativeDriver: true }),
+    ]).start();
+    if (props.onPressIn) props.onPressIn(e);
+  }, [scale, opacity, props]);
 
-  const handlePressOut = useCallback(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 300,
-      friction: 10,
-    }).start();
-  }, [scaleAnim]);
+  const handlePressOut = useCallback((e: any) => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, friction: 5, tension: 300, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+    if (props.onPressOut) props.onPressOut(e);
+  }, [scale, opacity, props]);
 
   let variantStyle: ViewStyle = {};
   let variantTextColor = '';
@@ -63,10 +66,10 @@ export const Button: React.FC<ButtonProps> = ({
       variantStyle = {
         backgroundColor: isDisabled ? accent + '60' : accent,
         shadowColor: accent,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: isDark ? 0.45 : 0.30,
-        shadowRadius: 10,
-        elevation: isDisabled ? 0 : 6,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: isDisabled ? 0 : (isDark ? 0.35 : 0.25),
+        shadowRadius: 12,
+        elevation: isDisabled ? 0 : 8,
       };
       variantTextColor = '#ffffff';
       break;
@@ -74,7 +77,7 @@ export const Button: React.FC<ButtonProps> = ({
       variantStyle = {
         backgroundColor: isDark ? colors.card : colors.bgSurface,
         borderWidth: 1,
-        borderColor: colors.cardBorder,
+        borderColor: colors.cardBorderStrong,
       };
       variantTextColor = colors.text;
       break;
@@ -101,51 +104,50 @@ export const Button: React.FC<ButtonProps> = ({
   switch (size) {
     case 'sm':
       sizeContainerTw = 'h-10 px-4';
-      sizeTextTw = 'text-sm';
+      sizeTextTw = 'text-sm font-bold';
       borderRadiusTw = 'rounded-xl';
       break;
     case 'md':
       sizeContainerTw = 'h-14 px-6';
-      sizeTextTw = 'text-base';
+      sizeTextTw = 'text-base font-bold';
       break;
     case 'lg':
       sizeContainerTw = 'h-16 px-8';
-      sizeTextTw = 'text-lg tracking-wider uppercase';
+      sizeTextTw = 'text-lg font-black tracking-widest uppercase';
       break;
   }
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
-        style={[
-          tw`flex-row items-center justify-center gap-2 ${borderRadiusTw} ${sizeContainerTw}`,
-          variantStyle,
-          isDisabled && { opacity: 0.55 },
-          containerStyle,
-        ]}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.9}
-        disabled={isDisabled}
-        {...props}
-      >
-        {loading ? (
-          <ActivityIndicator color={variantTextColor} />
-        ) : (
-          <>
-            <Text
-              style={[
-                tw`font-bold ${sizeTextTw}`,
-                { color: variantTextColor, letterSpacing: size === 'lg' ? 1.5 : 0 },
-                textStyle,
-              ]}
-            >
-              {title}
-            </Text>
-            {icon && icon}
-          </>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
+    <AnimatedTouchableOpacity
+      style={[
+        tw`flex-row items-center justify-center gap-2 ${borderRadiusTw} ${sizeContainerTw}`,
+        variantStyle,
+        isDisabled && { opacity: 0.55 },
+        containerStyle,
+        { transform: [{ scale }], opacity },
+      ]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
+      disabled={isDisabled}
+      {...props}
+    >
+      {loading ? (
+        <FitnessLoader size={size === 'sm' ? 24 : size === 'md' ? 32 : 40} color={variantTextColor} />
+      ) : (
+        <>
+          <Text
+            style={[
+              tw`${sizeTextTw}`,
+              { color: variantTextColor },
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+          {icon && icon}
+        </>
+      )}
+    </AnimatedTouchableOpacity>
   );
 };

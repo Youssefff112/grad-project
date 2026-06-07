@@ -2,10 +2,11 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as tokenManager from '../utils/tokenManager';
 import authService, { type User as AuthUser } from '../services/auth.service';
-import { getClientSubscriptionStatus, getClientProfile } from '../services/clientService';
+import { getClientSubscriptionStatus, getClientProfile, removeCoach } from '../services/clientService';
 import * as progressService from '../services/progressService';
 import * as coachService from '../services/coachService';
 import { isClientPlan } from '../constants/plans';
+import { canClientSelectPersonalCoach, resolveUserMode } from '../utils/planUtils';
 import type { CoachApplicationStatus } from '../utils/coachGate';
 
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
@@ -477,28 +478,28 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setCoach = useCallback((id: string, name: string) => {
     setCoachIdState(id);
     setCoachNameState(name);
-    setUserModeState('CoachAssisted');
     AsyncStorage.setItem('user_coach_id', id).catch((error) =>
       console.log('Failed to save coach id:', error)
     );
     AsyncStorage.setItem('user_coach_name', name).catch((error) =>
       console.log('Failed to save coach name:', error)
     );
-    AsyncStorage.setItem('user_mode', 'CoachAssisted').catch((error) =>
-      console.log('Failed to save user mode:', error)
-    );
   }, []);
 
   const clearCoach = useCallback(() => {
     setCoachIdState(null);
     setCoachNameState(null);
-    setUserModeState('Basic');
     AsyncStorage.removeItem('user_coach_id');
     AsyncStorage.removeItem('user_coach_name');
-    AsyncStorage.setItem('user_mode', 'Basic').catch((error) =>
-      console.log('Failed to save user mode:', error)
-    );
   }, []);
+
+  // Derive user mode from plan + coach — Standard stays AIDriven even if stale coach data exists.
+  useEffect(() => {
+    if (role !== 'client') return;
+    const mode = resolveUserMode(subscriptionPlan, coachId);
+    setUserModeState(mode);
+    AsyncStorage.setItem('user_mode', mode).catch(() => {});
+  }, [role, subscriptionPlan, coachId]);
 
   // Keep assigned coach in sync with the server (source of truth) so it survives restarts and multi-device use.
   useEffect(() => {
@@ -506,8 +507,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let cancelled = false;
     (async () => {
       try {
-        const { profile } = await getClientProfile();
+        const [{ profile }, { subscription }] = await Promise.all([
+          getClientProfile(),
+          getClientSubscriptionStatus(),
+        ]);
         if (cancelled || !profile) return;
+
+        const plan = (subscription?.planName || subscriptionPlan) as SubscriptionPlan;
+
+        // AI Plan / Free tiers must not retain a personal coach assignment.
+        if (!canClientSelectPersonalCoach(plan)) {
+          if (profile.selectedCoachId) {
+            try {
+              await removeCoach();
+            } catch {
+              /* offline — local state still cleared below */
+            }
+          }
+          clearCoach();
+          return;
+        }
+
         const sid = profile.selectedCoachId;
         if (!sid) {
           clearCoach();
@@ -529,7 +549,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       cancelled = true;
     };
-  }, [isLoading, isAuthenticated, role, clearCoach, setCoach, coachId, coachName]);
+  }, [isLoading, isAuthenticated, role, subscriptionPlan, clearCoach, setCoach, coachId, coachName]);
 
   const setComputerVisionEnabled = useCallback((enabled: boolean) => {
     setCanUseComputerVisionState(enabled);

@@ -13,14 +13,8 @@
  *  - Session data accumulator for workout summary
  */
 
-import axios from 'axios';
-import { environment } from '../config/environment';
-
-const aiClient = axios.create({
-  baseURL: environment.AI_BACKEND_URL,
-  timeout: 8000,
-  headers: { 'Content-Type': 'application/json' },
-});
+import { apiGet, apiPost } from './api';
+import { unwrapApiData } from '../utils/apiResponse';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -410,11 +404,11 @@ export const analyzeFrame = async (
   exerciseName: string,
 ): Promise<AnalyzeFrameResult> => {
   const profile = getExerciseProfile(exerciseName);
-  const res = await aiClient.post('/analyze-frame', {
+  const body = await apiPost('/vision/analyze-frame', {
     image_base64: imageBase64,
     exercise_name: profile.slug,
-  });
-  const data = res.data ?? {};
+  }, { timeout: 12000 });
+  const data = unwrapApiData<Record<string, unknown>>(body) ?? {};
   const angles = (data.angles ?? {}) as FrameAngles;
   const targets = (data.targets ?? {}) as FrameTargetsRaw;
 
@@ -437,11 +431,11 @@ export const analyzeFrame = async (
   };
 };
 
-/** Health check — quick GET to AI backend root. */
+/** Health check — proxied through Node API (phone cannot reach :8000 directly). */
 export const checkAIBackendHealth = async (): Promise<boolean> => {
   try {
-    const res = await axios.get(`${environment.AI_BACKEND_URL}/`, { timeout: 3000 });
-    return res.status === 200;
+    await apiGet('/vision/health', { timeout: 5000 });
+    return true;
   } catch {
     return false;
   }

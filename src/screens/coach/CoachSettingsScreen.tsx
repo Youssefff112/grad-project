@@ -9,6 +9,7 @@ import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
 import { ProfileAvatar } from '../../components/ProfileAvatar';
+import { Switch } from '../../components/Switch';
 import * as coachService from '../../services/coachService';
 
 export const CoachSettingsScreen = ({ navigation }: any) => {
@@ -74,32 +75,16 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
         navigation.navigate('CoachSchedule');
         break;
       case 'privacy':
-        Alert.alert(
-          'Privacy & Security',
-          'End-to-end encryption is enabled. Your data is stored securely and never shared with third parties.',
-          [{ text: 'OK' }],
-        );
+        navigation.navigate('PrivacySecurity');
         break;
       case 'help':
-        Alert.alert(
-          'Help Center',
-          'Need assistance?\n\nEmail: support@apexai.com\nResponse time: < 24 hours',
-          [{ text: 'OK' }],
-        );
+        navigation.navigate('HelpCenter');
         break;
       case 'feedback':
-        Alert.alert(
-          'Send Feedback',
-          "We'd love to hear from you! Your feedback helps us improve Vertex.",
-          [{ text: 'Cancel' }, { text: 'Send Email', onPress: () => {} }],
-        );
+        navigation.navigate('Feedback');
         break;
       case 'about':
-        Alert.alert(
-          'About Vertex',
-          'Version 1.0.0\n\nPeak performance coaching powered by real-time computer vision and AI analysis.\n\nBuilt with precision for coaches.',
-          [{ text: 'OK' }],
-        );
+        navigation.navigate('About');
         break;
     }
   };
@@ -240,54 +225,56 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
                 { backgroundColor: cardBg, borderWidth: 1, borderColor },
               ]}
             >
-              {section.items.map((item, i) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => handleMenuPress(item.id)}
-                  style={[
-                    tw`flex-row items-center justify-between px-4 py-3.5`,
-                    i < section.items.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                    },
-                  ]}
-                >
-                  <View style={tw`flex-row items-center gap-3`}>
-                    <View
-                      style={[
-                        tw`w-8 h-8 rounded-lg items-center justify-center`,
-                        { backgroundColor: accent + '14' },
-                      ]}
-                    >
-                      <MaterialIcons name={item.icon as any} size={18} color={accent} />
-                    </View>
-                    <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#e2e8f0' : '#334155' }]}>
-                      {item.label}
-                    </Text>
-                  </View>
-                  {(item as any).isToggle ? (
-                    <View
-                      style={[
-                        tw`w-12 h-7 rounded-full justify-center px-0.5`,
-                        { backgroundColor: isDark ? accent : '#cbd5e1' },
-                      ]}
-                    >
+              {section.items.map((item, i) => {
+                const isToggle = !!(item as any).isToggle;
+                const rowStyle = [
+                  tw`flex-row items-center justify-between px-4 py-3.5`,
+                  i < section.items.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                  },
+                ];
+                const rowContent = (
+                  <>
+                    <View style={tw`flex-row items-center gap-3 flex-1 mr-4`}>
                       <View
                         style={[
-                          tw`w-6 h-6 rounded-full bg-white shadow`,
-                          { alignSelf: isDark ? 'flex-end' : 'flex-start' },
+                          tw`w-8 h-8 rounded-lg items-center justify-center`,
+                          { backgroundColor: accent + '14' },
                         ]}
-                      />
+                      >
+                        <MaterialIcons name={item.icon as any} size={18} color={accent} />
+                      </View>
+                      <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#e2e8f0' : '#334155' }]}>
+                        {item.label}
+                      </Text>
                     </View>
-                  ) : (
-                    <MaterialIcons
-                      name="chevron-right"
-                      size={22}
-                      color={isDark ? '#475569' : '#94a3b8'}
-                    />
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {isToggle ? (
+                      <Switch value={isDark} onValueChange={toggleTheme} />
+                    ) : (
+                      <MaterialIcons
+                        name="chevron-right"
+                        size={22}
+                        color={isDark ? '#475569' : '#94a3b8'}
+                      />
+                    )}
+                  </>
+                );
+
+                return isToggle ? (
+                  <View key={item.id} style={rowStyle}>
+                    {rowContent}
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => handleMenuPress(item.id)}
+                    style={rowStyle}
+                  >
+                    {rowContent}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         ))}

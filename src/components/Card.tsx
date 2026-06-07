@@ -21,8 +21,8 @@ export const Card: React.FC<CardProps> = ({
   const paddingMap = {
     none: '',
     sm: 'p-3',
-    md: 'p-4',
-    lg: 'p-6',
+    md: 'p-5',
+    lg: 'p-8',
   };
 
   const variantStyles = {
@@ -36,44 +36,44 @@ export const Card: React.FC<CardProps> = ({
       backgroundColor: isDark ? colors.bgSurface : '#ffffff',
       borderWidth: isDark ? 1 : 0,
       borderColor: isDark ? colors.cardBorder : 'transparent',
-      shadowColor: isDark ? accent : '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.20 : 0.08,
-      shadowRadius: 12,
-      elevation: 6,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.40 : 0.06,
+      shadowRadius: 24,
+      elevation: 8,
     },
     outlined: {
       backgroundColor: 'transparent',
       borderWidth: 1.5,
-      borderColor: accent + '50',
+      borderColor: accent + '40',
       shadowColor: 'transparent',
     },
     filled: {
-      backgroundColor: isDark ? colors.bgSurface : accent + '08',
+      backgroundColor: isDark ? '#1a1a1f' : accent + '08',
       borderWidth: 0,
       borderColor: 'transparent',
       shadowColor: 'transparent',
     },
     glass: {
       backgroundColor: isDark
-        ? 'rgba(255,255,255,0.05)'
-        : 'rgba(255,255,255,0.75)',
+        ? 'rgba(255,255,255,0.03)'
+        : 'rgba(255,255,255,0.85)',
       borderWidth: 1,
       borderColor: isDark
-        ? 'rgba(255,255,255,0.10)'
-        : 'rgba(255,255,255,0.90)',
+        ? 'rgba(255,255,255,0.08)'
+        : 'rgba(255,255,255,0.60)',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.25 : 0.06,
-      shadowRadius: 8,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.5 : 0.04,
+      shadowRadius: 16,
+      elevation: 4,
     },
   };
 
   return (
     <View
       style={[
-        tw`rounded-2xl ${paddingMap[padding]}`,
+        tw`rounded-3xl ${paddingMap[padding]}`,
         variantStyles[variant],
         style,
       ]}

@@ -250,12 +250,14 @@ export const getClientDietPlan = async (clientId: number): Promise<{ plan: any |
 };
 
 export const generateWorkoutForClient = async (clientId: number): Promise<{ plan: any }> => {
-  const response = await apiPost(`/coach/clients/${clientId}/generate-workout`, {});
+  // AI generation can take 60-120 s on a cold start — use a generous timeout.
+  const response = await apiPost(`/coach/clients/${clientId}/generate-workout`, {}, { timeout: 120000 });
   return { plan: response.data?.plan };
 };
 
 export const generateDietForClient = async (clientId: number): Promise<{ plan: any }> => {
-  const response = await apiPost(`/coach/clients/${clientId}/generate-diet`, {});
+  // AI generation can take 60-120 s on a cold start — use a generous timeout.
+  const response = await apiPost(`/coach/clients/${clientId}/generate-diet`, {}, { timeout: 120000 });
   return { plan: response.data?.plan };
 };
 

@@ -1,23 +1,25 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
+import { canClientSelectPersonalCoach } from '../../utils/planUtils';
 import { useNotifications } from '../../context/NotificationContext';
-import { useOffline } from '../../context/OfflineContext';
 import { hasFeatureAccess } from '../../utils/planUtils';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import * as progressService from '../../services/progressService';
 import * as workoutService from '../../services/workoutService';
 import * as dietService from '../../services/dietService';
-import * as offlineService from '../../services/offlineService';
 import { getClientProfile, getClientSubscriptionStatus } from '../../services/clientService';
 import { getCoaches } from '../../services/coachService';
 import { WATER_ML_PER_GLASS } from '../../utils/waterConversions';
+import { buildImageUrl } from '../../utils/imageUrl';
 import type { WorkoutPlan, WorkoutDay } from '../../services/workoutService';
 
 const prettyLabel = (s?: string) =>
@@ -63,37 +65,34 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [calorieTarget, setCalorieTarget] = useState(2000);
   const [waterGlasses, setWaterGlasses] = useState(0);
   const [hasActiveDietPlan, setHasActiveDietPlan] = useState(false);
-  const { isDark, accent } = useTheme();
-  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach, setSubscriptionPlan, updateLastPlanReview, userId } = useUser();
+  const { isDark, accent, colors } = useTheme();
+  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach, setSubscriptionPlan, updateLastPlanReview, userId, profilePicture } = useUser();
   const { totalUnread } = useNotifications();
-  const { isOnline, syncInProgress, queuedCount } = useOffline();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
 
   const loadActivePlan = useCallback(async () => {
     try {
       const { plan } = await workoutService.getActiveWorkoutPlan();
-      // Always reflect the server-side truth, including null (no plan).
       setActivePlan(plan ?? null);
     } catch {
       setActivePlan(null);
     }
-    // Load completed exercises so per-exercise Done badges show on focus.
     try {
       const exercises = await workoutService.getCompletedExercises();
       setCompletedExercises(exercises);
-    } catch {
-      // Non-critical — badges simply won't show if the request fails.
-    }
+    } catch {}
   }, []);
 
-  // Sync assigned coach from the server so it persists correctly after restart
   const syncCoachInfo = useCallback(async () => {
+    if (!canClientSelectPersonalCoach(subscriptionPlan)) {
+      if (coachId) clearCoach();
+      return;
+    }
     try {
       const profile = await getClientProfile();
       const profileData = (profile as any)?.profile ?? profile;
       const serverCoachId = profileData?.selectedCoachId ?? null;
       if (serverCoachId) {
-        // Resolve coach name if we don't already have it
         if (!coachName) {
           try {
             const { coaches } = await getCoaches();
@@ -109,66 +108,82 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
           setCoach(String(serverCoachId), coachName);
         }
       } else if (!serverCoachId && coachId) {
-        // Server says no coach but local state has one — clear it
         clearCoach();
       }
-    } catch {
-      // Non-critical — silently fail, coach card will show based on AsyncStorage
-    }
-  }, [coachId, coachName, setCoach, clearCoach]);
+    } catch {}
+  }, [coachId, coachName, subscriptionPlan, setCoach, clearCoach]);
 
   const syncClientSubscription = useCallback(async () => {
     try {
       const { subscription } = await getClientSubscriptionStatus();
       if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
-    } catch {
-      /* non-blocking */
-    }
+    } catch {}
   }, [setSubscriptionPlan]);
 
   const loadDailyProgress = useCallback(async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const [logResult, planResult] = await Promise.allSettled([
-        offlineService.getCachedMealLog(today, userId),
-        dietService.getActiveDietPlan(),
-      ]);
 
-      const cachedLog =
-        logResult.status === 'fulfilled' ? (logResult.value as offlineService.DailyMealLog | null) : null;
-      const plan: dietService.DietPlan | null =
-        planResult.status === 'fulfilled' && planResult.value ? planResult.value.plan ?? null : null;
+      const planResult = await dietService.getActiveDietPlan().catch(() => ({ plan: null }));
+      const plan = planResult.plan ?? null;
 
-      const log = cachedLog;
-      if (log?.waterMl != null && log.waterMl > 0) {
-        setWaterGlasses(Math.round(log.waterMl / WATER_ML_PER_GLASS));
-      } else {
-        setWaterGlasses(log?.waterGlasses ?? 0);
+      setHasActiveDietPlan(!!plan);
+
+      if (!plan) {
+        setCaloriesConsumed(0);
+        setCalorieTarget(0); // No plan — no target, avoids hardcoded 2000 fallback
+        setWaterGlasses(0);
+        return;
       }
 
-      const dietPlan = plan;
-      setHasActiveDietPlan(!!dietPlan);
-      // Reset to default when there's no active diet plan, otherwise the
-      // home page keeps showing the deleted plan's calorie target.
-      setCalorieTarget(dietPlan?.dailyCalorieTarget ?? 2000);
-      if (!dietPlan) setCaloriesConsumed(0);
+      // Compute today's meal list to derive the real calorie target
+      const todayDow = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+      const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const todayDayName = DAY_FULL_NAMES[todayDow];
+      const dayPlan =
+        plan.weeklyMealPlan.find((d) => d.day.toLowerCase() === todayDayName) ||
+        plan.weeklyMealPlan[todayDow] ||
+        plan.weeklyMealPlan[0];
 
-      // Try to get today's consumed calories from diet history
+      const todayMeals = (dayPlan?.meals ?? []).map((m, idx) => ({
+        id: `${m.type}-${idx}`,
+        calories: m.nutrition?.calories ?? 0,
+      }));
+
+      const actualDailyTarget = todayMeals.reduce((sum, m) => sum + m.calories, 0);
+      // Prefer today's actual meal-sum; fall back to plan-level target; never use magic 2000
+      setCalorieTarget(actualDailyTarget > 0 ? actualDailyTarget : plan.dailyCalorieTarget > 0 ? plan.dailyCalorieTarget : 0);
+
+      // Read today's log from the server
       try {
-        const { logs } = await dietService.getDietHistory(1, 5);
-        const todayLog = logs.find((l) => l.date?.startsWith(today));
-        if (todayLog?.caloriesConsumed != null) {
-          setCaloriesConsumed(todayLog.caloriesConsumed);
-        }
-        if (todayLog?.waterMl != null && todayLog.waterMl > 0) {
-          setWaterGlasses(Math.round(todayLog.waterMl / WATER_ML_PER_GLASS));
+        const { log } = await dietService.getDietLog(today);
+        if (log) {
+          // Compute consumed from mealsCompleted + plan meal calories
+          if (log.mealsCompleted && Number(log.dietPlanId) === plan.id) {
+            const consumed = todayMeals.reduce(
+              (sum, meal) => sum + (log.mealsCompleted![meal.id] ? meal.calories : 0),
+              0,
+            );
+            setCaloriesConsumed(consumed);
+          } else if (log.caloriesConsumed != null) {
+            setCaloriesConsumed(log.caloriesConsumed);
+          } else {
+            setCaloriesConsumed(0);
+          }
+          if (log.waterMl != null && log.waterMl > 0) {
+            setWaterGlasses(Math.round(log.waterMl / WATER_ML_PER_GLASS));
+          } else {
+            setWaterGlasses(0);
+          }
+        } else {
+          setCaloriesConsumed(0);
+          setWaterGlasses(0);
         }
       } catch {
-        // no history yet
+        setCaloriesConsumed(0);
+        setWaterGlasses(0);
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   useFocusEffect(
@@ -180,7 +195,6 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     }, [loadDailyProgress, loadActivePlan, syncCoachInfo, syncClientSubscription]),
   );
 
-  // Get today's workout day from the active plan
   const todayWorkoutDay = useMemo((): WorkoutDay | null => {
     if (!activePlan?.weeklySchedule) return null;
     const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -191,8 +205,32 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     );
   }, [activePlan]);
 
+  const nextWorkoutTarget = useMemo(() => {
+    const exercises = todayWorkoutDay?.exercises ?? [];
+    if (!exercises.length) return null;
+    const undone = exercises.find(
+      (ex) => !completedExercises.includes(ex.name.toLowerCase()),
+    );
+    if (undone) return { exercise: undone, isRedo: false };
+    return { exercise: exercises[0], isRedo: true };
+  }, [todayWorkoutDay, completedExercises]);
 
-  // Check if plan review is due (every 7 days)
+  const openNextWorkoutSession = useCallback(() => {
+    if (!todayWorkoutDay || !nextWorkoutTarget) return;
+    const { exercise } = nextWorkoutTarget;
+    navigation.navigate('Calibration', {
+      exerciseName: exercise.name,
+      workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout",
+      workoutFocus: todayWorkoutDay.focus,
+      workoutPlanId: activePlan?.id,
+      workoutDay: todayWorkoutDay.day?.toLowerCase(),
+      targetReps: exercise.reps
+        ? parseInt(String(exercise.reps), 10) || undefined
+        : undefined,
+      targetSets: exercise.sets,
+    });
+  }, [todayWorkoutDay, nextWorkoutTarget, activePlan?.id, navigation]);
+
   const shouldShowPlanReview = useMemo(() => {
     if (!lastPlanReviewDate) return true;
     const lastReview = new Date(lastPlanReviewDate);
@@ -202,490 +240,411 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   }, [lastPlanReviewDate]);
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      <View style={[tw`flex-row items-center p-4 pb-2 justify-between z-10`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-        <View style={tw`flex w-12 items-center justify-start`}>
-          <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('NotificationsSettings')}>
-            <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.bg }]}>
+      {/* Header */}
+      <View style={[tw`flex-row items-center px-5 py-3 justify-between z-10 relative`, { backgroundColor: colors.navBg, borderBottomWidth: 1, borderColor: colors.navBorder }]}>
+        {/* Absolute Centered Title */}
+        <View style={tw`absolute inset-0 items-center justify-center pointer-events-none`}>
+          <Text style={[tw`text-lg font-black tracking-widest`, { color: accent }]}>VERTEX</Text>
+        </View>
+
+        <View style={tw`flex w-12 items-center justify-center`}>
+          <TouchableOpacity style={tw`relative p-2 ml-[-8px]`} onPress={() => navigation.navigate('NotificationsSettings')}>
+            <MaterialIcons name="notifications" size={30} color={colors.text} />
             {!!totalUnread && (
-              <View style={[tw`absolute top-1 right-0 rounded-full items-center justify-center h-5 w-5`, { backgroundColor: accent }]}>
-                <Text style={tw`text-white text-xs font-bold`}>
+              <View style={[tw`absolute top-1 right-0 rounded-full items-center justify-center h-5 w-5`, { backgroundColor: colors.error }]}>
+                <Text style={tw`text-white text-[10px] font-black`}>
                   {totalUnread > 99 ? '99+' : totalUnread}
                 </Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
-        <View style={tw`flex-row items-center gap-2`}>
-          {!isOnline && (
-            <View style={[tw`px-3 py-1 rounded-full flex-row items-center gap-1`, { backgroundColor: '#ef444430' }]}>
-              <MaterialIcons name="wifi-off" size={12} color="#ef4444" />
-              <Text style={tw`text-xs text-red-500 font-bold`}>Offline</Text>
-            </View>
-          )}
-          {syncInProgress && (
-            <View style={tw`flex-row items-center gap-1`}>
-              <MaterialIcons name="cloud-upload" size={16} color={accent} />
-              <Text style={[tw`text-xs font-semibold`, { color: accent }]}>Syncing...</Text>
-            </View>
-          )}
-          {!!queuedCount && (
-            <View style={tw`px-2 py-0.5 rounded bg-yellow-500/20`}>
-              <Text style={tw`text-xs text-yellow-600 font-bold`}>{queuedCount} pending</Text>
-            </View>
-          )}
+        
+        <View style={tw`flex w-12 items-center justify-center`}>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`p-1 mr-[-8px]`}>
+            {buildImageUrl(profilePicture) ? (
+              <Image source={{ uri: buildImageUrl(profilePicture) }} style={[tw`rounded-full`, { width: 40, height: 40 }]} />
+            ) : (
+              <MaterialIcons name="account-circle" size={40} color={colors.text} />
+            )}
+          </TouchableOpacity>
         </View>
-        <Text style={[tw`text-lg font-bold tracking-tighter flex-1 text-center`, { color: accent }]}>VERTEX</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`flex size-12 shrink-0 items-center justify-center`}>
-          <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
-        </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
-        {/* Personal Info & Plan Review Reminder Banner */}
-        {shouldShowPlanReview && (
-          <View style={[tw`mx-4 mt-4 rounded-xl p-4 flex-col gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
-            <View style={tw`flex-row items-start gap-3`}>
-              <MaterialIcons name="scale" size={22} color={accent} style={tw`mt-0.5`} />
-              <View style={tw`flex-1`}>
-                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                  Weekly Check-In: Weigh In
-                </Text>
-                <Text style={[tw`text-xs mt-1.5 leading-relaxed`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  Weigh yourself this week to track your progress accurately. Your weight helps us optimize your personalized plan for better results.
-                </Text>
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={tw`flex-col gap-2 mt-2`}>
-              <View style={tw`flex-row gap-2 items-center`}>
-                <TextInput
-                  placeholder="Weight"
-                  placeholderTextColor={isDark ? '#64748b' : '#cbd5e1'}
-                  value={weightInput}
-                  onChangeText={setWeightInput}
-                  keyboardType="decimal-pad"
-                  style={[tw`flex-1 rounded-lg p-3 text-base font-semibold`, { 
-                    backgroundColor: isDark ? '#1a1a2e' : '#ffffff',
-                    color: isDark ? '#f1f5f9' : '#1e293b',
-                    borderWidth: 1,
-                    borderColor: accent + '40'
-                  }]}
-                />
-                <TextInput
-                  placeholder="Body Fat %"
-                  placeholderTextColor={isDark ? '#64748b' : '#cbd5e1'}
-                  value={bodyFatInput}
-                  onChangeText={setBodyFatInput}
-                  keyboardType="decimal-pad"
-                  style={[tw`flex-1 rounded-lg p-3 text-base font-semibold`, { 
-                    backgroundColor: isDark ? '#1a1a2e' : '#ffffff',
-                    color: isDark ? '#f1f5f9' : '#1e293b',
-                    borderWidth: 1,
-                    borderColor: accent + '40'
-                  }]}
-                />
-                <TouchableOpacity
-                  onPress={async () => {
-                    const newWeight = weightInput.trim() ? parseFloat(weightInput) : undefined;
-                    const newBodyFat = bodyFatInput.trim() ? parseFloat(bodyFatInput) : undefined;
-                    const weightValid = newWeight != null && isFinite(newWeight) && newWeight > 0;
-                    const fatValid = newBodyFat != null && isFinite(newBodyFat) && newBodyFat > 0;
-
-                    if (!weightValid && !fatValid) return;
-
-                    if (weightValid) setWeight(newWeight!);
-                    if (fatValid) setBodyFatPercentage(newBodyFat!);
-
-                    // Mark the check-in done — hides the banner until next week
-                    updateLastPlanReview();
-
-                    // Persist to measurements history (non-blocking)
-                    progressService.addMeasurement({
-                      weight: weightValid ? newWeight : undefined,
-                      bodyFat: fatValid ? newBodyFat : undefined,
-                      measuredAt: new Date().toISOString(),
-                    }).catch(() => {/* silently fail — profile already updated */});
-
-                    setWeightInput('');
-                    setBodyFatInput('');
-                  }}
-                  style={[tw`rounded-lg p-3 items-center justify-center`, { backgroundColor: accent }]}
-                >
-                  <MaterialIcons name="check" size={20} color="white" />
-                </TouchableOpacity>
-              </View>
-              <View style={tw`flex-row gap-2 text-xs`}>
-                {!!weight && <Text style={[tw`flex-1 text-xs text-center`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Weight: {weight} kg</Text>}
-                {!!bodyFatPercentage && <Text style={[tw`flex-1 text-xs text-center`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Fat: {bodyFatPercentage}%</Text>}
-              </View>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('SubscriptionPlans')}
-                style={[tw`rounded-lg p-3 items-center`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}
-              >
-                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  Review Plans
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-        {/* Greeting */}
-        <View style={tw`px-4 pt-6 pb-2`}>
-          <Text style={[tw`text-sm font-medium`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Welcome back,</Text>
-          <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{firstName}</Text>
+      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-28 pt-4`}>
+        
+        {/* Greeting Section */}
+        <View style={tw`px-6 pb-6`}>
+          <Text style={[tw`text-sm font-semibold uppercase tracking-wider`, { color: colors.textMuted }]}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </Text>
+          <Text style={[tw`text-4xl font-black mt-1 tracking-tight`, { color: colors.text }]}>
+            Hi, {firstName}
+          </Text>
         </View>
 
-        {/* Coach Info Card — shows only when client has an assigned coach */}
-        {!!coachId && (
-          <View style={tw`px-4 mb-2 flex-row items-stretch gap-2`}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CoachAssignment')}
-              style={[tw`flex-1 flex-row items-center gap-3 p-3 rounded-xl`, { backgroundColor: accent + '12', borderWidth: 1, borderColor: accent + '28' }]}
-            >
-              <View style={[tw`w-9 h-9 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
-                <MaterialIcons name="sports" size={18} color={accent} />
+        {/* Weekly Check-In Banner */}
+        {shouldShowPlanReview && (
+          <View style={tw`px-5 mb-6`}>
+            <Card variant="filled" padding="md" style={[tw`flex-col gap-4 border`, { borderColor: accent + '40', backgroundColor: accent + '12' }]}>
+              <View style={tw`flex-row items-start gap-3`}>
+                <View style={[tw`w-10 h-10 rounded-full items-center justify-center`, { backgroundColor: accent + '25' }]}>
+                  <MaterialIcons name="scale" size={22} color={accent} />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`font-bold text-base`, { color: colors.text }]}>
+                    Weekly Weigh-In
+                  </Text>
+                  <Text style={[tw`text-sm mt-1 leading-relaxed`, { color: colors.textSecondary }]}>
+                    Track your weight to optimize your personalized plan.
+                  </Text>
+                </View>
               </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`text-xs font-semibold`, { color: accent }]}>Your Coach</Text>
-                <Text style={[tw`text-sm font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{coachName || 'Coach'}</Text>
+              <View style={tw`flex-col gap-3`}>
+                <View style={tw`flex-row gap-3`}>
+                  <View style={[tw`flex-1 rounded-2xl flex-row items-center px-2 h-14`, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder }]}>
+                    <MaterialIcons name="monitor-weight" size={18} color={accent} style={tw`mr-1`} />
+                    <TextInput
+                      placeholder="Weight (kg)"
+                      placeholderTextColor={colors.textMuted}
+                      value={weightInput}
+                      onChangeText={setWeightInput}
+                      keyboardType="decimal-pad"
+                      style={[tw`flex-1 text-xs font-bold`, { color: colors.text }]}
+                    />
+                  </View>
+                  <View style={[tw`flex-1 rounded-2xl flex-row items-center px-2 h-14`, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder }]}>
+                    <MaterialIcons name="opacity" size={18} color={accent} style={tw`mr-1`} />
+                    <TextInput
+                      placeholder="Fat %"
+                      placeholderTextColor={colors.textMuted}
+                      value={bodyFatInput}
+                      onChangeText={setBodyFatInput}
+                      keyboardType="decimal-pad"
+                      style={[tw`flex-1 text-xs font-bold`, { color: colors.text }]}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const newWeight = weightInput.trim() ? parseFloat(weightInput) : undefined;
+                      const newBodyFat = bodyFatInput.trim() ? parseFloat(bodyFatInput) : undefined;
+                      const weightValid = newWeight != null && isFinite(newWeight) && newWeight > 0;
+                      const fatValid = newBodyFat != null && isFinite(newBodyFat) && newBodyFat > 0;
+
+                      if (!weightValid && !fatValid) return;
+
+                      if (weightValid) setWeight(newWeight!);
+                      if (fatValid) setBodyFatPercentage(newBodyFat!);
+
+                      updateLastPlanReview();
+                      progressService.addMeasurement({
+                        weight: weightValid ? newWeight : undefined,
+                        bodyFat: fatValid ? newBodyFat : undefined,
+                        measuredAt: new Date().toISOString(),
+                      }).catch(() => {});
+
+                      setWeightInput('');
+                      setBodyFatInput('');
+                    }}
+                    style={[tw`h-14 w-14 rounded-2xl items-center justify-center`, { backgroundColor: accent }]}
+                  >
+                    <MaterialIcons name="check" size={24} color="white" />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <MaterialIcons name="chevron-right" size={18} color={accent} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate('Chat', {
-                  conversationName: coachName || 'Coach',
-                  receiverId: Number(coachId),
-                  conversationId: null,
-                })
-              }
-              accessibilityLabel="Message your coach"
-              style={[tw`w-14 rounded-xl items-center justify-center`, { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '35' }]}
-            >
-              <MaterialIcons name="chat-bubble" size={22} color={accent} />
+            </Card>
+          </View>
+        )}
+
+        {/* Coach Info Card */}
+        {canClientSelectPersonalCoach(subscriptionPlan) && !!coachId && (
+          <View style={tw`px-5 mb-6`}>
+            <TouchableOpacity onPress={() => navigation.navigate('CoachAssignment')}>
+              <Card variant="default" padding="sm" style={tw`flex-row items-center gap-3`}>
+                <View style={[tw`w-12 h-12 rounded-full items-center justify-center`, { backgroundColor: accent + '15' }]}>
+                  <MaterialIcons name="sports" size={24} color={accent} />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: accent }]}>Your Coach</Text>
+                  <Text style={[tw`text-base font-bold mt-0.5`, { color: colors.text }]}>{coachName || 'Coach'}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('Chat', {
+                      conversationName: coachName || 'Coach',
+                      receiverId: Number(coachId),
+                      conversationId: null,
+                    })
+                  }
+                  style={[tw`h-10 w-10 rounded-full items-center justify-center`, { backgroundColor: accent + '15' }]}
+                >
+                  <MaterialIcons name="chat-bubble" size={20} color={accent} />
+                </TouchableOpacity>
+              </Card>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Daily Dial Section */}
-        <View style={tw`px-4 pt-2`}>
-          <View style={tw`flex-row items-center justify-between mb-4`}>
-            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+        <View style={tw`px-5 mb-8`}>
+          <View style={tw`flex-row items-end justify-between mb-4`}>
+            <Text style={[tw`text-2xl font-black tracking-tight`, { color: colors.text }]}>
               Daily Dial
             </Text>
-            <Text style={[tw`text-sm font-semibold`, { color: accent }]}>Today</Text>
           </View>
 
-          <View style={tw`flex-row flex-wrap justify-between gap-y-3`}>
+          <View style={tw`flex-row justify-between gap-4`}>
             {/* Calories Card */}
             {(() => {
               const pct = calorieTarget > 0 ? Math.min(caloriesConsumed / calorieTarget, 1) : 0;
-              const remaining = calorieTarget - caloriesConsumed;
+              const remaining = calorieTarget > 0 ? Math.max(calorieTarget - caloriesConsumed, 0) : 0;
+              const isComplete = hasActiveDietPlan && calorieTarget > 0 && pct >= 1;
+              const barColor = isComplete ? colors.success : colors.warning;
               return (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Meals')}
-                  activeOpacity={0.7}
-                  style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-                >
-                  <View style={tw`flex-row items-center gap-1.5`}>
-                    <MaterialIcons name="local-fire-department" size={18} color={accent} />
-                    <Text style={[tw`text-xs font-semibold uppercase tracking-wider`, { color: isDark ? '#64748b' : '#94a3b8' }]}>Calories</Text>
-                  </View>
-                  {!hasActiveDietPlan && caloriesConsumed === 0 ? (
-                    <Text style={[tw`text-sm font-semibold leading-tight`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                      No meals{'\n'}logged yet
-                    </Text>
-                  ) : (
-                    <Text style={[tw`text-2xl font-black leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                      {caloriesConsumed.toLocaleString()}
-                    </Text>
-                  )}
-                  <View style={[tw`w-full h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
-                    <View style={[tw`h-full rounded-full`, { backgroundColor: accent, width: `${Math.round(pct * 100)}%` }]} />
-                  </View>
-                  <Text style={[tw`text-xs font-semibold`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    {!hasActiveDietPlan && caloriesConsumed === 0
-                      ? 'Generate a meal plan'
-                      : remaining > 0
-                        ? `${remaining.toLocaleString()} kcal left`
-                        : 'Goal reached!'
-                    }{'\n'}
-                    {(hasActiveDietPlan || caloriesConsumed > 0) && (
-                      <Text style={{ color: isDark ? '#475569' : '#cbd5e1' }}>of {calorieTarget.toLocaleString()}</Text>
-                    )}
-                  </Text>
-                </TouchableOpacity>
+                <View style={tw`flex-1`}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Meals')} activeOpacity={0.8}>
+                    <Card variant="default" padding="lg" style={tw`flex-col gap-3 h-44 justify-between`}>
+                      <View style={tw`flex-row items-center gap-2`}>
+                        <View style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: isComplete ? colors.successSurface : colors.warningSurface }]}>
+                          <MaterialIcons name={isComplete ? 'check-circle' : 'local-fire-department'} size={16} color={isComplete ? colors.success : colors.warning} />
+                        </View>
+                        <Text style={[tw`text-[11px] font-bold uppercase tracking-widest`, { color: colors.textSecondary }]}>Calories</Text>
+                      </View>
+                      
+                      <View style={tw`items-center`}>
+                        {!hasActiveDietPlan ? (
+                          <Text style={[tw`text-sm font-semibold text-center`, { color: colors.textMuted }]}>No meal plan</Text>
+                        ) : (
+                          <Text style={[tw`text-3xl font-black tracking-tighter text-center`, { color: isComplete ? colors.success : colors.text }]}>
+                            {caloriesConsumed.toLocaleString()}
+                          </Text>
+                        )}
+                        <Text style={[tw`text-xs font-medium mt-1 text-center`, { color: colors.textMuted }]}>
+                          {!hasActiveDietPlan
+                            ? 'Add a plan to track'
+                            : isComplete
+                            ? '🎯 Goal met!'
+                            : `${remaining.toLocaleString()} kcal left`}
+                        </Text>
+                      </View>
+
+                      <View style={tw`w-full`}>
+                        <View style={[tw`w-full h-2 rounded-full overflow-hidden`, { backgroundColor: colors.bgSurface }]}>
+                          <View style={[tw`h-full rounded-full`, { backgroundColor: barColor, width: `${Math.round(pct * 100)}%` }]} />
+                        </View>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                </View>
               );
             })()}
 
             {/* Water Card */}
             {(() => {
-              const waterMl = waterGlasses * WATER_ML_PER_GLASS;
-              const targetMl = WATER_TARGET_GLASSES * WATER_ML_PER_GLASS;
               const pct = Math.min(waterGlasses / WATER_TARGET_GLASSES, 1);
-              const waterL = (waterMl / 1000).toFixed(1);
-              const targetL = (targetMl / 1000).toFixed(1);
+              const waterL = ((waterGlasses * WATER_ML_PER_GLASS) / 1000).toFixed(1);
               return (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Meals')}
-                  activeOpacity={0.7}
-                  style={[tw`w-[48%] flex-col gap-2 rounded-xl p-4`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-                >
-                  <View style={tw`flex-row items-center gap-1.5`}>
-                    <MaterialIcons name="water-drop" size={18} color="#3b82f6" />
-                    <Text style={[tw`text-xs font-semibold uppercase tracking-wider`, { color: isDark ? '#64748b' : '#94a3b8' }]}>Water</Text>
-                  </View>
-                  <Text style={[tw`text-2xl font-black leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                    {waterL}L
-                  </Text>
-                  <View style={[tw`w-full h-1.5 rounded-full overflow-hidden`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
-                    <View style={[tw`h-full rounded-full bg-blue-500`, { width: `${Math.round(pct * 100)}%` }]} />
-                  </View>
-                  <Text style={[tw`text-xs font-semibold`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    {waterGlasses}/{WATER_TARGET_GLASSES} glasses{'\n'}
-                    <Text style={{ color: isDark ? '#475569' : '#cbd5e1' }}>of {targetL}L goal</Text>
-                  </Text>
-                </TouchableOpacity>
+                <View style={tw`flex-1`}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Meals')} activeOpacity={0.8}>
+                    <Card variant="default" padding="lg" style={tw`flex-col gap-3 h-44 justify-between`}>
+                      <View style={tw`flex-row items-center gap-2`}>
+                        <View style={[tw`w-8 h-8 rounded-full items-center justify-center`, { backgroundColor: 'rgba(10,132,255,0.15)' }]}>
+                          <MaterialIcons name="water-drop" size={16} color="#0a84ff" />
+                        </View>
+                        <Text style={[tw`text-[11px] font-bold uppercase tracking-widest`, { color: colors.textSecondary }]}>Water</Text>
+                      </View>
+                      
+                      <View style={tw`items-center`}>
+                        <Text style={[tw`text-3xl font-black tracking-tighter text-center`, { color: colors.text }]}>
+                          {waterL}L
+                        </Text>
+                        <Text style={[tw`text-xs font-medium mt-1 text-center`, { color: colors.textMuted }]}>
+                          {waterGlasses} of {WATER_TARGET_GLASSES} glasses
+                        </Text>
+                      </View>
+
+                      <View style={tw`w-full`}>
+                        <View style={[tw`w-full h-2 rounded-full overflow-hidden`, { backgroundColor: colors.bgSurface }]}>
+                          <View style={[tw`h-full rounded-full bg-blue-500`, { width: `${Math.round(pct * 100)}%` }]} />
+                        </View>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                </View>
               );
             })()}
-
           </View>
         </View>
 
-        {/* AI/Workout & Meal Generation Section */}
+        {/* AI Generate Section */}
         {(hasFeatureAccess(subscriptionPlan, 'hasAIWorkoutGeneration') || hasFeatureAccess(subscriptionPlan, 'hasAIMealPlanGeneration')) && (
-          <View style={tw`px-4 mt-8`}>
-            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              Generate Plans
+          <View style={tw`px-5 mb-8`}>
+            <Text style={[tw`text-xl font-black tracking-tight mb-4`, { color: colors.text }]}>
+              Intelligence
             </Text>
-            <View style={tw`flex-row gap-3`}>
+            <View style={tw`flex-row gap-4`}>
               <TouchableOpacity
                 onPress={() => navigation.navigate('WorkoutGeneration')}
-                style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+                style={tw`flex-1`}
               >
-                <MaterialIcons name="lightbulb" size={28} color={accent} style={tw`mb-2`} />
-                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                  Generate Workout
-                </Text>
-                <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  Custom plan for you
-                </Text>
+                <Card variant="filled" padding="md" style={tw`items-center`}>
+                  <View style={[tw`w-12 h-12 rounded-full items-center justify-center mb-3`, { backgroundColor: accent + '20' }]}>
+                    <MaterialIcons name="auto-awesome" size={24} color={accent} />
+                  </View>
+                  <Text style={[tw`font-bold text-sm text-center`, { color: colors.text }]}>AI Workout</Text>
+                </Card>
               </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={() => navigation.navigate('MealGeneration')}
-                style={[tw`flex-1 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
+                style={tw`flex-1`}
               >
-                <MaterialIcons name="restaurant" size={28} color={accent} style={tw`mb-2`} />
-                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                  Generate Meals
-                </Text>
-                <Text style={[tw`text-xs mt-1`, { color: isDark ? '#cbd5e1' : '#475569' }]}>
-                  Personalized nutrition
-                </Text>
+                <Card variant="filled" padding="md" style={tw`items-center`}>
+                  <View style={[tw`w-12 h-12 rounded-full items-center justify-center mb-3`, { backgroundColor: accent + '20' }]}>
+                    <MaterialIcons name="restaurant-menu" size={24} color={accent} />
+                  </View>
+                  <Text style={[tw`font-bold text-sm text-center`, { color: colors.text }]}>AI Diet</Text>
+                </Card>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Hub Section - Quick Access */}
-        <View style={tw`px-4 mt-8 mb-6`}>
-          <Text style={[tw`text-2xl font-bold leading-tight tracking-tight mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-            Important
-          </Text>
-          <View style={tw`flex-row gap-3 flex-wrap`}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('SubscriptionPlans')}
-              style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: accent + '20', borderWidth: 1, borderColor: accent + '40' }]}
-            >
-              <MaterialIcons name="card-membership" size={24} color={accent} style={tw`mb-2`} />
-              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                Subscription
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Profile')}
-              style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <MaterialIcons name="person" size={24} color={accent} style={tw`mb-2`} />
-              <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                Profile
-              </Text>
-            </TouchableOpacity>
-            {hasFeatureAccess(subscriptionPlan, 'hasAIChat') || hasFeatureAccess(subscriptionPlan, 'hasCoachChat') ? (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Messages')}
-                style={[tw`flex-1 rounded-xl p-4 min-w-32`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-              >
-                <MaterialIcons name="chat-bubble" size={24} color={accent} style={tw`mb-2`} />
-                <Text style={[tw`font-bold text-sm`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-                  Coaching
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('SubscriptionPlans')}
-                style={[tw`flex-1 rounded-xl p-4 min-w-32 opacity-70`, { backgroundColor: isDark ? '#111128' : '#e2e8f0', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-              >
-                <MaterialIcons name="chat-bubble" size={24} color={isDark ? '#cbd5e1' : '#64748b'} style={tw`mb-2`} />
-                <View style={tw`flex-row items-center gap-1`}>
-                  <Text style={[tw`font-bold text-sm`, { color: isDark ? '#cbd5e1' : '#64748b' }]}>
-                    Coaching
-                  </Text>
-                  <MaterialIcons name="lock" size={14} color={isDark ? '#cbd5e1' : '#64748b'} />
-                </View>
+        {/* Workout Anchor */}
+        <View style={tw`px-5 mb-8`}>
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <Text style={[tw`text-2xl font-black tracking-tight`, { color: colors.text }]}>
+              Workout Anchor
+            </Text>
+            {hasFeatureAccess(subscriptionPlan, 'hasComputerVision') && (
+              <TouchableOpacity onPress={() => navigation.navigate('VisionAnalysisLab')}>
+                <Text style={[tw`text-sm font-bold`, { color: accent }]}>See All</Text>
               </TouchableOpacity>
             )}
           </View>
-        </View>
 
-        {hasFeatureAccess(subscriptionPlan, 'hasComputerVision') ? (
-        <View style={tw`px-4 mt-8`}>
-          <View style={tw`flex-row items-center justify-between mb-4`}>
-            <Text style={[tw`text-2xl font-bold leading-tight tracking-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
-              Workout Anchor
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('VisionAnalysisLab')}>
-              <Text style={[tw`text-sm font-bold`, { color: accent }]}>View Plan</Text>
-            </TouchableOpacity>
-          </View>
-
-          {todayWorkoutDay ? (
-            <>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={[tw`overflow-hidden rounded-2xl h-60 w-full`, { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
-                onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout", workoutPlanId: activePlan?.id, workoutDay: todayWorkoutDay.day?.toLowerCase() })}
-              >
-                <ImageBackground
-                  source={{ uri: getWorkoutImage(todayWorkoutDay.focus) }}
-                  style={tw`w-full h-full justify-end`}
-                  imageStyle={{ resizeMode: 'cover' }}
+          {hasFeatureAccess(subscriptionPlan, 'hasComputerVision') ? (
+            todayWorkoutDay ? (
+              <View style={tw`gap-4`}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={[tw`overflow-hidden rounded-3xl h-64 w-full shadow-lg`, { backgroundColor: colors.card }]}
+                  onPress={openNextWorkoutSession}
                 >
-                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.52)' }} />
-                  <View style={tw`p-5`}>
-                    <View style={tw`flex-row items-center gap-2 mb-2`}>
-                      <View style={[tw`px-2.5 py-0.5 rounded-full`, { backgroundColor: accent }]}>
-                        <Text style={tw`text-white text-[10px] font-bold uppercase tracking-wider`}>Today</Text>
-                      </View>
-                      <Text style={tw`text-white/70 text-xs font-medium`}>
-                        {prettyLabel(todayWorkoutDay.day)} · {todayWorkoutDay.duration || 60} min
-                      </Text>
-                    </View>
-                    <Text style={tw`text-white text-2xl font-black mb-1`}>
-                      {prettyLabel(todayWorkoutDay.focus) || "Today's Workout"}
-                    </Text>
-                    <Text style={tw`text-white/60 text-xs mb-4`}>
-                      {(todayWorkoutDay.exercises || []).length} exercises
-                    </Text>
-                    <View style={tw`flex-row items-center gap-2`}>
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('Calibration', { workoutName: prettyLabel(todayWorkoutDay.focus) || "Today's Workout", workoutPlanId: activePlan?.id, workoutDay: todayWorkoutDay.day?.toLowerCase() })}
-                        style={[tw`flex-row items-center gap-2 px-5 py-2.5 rounded-xl`, { backgroundColor: accent }]}
-                      >
-                        <MaterialIcons name="play-arrow" size={18} color="white" />
-                        <Text style={tw`text-white text-sm font-bold`}>Start Session</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('VisionAnalysisLab')}
-                        style={[tw`flex-row items-center gap-1 px-4 py-2.5 rounded-xl`, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
-                      >
-                        <Text style={tw`text-white text-xs font-semibold`}>View Plan</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </ImageBackground>
-              </TouchableOpacity>
-
-              {(todayWorkoutDay.exercises || []).length > 0 && (
-                <View style={tw`mt-3 gap-2`}>
-                  <Text style={[tw`text-xs font-semibold uppercase tracking-wider px-1 mb-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                    {"Today's Exercises"}
-                  </Text>
-                  {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => {
-                    const exDone = completedExercises.includes(exercise.name.toLowerCase());
-                    return (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
-                        style={[tw`flex-row items-center justify-between px-4 py-3 rounded-xl`, {
-                          backgroundColor: exDone ? '#22c55e0d' : (isDark ? '#111128' : '#ffffff'),
-                          borderWidth: 1,
-                          borderColor: exDone ? '#22c55e40' : (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'),
-                        }]}
-                      >
-                        <View style={tw`flex-row items-center gap-3`}>
-                          <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: exDone ? '#22c55e20' : accent + '18' }]}>
-                            {exDone
-                              ? <MaterialIcons name="check" size={16} color="#22c55e" />
-                              : <Text style={[tw`text-xs font-black`, { color: accent }]}>{i + 1}</Text>
-                            }
-                          </View>
-                          <View>
-                            <Text style={[tw`text-sm font-bold`, { color: exDone ? '#22c55e' : (isDark ? '#f1f5f9' : '#1e293b') }]}>{exercise.name}</Text>
-                            <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>
-                              {exercise.sets} sets · {exercise.reps} reps · {exercise.restTime}s rest
-                            </Text>
-                          </View>
+                  <ImageBackground
+                    source={{ uri: getWorkoutImage(todayWorkoutDay.focus) }}
+                    style={tw`w-full h-full justify-end`}
+                    imageStyle={{ resizeMode: 'cover' }}
+                  >
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.85)']}
+                      style={tw`absolute inset-0`}
+                    />
+                    <View style={tw`p-6`}>
+                      <View style={tw`flex-row items-center gap-3 mb-3`}>
+                        <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent }]}>
+                          <Text style={tw`text-white text-[10px] font-black uppercase tracking-widest`}>Up Next</Text>
                         </View>
-                        {exDone
-                          ? <View style={[tw`px-2 py-0.5 rounded-full`, { backgroundColor: '#22c55e20' }]}>
-                              <Text style={[tw`text-[10px] font-black`, { color: '#22c55e' }]}>Done</Text>
-                            </View>
-                          : <MaterialIcons name="chevron-right" size={20} color={isDark ? '#334155' : '#cbd5e1'} />
-                        }
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {(todayWorkoutDay.exercises || []).length > 3 && (
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate('VisionAnalysisLab')}
-                      style={[tw`items-center py-2.5 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#f1f5f9' }]}
-                    >
-                      <Text style={[tw`text-xs font-bold`, { color: accent }]}>
-                        +{(todayWorkoutDay.exercises || []).length - 3} more exercises
+                        <Text style={tw`text-white/80 text-xs font-bold uppercase tracking-wider`}>
+                          {prettyLabel(todayWorkoutDay.day)} · {todayWorkoutDay.duration || 60} min
+                        </Text>
+                      </View>
+                      <Text style={tw`text-white text-3xl font-black mb-1 tracking-tighter`}>
+                        {prettyLabel(todayWorkoutDay.focus) || "Today's Workout"}
                       </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </>
-          ) : (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('WorkoutGeneration')}
-              style={[tw`rounded-2xl p-6 items-center gap-3`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <MaterialIcons name="auto-awesome" size={40} color={accent} />
-              <Text style={[tw`text-base font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>No Workout Plan Yet</Text>
-              <Text style={[tw`text-sm text-center`, { color: isDark ? '#94a3b8' : '#64748b' }]}>Generate your personalized AI workout plan</Text>
-              <View style={[tw`flex-row items-center justify-center gap-2 py-3 px-6 rounded-xl mt-1`, { backgroundColor: accent + '14' }]}>
-                <MaterialIcons name="arrow-forward" size={16} color={accent} />
-                <Text style={[tw`text-sm font-bold`, { color: accent }]}>Generate Plan</Text>
+                      {nextWorkoutTarget && (
+                        <Text style={tw`text-white/70 text-sm font-bold mb-4`}>
+                          {nextWorkoutTarget.isRedo
+                            ? `All done — redo ${nextWorkoutTarget.exercise.name}`
+                            : `Next: ${nextWorkoutTarget.exercise.name}`}
+                        </Text>
+                      )}
+                      
+                      <Button 
+                        title={
+                          nextWorkoutTarget
+                            ? nextWorkoutTarget.isRedo
+                              ? `Redo ${nextWorkoutTarget.exercise.name}`
+                              : `Start ${nextWorkoutTarget.exercise.name}`
+                            : 'Start Session'
+                        }
+                        size="md" 
+                        icon={<MaterialIcons name="play-arrow" size={20} color="white" />}
+                        onPress={openNextWorkoutSession}
+                      />
+                    </View>
+                  </ImageBackground>
+                </TouchableOpacity>
+
+                {(todayWorkoutDay.exercises || []).length > 0 && (
+                  <View style={tw`mt-2 gap-3`}>
+                    {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => {
+                      const exDone = completedExercises.includes(exercise.name.toLowerCase());
+                      return (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() => navigation.navigate('ExerciseDetail', { name: exercise.name })}
+                        >
+                          <Card variant="default" padding="md" style={tw`flex-row items-center justify-between`}>
+                            <View style={tw`flex-row items-center gap-4`}>
+                              <View style={[tw`w-12 h-12 rounded-2xl items-center justify-center`, { backgroundColor: exDone ? colors.successSurface : colors.bgSurface }]}>
+                                {exDone
+                                  ? <MaterialIcons name="check" size={20} color={colors.success} />
+                                  : <Text style={[tw`text-sm font-black`, { color: colors.textSecondary }]}>{i + 1}</Text>
+                                }
+                              </View>
+                              <View>
+                                <Text style={[tw`text-base font-bold`, { color: exDone ? colors.success : colors.text }]}>{exercise.name}</Text>
+                                <Text style={[tw`text-xs font-medium mt-1`, { color: colors.textMuted }]}>
+                                  {exercise.sets} sets · {exercise.reps} reps
+                                </Text>
+                              </View>
+                            </View>
+                            <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
+                          </Card>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
+            ) : (
+              <Card variant="default" padding="lg" style={tw`items-center gap-4 py-10`}>
+                <View style={[tw`w-16 h-16 rounded-full items-center justify-center`, { backgroundColor: accent + '15' }]}>
+                  <MaterialIcons name="calendar-today" size={28} color={accent} />
+                </View>
+                <View style={tw`items-center`}>
+                  <Text style={[tw`text-lg font-black`, { color: colors.text }]}>No Plan Assigned</Text>
+                  <Text style={[tw`text-sm text-center mt-2`, { color: colors.textSecondary }]}>Generate a new AI plan or ask your coach for a routine.</Text>
+                </View>
+                <Button 
+                  title="Generate Plan" 
+                  size="md" 
+                  onPress={() => navigation.navigate('WorkoutGeneration')}
+                  containerStyle={tw`w-full mt-2`}
+                />
+              </Card>
+            )
+          ) : (
+            <TouchableOpacity onPress={() => navigation.navigate('SubscriptionPlans')}>
+              <Card variant="elevated" padding="lg" style={tw`items-center gap-3 py-8`}>
+                <View style={[tw`w-16 h-16 rounded-full items-center justify-center mb-2`, { backgroundColor: accent + '15' }]}>
+                  <MaterialIcons name="lock" size={28} color={accent} />
+                </View>
+                <Text style={[tw`text-xl font-black text-center`, { color: colors.text }]}>Premium Tracking</Text>
+                <Text style={[tw`text-sm text-center mb-4`, { color: colors.textSecondary }]}>Unlock AI form analysis and smart workout guidance.</Text>
+                <Button 
+                  title="Upgrade Plan" 
+                  size="md" 
+                  onPress={() => navigation.navigate('SubscriptionPlans')} 
+                  containerStyle={tw`w-full`}
+                />
+              </Card>
             </TouchableOpacity>
           )}
         </View>
-        ) : (
-        <TouchableOpacity
-          onPress={() => navigation.navigate('SubscriptionPlans')}
-          style={[tw`mx-4 mt-8 rounded-2xl p-5`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-        >
-          <View style={tw`flex-row items-center gap-3 mb-3`}>
-            <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
-              <MaterialIcons name="lock" size={24} color={accent} />
-            </View>
-            <View style={tw`flex-1`}>
-              <Text style={[tw`text-lg font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Workout Anchor</Text>
-              <Text style={[tw`text-xs mt-0.5`, { color: isDark ? '#94a3b8' : '#64748b' }]}>CV-powered form tracking & guided sessions</Text>
-            </View>
-          </View>
-          <View style={[tw`flex-row items-center justify-center gap-2 py-3 rounded-xl`, { backgroundColor: accent + '14' }]}>
-            <MaterialIcons name="arrow-upward" size={16} color={accent} />
-            <Text style={[tw`text-sm font-bold`, { color: accent }]}>Upgrade to Premium+</Text>
-          </View>
-        </TouchableOpacity>
-        )}
+
       </ScrollView>
 
       <TraineeBottomNav activeId={activeTab} navigation={navigation} totalUnread={totalUnread} />

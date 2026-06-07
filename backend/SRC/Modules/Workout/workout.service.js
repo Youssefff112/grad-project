@@ -7,6 +7,8 @@ import { AppError } from '../../Utils/appError.utils.js';
 import { notificationService } from '../Notification/notification.service.js';
 import { generateAiWorkoutPlan } from '../../Utils/aiService.js';
 import { pickFitnessGoal } from '../../Utils/mergeClientGoal.utils.js';
+import { subscriptionService } from '../Subscription/subscription.service.js';
+import { clientShouldRequireCoachPlanApproval } from '../../Utils/planAccess.utils.js';
 
 export const workoutService = {
   // ─── AI INTEGRATION POINT ────────────────────────────────────────────────────
@@ -21,10 +23,13 @@ export const workoutService = {
   // See: workout.model.js for the WorkoutPlan schema.
   // ─────────────────────────────────────────────────────────────────────────────
   async generateWorkoutPlan(userId, location = null, equipment = null) {
-    // Check if the user has an assigned coach — if so, plan starts as pending review
     const clientProfile = await ClientProfile.findOne({ where: { userId } });
-    const hasCoach = !!(clientProfile?.selectedCoachId);
-    return this._generateWorkoutPlanForUser(userId, null, location, equipment, null, hasCoach);
+    const subscription = await subscriptionService.getActiveSubscription(userId, 'client').catch(() => null);
+    const needsCoachReview = clientShouldRequireCoachPlanApproval(
+      subscription,
+      clientProfile?.selectedCoachId
+    );
+    return this._generateWorkoutPlanForUser(userId, null, location, equipment, null, needsCoachReview);
   },
 
   async generateWorkoutPlanForUser(targetUserId, coachId, planName = null) {
@@ -76,8 +81,31 @@ export const workoutService = {
     return { deleted: updated[0] > 0 };
   },
 
+  async _countPriorExerciseSessions(userId, exerciseName, planDay) {
+    if (!exerciseName) return 0;
+    const normalizedName = String(exerciseName).trim().toLowerCase();
+    const normalizedDay = planDay ? String(planDay).trim().toLowerCase() : null;
+
+    const logs = await WorkoutLog.findAll({
+      where: { userId, status: 'completed' },
+      attributes: ['exercises', 'sessionMeta', 'day'],
+      order: [['date', 'ASC']],
+    });
+
+    let count = 0;
+    for (const log of logs) {
+      const meta = log.sessionMeta || {};
+      const logName = (meta.exerciseName || log.exercises?.[0]?.name || '').trim().toLowerCase();
+      if (logName !== normalizedName) continue;
+      const logDay = (meta.planDay || log.day || '').trim().toLowerCase();
+      if (normalizedDay && logDay !== normalizedDay) continue;
+      count += 1;
+    }
+    return count;
+  },
+
   async logWorkout(userId, logData) {
-    const { date, exercises, duration, calories, notes, rating, formScore, totalReps, workoutPlanId } = logData;
+    const { date, exercises, duration, calories, notes, rating, formScore, totalReps, workoutPlanId, sessionMeta } = logData;
     // `day` from the CV screen is the exercise display name (e.g. "Jumping Jack").
     // The WorkoutLog.day column is an ENUM of weekday names, so we always derive
     // today's weekday and treat the passed value as the exercise name.
@@ -95,6 +123,24 @@ export const workoutService = {
         ? [{ name: exerciseName, sets: logData.completedSets || 1, reps: String(totalReps || 0), restTime: 60 }]
         : [];
 
+    const exerciseDisplayName =
+      sessionMeta?.exerciseName ||
+      exercisesList[0]?.name ||
+      exerciseName ||
+      'Workout';
+    const planDay = sessionMeta?.planDay || safeDay;
+    const priorCount = await this._countPriorExerciseSessions(userId, exerciseDisplayName, planDay);
+    const redoNumber = priorCount;
+    const mergedMeta = sessionMeta
+      ? {
+          ...sessionMeta,
+          exerciseName: exerciseDisplayName,
+          planDay,
+          redoNumber,
+          isRedo: redoNumber > 0,
+        }
+      : null;
+
     const workoutLog = await WorkoutLog.create({
       userId,
       workoutPlanId: workoutPlanId || null,
@@ -105,6 +151,7 @@ export const workoutService = {
       calories,
       notes,
       rating,
+      sessionMeta: mergedMeta,
       status: 'completed'
     });
 

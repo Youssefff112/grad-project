@@ -242,6 +242,7 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
   const workoutName: string | undefined = route?.params?.workoutName;
   const workoutPlanId: number | undefined = route?.params?.workoutPlanId;
   const workoutDay: string | undefined = route?.params?.workoutDay;
+  const workoutFocus: string | undefined = route?.params?.workoutFocus;
   const displayName = exerciseName || workoutName || 'Exercise';
   const instructions = getExerciseInstructions(displayName);
 
@@ -257,7 +258,8 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
     // Forward exercise context (including plan linkage) to the live tracking screen.
     navigation.navigate('ActiveSet', {
       exerciseName: exerciseName ?? workoutName,
-      workoutName,
+      workoutName: workoutFocus || workoutName,
+      workoutFocus: workoutFocus || workoutName,
       workoutPlanId,
       workoutDay,
     });
@@ -285,8 +287,8 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
         </View>
       </View>
 
-      {/* Camera View */}
-      <View style={tw`relative flex-1`}>
+      {/* Camera preview — fixed share of screen so instructions stay visible */}
+      <View style={[tw`relative`, { height: '38%', minHeight: 200 }]}>
         {permission?.granted ? (
           <>
             {/* CameraView must have no children — overlays go on the sibling View */}
@@ -330,7 +332,7 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
       </View>
 
       {/* Bottom: Instructions + Start */}
-      <View style={[{ backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+      <View style={[{ flex: 1, backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
 
         {/* Toggle button */}
         <TouchableOpacity
@@ -353,9 +355,9 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
         {/* Instruction cards */}
         {showInstructions && (
           <ScrollView
-            style={{ maxHeight: 260 }}
+            style={{ flex: 1 }}
             contentContainerStyle={tw`px-4 pt-3 pb-2 gap-2`}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
           >
             {/* Camera position */}
             <View style={[tw`flex-row items-start gap-3 p-3 rounded-xl`, { backgroundColor: isDark ? '#111128' : '#f1f5f9' }]}>

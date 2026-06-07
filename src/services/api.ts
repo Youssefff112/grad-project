@@ -1,28 +1,12 @@
 /**
  * API Client Service
- * Handles all HTTP requests with JWT token injection and refresh logic
- * Includes offline support with queue and caching
+ * Handles all HTTP requests with JWT token injection and refresh logic.
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { environment } from '../config/environment';
 import * as tokenManager from '../utils/tokenManager';
-import * as offlineService from './offlineService';
-import * as syncQueueService from './syncQueueService';
-import type { OperationType } from './syncQueueService';
-import { getCurrentNetworkState } from './networkService';
 import { unwrapApiData } from '../utils/apiResponse';
-
-const URL_TO_OPERATION_TYPE: Record<string, OperationType> = {
-  messages: 'message',
-  message: 'message',
-  notifications: 'notification_read',
-  notification: 'notification_read',
-  workouts: 'workout_complete',
-  workout: 'workout_complete',
-  meals: 'meal_log',
-  meal: 'meal_log',
-};
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -63,65 +47,18 @@ apiClient.interceptors.request.use(
 );
 
 /**
- * Response interceptor - Handle token refresh, offline queuing, and caching
+ * Response interceptor - Handle token refresh and error normalisation
  */
 apiClient.interceptors.response.use(
-  async (response) => {
-    // Cache successful GET responses for offline access
-    if (response.config.method === 'get') {
-      const endpoint = response.config.url || '';
-      await offlineService.cacheResponse(endpoint, response.data);
-    }
-    return response;
-  },
+  (response) => response,
   async (error: AxiosError) => {
     if (!error.config) {
       return Promise.reject(error);
     }
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-    const method = originalRequest.method?.toUpperCase() as 'POST' | 'PUT' | 'PATCH' | 'GET' | 'DELETE' | undefined;
 
-    // Handle network errors (no response) for write operations
-    if (!error.response && method && ['POST', 'PUT', 'PATCH'].includes(method)) {
-      const writeMethod = method as 'POST' | 'PUT' | 'PATCH';
-      const networkState = await getCurrentNetworkState();
-      if (!networkState.isOnline) {
-        console.log(`[Offline] Queuing ${writeMethod} request: ${originalRequest.url}`);
-        let payload: Record<string, any> = {};
-        try {
-          if (originalRequest.data) {
-            payload = typeof originalRequest.data === 'string'
-              ? JSON.parse(originalRequest.data)
-              : JSON.parse(JSON.stringify(originalRequest.data));
-          }
-        } catch {
-          payload = {};
-        }
-        // Derive operation type from URL (e.g. /messages → 'message', /workouts → 'workout_complete')
-        const urlSegment = (originalRequest.url || '').split('/').filter(Boolean)[0] || '';
-        const operationType: OperationType = URL_TO_OPERATION_TYPE[urlSegment] ?? 'message';
-        await syncQueueService.enqueueOperation(
-          operationType,
-          originalRequest.url || '',
-          writeMethod,
-          payload,
-          2 // priority
-        );
-        return Promise.resolve({ data: { queued: true } } as any);
-      }
-    }
-
-    // For GET requests when offline, try to return cached data
-    if (!error.response && originalRequest.method === 'get') {
-      const endpoint = originalRequest.url || '';
-      const cached = await offlineService.getCachedResponse(endpoint);
-      if (cached) {
-        console.log(`[Offline] Returning cached response for: ${endpoint}`);
-        return Promise.resolve({ data: cached } as any);
-      }
-    }
-
-    // Handle 429 Too Many Requests — surface a readable error message
+    // Handle 429 Too Many Requests
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers?.['retry-after'];
       const msg = retryAfter
@@ -130,7 +67,7 @@ apiClient.interceptors.response.use(
       return Promise.reject(new Error(msg));
     }
 
-    // Handle 401 Unauthorized
+    // Handle 401 Unauthorized — attempt token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -227,8 +164,6 @@ export const apiDelete = <T = any>(url: string, config?: any): Promise<T> => {
 /**
  * Upload FormData via fetch (not axios) so React Native can inject the
  * correct multipart/form-data boundary automatically.
- * Axios's default `Content-Type: application/json` header interferes with
- * FormData boundary generation, causing server-side parse failures.
  */
 export const apiUpload = async <T = any>(url: string, formData: FormData): Promise<T> => {
   const token = await tokenManager.getAccessToken();
@@ -238,7 +173,6 @@ export const apiUpload = async <T = any>(url: string, formData: FormData): Promi
     method: 'POST',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      // No Content-Type — React Native fetch sets multipart/form-data + boundary automatically
     },
     body: formData,
   });

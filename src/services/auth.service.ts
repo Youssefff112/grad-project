@@ -78,11 +78,29 @@ export interface ProfileResponse {
   };
 }
 
+const isNetworkError = (err: any): boolean =>
+  err?.message === 'Network Error' ||
+  err?.code === 'ERR_NETWORK' ||
+  err?.code === 'ECONNABORTED' ||
+  !err?.response;
+
+const withNetworkRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
+  try {
+    return await fn();
+  } catch (err: any) {
+    if (!isNetworkError(err)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    return fn();
+  }
+};
+
 /**
  * Login with email and password
  */
 export const login = async (credentials: LoginRequest): Promise<LoginResponse> => {
-  const response = await apiPost<LoginResponse>('/auth/login', credentials);
+  const response = await withNetworkRetry(() =>
+    apiPost<LoginResponse>('/auth/login', credentials, { timeout: 12000 }),
+  );
 
   // Save tokens after successful login
   if (response.data?.token && response.data?.refreshToken) {
@@ -100,7 +118,9 @@ export const login = async (credentials: LoginRequest): Promise<LoginResponse> =
  * Register new user
  */
 export const register = async (userData: RegisterRequest): Promise<RegisterResponse> => {
-  const response = await apiPost<RegisterResponse>('/auth/register', userData);
+  const response = await withNetworkRetry(() =>
+    apiPost<RegisterResponse>('/auth/register', userData, { timeout: 12000 }),
+  );
 
   // Save tokens after successful registration
   if (response.data?.token && response.data?.refreshToken) {

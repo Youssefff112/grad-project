@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Animated, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,200 +9,150 @@ import { Button } from '../components/Button';
 
 export const SplashScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
+  
+  // Shared Values for Animated
+  const splashOpacity = useRef(new Animated.Value(0)).current;
+  const splashScale = useRef(new Animated.Value(0.9)).current;
+  
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const logoTranslateY = useRef(new Animated.Value(Dimensions.get('window').height * 0.4)).current;
 
-  // Animations
-  const logoScale = useRef(new Animated.Value(0.3)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleY = useRef(new Animated.Value(30)).current;
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const subtitleOpacity = useRef(new Animated.Value(0)).current;
-  const pillsY = useRef(new Animated.Value(40)).current;
-  const pillsOpacity = useRef(new Animated.Value(0)).current;
-  const ctaY = useRef(new Animated.Value(30)).current;
-  const ctaOpacity = useRef(new Animated.Value(0)).current;
+  const [isSplashPhase, setIsSplashPhase] = useState(true);
 
   useEffect(() => {
-    Animated.stagger(150, [
-      // Logo: spring scale + fade
-      Animated.parallel([
-        Animated.spring(logoScale, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
-        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-      ]),
-      // Title: slide up + fade
-      Animated.parallel([
-        Animated.spring(titleY, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
-        Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-      ]),
-      // Tagline divider fade
-      Animated.timing(taglineOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-      // Subtitle fade
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-      // Feature pills: slide up + fade
-      Animated.parallel([
-        Animated.spring(pillsY, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
-        Animated.timing(pillsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-      ]),
-      // CTA buttons: slide up + fade
-      Animated.parallel([
-        Animated.spring(ctaY, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
-        Animated.timing(ctaOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-      ]),
+    // 1. YouTube-style splash phase (just the logo)
+    Animated.parallel([
+      Animated.timing(splashOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(splashScale, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: true,
+      })
     ]).start();
-  }, []);
+
+    // 2. Transition to Welcome screen phase
+    const timer = setTimeout(() => {
+      setIsSplashPhase(false);
+      Animated.parallel([
+        Animated.timing(logoTranslateY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 600,
+          delay: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [splashOpacity, splashScale, logoTranslateY, contentOpacity]);
 
   return (
     <LinearGradient
-      colors={isDark ? ['#0a0a12', '#0d1020', '#0a0a12'] : ['#fff8f2', '#fff1e6', '#f8f7f5']}
+      colors={isDark ? ['#000000', '#0a0a0c', '#000000'] : ['#ffffff', '#f8f9fa', '#ffffff']}
       style={tw`flex-1`}
     >
       <SafeAreaView style={tw`flex-1`}>
-        <View style={tw`flex-1 px-6 justify-between py-8`}>
+        <View style={tw`flex-1 px-6 py-10 justify-between`}>
+          
+          {/* Top Section: Brand */}
+          <Animated.View style={[tw`flex-1 items-center justify-center`, { transform: [{ translateY: logoTranslateY }] }]}>
+            {/* Logo */}
+            <Animated.Image
+              source={isDark ? require('../../assets/images/logo-dark.png') : require('../../assets/images/logo.png')}
+              style={[
+                tw`w-32 h-32 rounded-[32px] mb-8`,
+                {
+                  opacity: splashOpacity,
+                  transform: [{ scale: splashScale }],
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                }
+              ]}
+            />
 
-          {/* Logo & Brand */}
-          <View style={tw`flex-1 items-center justify-center`}>
-            {/* Animated Logo */}
-            <Animated.View style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}>
-              <LinearGradient
-                colors={isDark ? ['#1e3a5f', '#0f2040'] : ['#ff8a30', '#ff6a00']}
-                style={[
-                  tw`w-32 h-32 rounded-3xl items-center justify-center mb-10`,
-                  {
-                    shadowColor: accent,
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 20,
-                    elevation: 12 },
-                ]}
-              >
-                <MaterialIcons name="bolt" size={68} color="white" />
-              </LinearGradient>
-            </Animated.View>
-
-            {/* Animated Title */}
-            <Animated.View
-              style={{
-                transform: [{ translateY: titleY }],
-                opacity: titleOpacity,
-                alignItems: 'center',
-                marginBottom: 2 }}
-            >
+            {/* Title (Only visible in welcome phase) */}
+            <Animated.View style={[tw`items-center mb-4`, { opacity: contentOpacity }]}>
               <Text
                 style={[
-                  tw`text-7xl font-black tracking-tight leading-none`,
-                  { color: isDark ? '#ffffff' : '#1a1a1a' },
+                  tw`text-6xl font-black tracking-tighter leading-none`,
+                  { color: isDark ? '#ffffff' : '#000000' },
                 ]}
               >
                 VERTEX
               </Text>
             </Animated.View>
 
-            {/* Animated Tagline Divider */}
-            <Animated.View
-              style={[
-                tw`flex-row items-center gap-3 my-6 w-full`,
-                { opacity: taglineOpacity },
-              ]}
-            >
-              <View style={[tw`h-px flex-1 rounded-full`, { backgroundColor: accent + '35' }]} />
-              <Text
-                style={[
-                  tw`text-[11px] font-bold tracking-widest uppercase`,
-                  { color: accent },
-                ]}
-              >
-                Your Fitness Journey
+            {/* Tagline */}
+            <Animated.View style={[tw`flex-row items-center gap-4 w-full mb-6`, { opacity: contentOpacity }]}>
+              <View style={[tw`h-px flex-1`, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
+              <Text style={[tw`text-[11px] font-bold tracking-widest uppercase`, { color: accent }]}>
+                Intelligent Fitness
               </Text>
-              <View style={[tw`h-px flex-1 rounded-full`, { backgroundColor: accent + '35' }]} />
+              <View style={[tw`h-px flex-1`, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
             </Animated.View>
 
-            {/* Animated Subtitle */}
-            <Animated.View style={{ opacity: subtitleOpacity }}>
-              <Text
-                style={[
-                  tw`text-base text-center leading-relaxed max-w-[280px]`,
-                  { color: isDark ? '#94a3b8' : '#64748b' },
-                ]}
-              >
-                Track workouts, reach your goals, and train with expert coaching guidance
+            {/* Subtitle */}
+            <Animated.View style={{ opacity: contentOpacity }}>
+              <Text style={[tw`text-base text-center font-medium leading-relaxed max-w-[280px]`, { color: isDark ? '#a1a1aa' : '#475569' }]}>
+                Track workouts, visualize progress, and unlock your true potential.
               </Text>
             </Animated.View>
-          </View>
+          </Animated.View>
 
-          {/* Animated Feature Pills */}
-          <Animated.View
-            style={{
-              transform: [{ translateY: pillsY }],
-              opacity: pillsOpacity,
-              marginBottom: 32 }}
-          >
-            <View style={tw`flex-row gap-3`}>
+          {/* Bottom Section: Features & Actions */}
+          <Animated.View style={{ opacity: contentOpacity }} pointerEvents={isSplashPhase ? 'none' : 'auto'}>
+            <View style={tw`flex-row gap-3 mb-10`}>
               {[
-                { icon: 'fit-screen', label: 'Track Workouts', desc: 'Log your sessions' },
-                { icon: 'analytics', label: 'Monitor Progress', desc: 'See your gains' },
-                { icon: 'person-outline', label: 'Get Coaching', desc: 'Expert guidance' },
+                { icon: 'speed', label: 'Performance' },
+                { icon: 'auto-awesome', label: 'AI Coach' },
+                { icon: 'monitor-heart', label: 'Tracking' },
               ].map((f) => (
                 <View
                   key={f.label}
                   style={[
-                    tw`flex-1 items-center py-4 px-2 rounded-2xl`,
+                    tw`flex-1 items-center py-3 px-1 rounded-2xl`,
                     {
-                      backgroundColor: accent + '14',
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
                       borderWidth: 1,
-                      borderColor: accent + '28' },
+                      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                    },
                   ]}
                 >
-                  <View
-                    style={[
-                      tw`w-10 h-10 rounded-xl items-center justify-center mb-2`,
-                      { backgroundColor: accent + '20' },
-                    ]}
-                  >
-                    <MaterialIcons name={f.icon as any} size={22} color={accent} />
+                  <View style={[tw`w-10 h-10 rounded-full items-center justify-center mb-2`, { backgroundColor: accent + '1A' }]}>
+                    <MaterialIcons name={f.icon as any} size={20} color={accent} />
                   </View>
-                  <Text
-                    style={[
-                      tw`text-[10px] font-black uppercase tracking-wider text-center`,
-                      { color: isDark ? '#e2e8f0' : '#1e293b' },
-                    ]}
-                  >
+                  <Text style={[tw`text-[9px] font-bold uppercase tracking-wide text-center`, { color: isDark ? '#e4e4e7' : '#1e293b' }]}>
                     {f.label}
-                  </Text>
-                  <Text
-                    style={[
-                      tw`text-[9px] mt-0.5 text-center`,
-                      { color: isDark ? '#64748b' : '#94a3b8' },
-                    ]}
-                  >
-                    {f.desc}
                   </Text>
                 </View>
               ))}
             </View>
-          </Animated.View>
 
-          {/* Animated CTA Buttons */}
-          <Animated.View
-            style={{
-              transform: [{ translateY: ctaY }],
-              opacity: ctaOpacity }}
-          >
-            <View style={tw`gap-3`}>
+            {/* CTA Buttons */}
+            <View style={tw`gap-4`}>
               <Button
                 title="Get Started"
                 size="lg"
                 onPress={() => navigation.navigate('AccountCreation')}
-                icon={<MaterialIcons name="arrow-forward" size={20} color="white" style={tw`ml-2`} />}
               />
               <Button
-                title="Sign In"
+                title="Log In"
                 size="md"
-                variant="outline"
+                variant="ghost"
                 onPress={() => navigation.navigate('SignIn')}
               />
             </View>
           </Animated.View>
-
+          
         </View>
       </SafeAreaView>
     </LinearGradient>

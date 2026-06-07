@@ -9,7 +9,6 @@
  */
 
 import { apiGet, apiPost, apiDelete } from './api';
-import { invalidateCachedResponse } from './offlineService';
 
 export interface WorkoutExercise {
   name: string;
@@ -41,6 +40,30 @@ export interface WorkoutPlan {
   createdAt: string;
 }
 
+export interface WorkoutSessionMeta {
+  exerciseName: string;
+  planDay: string;
+  planFocus?: string;
+  redoNumber: number;
+  isRedo: boolean;
+  formScore: number;
+  avgFormScore: number;
+  peakFormScore: number;
+  performanceScore: number;
+  formAccuracy: number;
+  totalReps: number;
+  correctReps: number;
+  incorrectReps: number;
+  completedSets: number;
+  targetSets: number;
+  targetReps: number;
+  durationSeconds: number;
+  isHold?: boolean;
+  holdSeconds?: number;
+  topMistakes?: Array<{ msg: string; count: number }>;
+  tips?: string[];
+}
+
 export interface WorkoutSession {
   id: number;
   userId: number;
@@ -53,6 +76,7 @@ export interface WorkoutSession {
   duration?: number;
   calories?: number;
   notes?: string;
+  sessionMeta?: WorkoutSessionMeta | null;
   rating?: number;
   status: 'in_progress' | 'completed' | 'cancelled';
 }
@@ -88,6 +112,8 @@ export interface LogWorkoutRequest {
   totalReps?: number;
   /** Links this log entry to the parent WorkoutPlan */
   workoutPlanId?: number;
+  /** Full CV session snapshot for history + detail screens */
+  sessionMeta?: WorkoutSessionMeta;
 }
 
 /**
@@ -100,13 +126,11 @@ export const generateWorkoutPlan = async (
   location?: 'home' | 'gym' | null,
   equipment?: string[],
 ): Promise<{ plan: WorkoutPlan }> => {
+  // AI generation can take 60-120 s on a cold start — use a generous timeout.
   const response: any = await apiPost('/workout/generate', {
     location: location ?? undefined,
     equipment: equipment && equipment.length > 0 ? equipment : undefined,
-  });
-  // The server just deactivated the old plan; drop any cached GET so the
-  // offline interceptor can't resurrect it.
-  await invalidateCachedResponse(['/workout/active', '/workout/history']);
+  }, { timeout: 120000 });
   return { plan: response.data?.plan };
 };
 
@@ -121,7 +145,6 @@ export const getActiveWorkoutPlan = async (): Promise<{ plan: WorkoutPlan | null
 
 export const deleteActiveWorkoutPlan = async (): Promise<void> => {
   await apiDelete('/workout/active');
-  await invalidateCachedResponse(['/workout/active', '/workout/history']);
 };
 
 /**

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Image, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
 import { TraineeBottomNav } from '../components/TraineeBottomNav';
 import { CoachBottomNav } from '../components/coach/CoachBottomNav';
+import { Switch } from '../components/Switch';
 import * as workoutService from '../services/workoutService';
 import * as progressService from '../services/progressService';
 import { canClientSelectPersonalCoach } from '../utils/planUtils';
@@ -16,15 +17,35 @@ import { buildImageUrl } from '../utils/imageUrl';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
-  const { fullName, email, logout, role, subscriptionPlan, weight: userWeight, syncProfileFromServer, profilePicture } = useUser();
+  const { fullName, email, logout, role, subscriptionPlan, weight: userWeight, setWeight, syncProfileFromServer, profilePicture } = useUser();
   const { totalUnread } = useNotifications();
   const displayName = fullName || 'Trainee';
 
-  const [workoutCount, setWorkoutCount] = useState<string>('—');
   const [latestWeight, setLatestWeight] = useState<string>(
     userWeight != null ? `${userWeight}kg` : '—'
   );
+  const [workoutCount, setWorkoutCount] = useState<string>('—');
   const [streakDays, setStreakDays] = useState<string>('—');
+  const [isWeightModalVisible, setIsWeightModalVisible] = useState(false);
+  const [weightInput, setWeightInput] = useState('');
+
+  const handleSaveWeight = async () => {
+    const newWeight = parseFloat(weightInput);
+    if (isNaN(newWeight) || newWeight <= 0) {
+      Alert.alert('Invalid Weight', 'Please enter a valid number.');
+      return;
+    }
+    setIsWeightModalVisible(false);
+    setLatestWeight(`${newWeight}kg`);
+    if (setWeight) setWeight(newWeight);
+    try {
+      await progressService.addMeasurement({
+        weight: newWeight,
+        measuredAt: new Date().toISOString(),
+      });
+      await syncProfileFromServer();
+    } catch {}
+  };
 
   useEffect(() => {
     if (userWeight != null) setLatestWeight(`${userWeight}kg`);
@@ -91,7 +112,7 @@ export const ProfileScreen = ({ navigation }: any) => {
         navigation.navigate('MeasurementsSettings');
         break;
       case 'privacy':
-        Alert.alert('Privacy & Security', 'End-to-end encryption is enabled. Your data is stored securely and never shared with third parties.', [{ text: 'OK' }]);
+        navigation.navigate('PrivacySecurity');
         break;
       case 'subscription':
         navigation.navigate('SubscriptionPlans');
@@ -100,13 +121,13 @@ export const ProfileScreen = ({ navigation }: any) => {
         navigation.navigate('CoachAssignment');
         break;
       case 'help':
-        Alert.alert('Help Center', 'Need assistance?\n\nEmail: support@apexai.com\nResponse time: < 24 hours', [{ text: 'OK' }]);
+        navigation.navigate('HelpCenter');
         break;
       case 'feedback':
-        Alert.alert('Send Feedback', 'We\'d love to hear from you! Your feedback helps us improve Vertex.', [{ text: 'Cancel' }, { text: 'Send Email', onPress: () => {} }]);
+        navigation.navigate('Feedback');
         break;
       case 'about':
-        Alert.alert('About Vertex', 'Version 1.0.0\n\nPeak performance coaching powered by real-time computer vision and AI analysis.\n\nBuilt with precision for athletes.', [{ text: 'OK' }]);
+        navigation.navigate('About');
         break;
       case 'experience':
         navigation.navigate('EditExperience');
@@ -181,7 +202,7 @@ export const ProfileScreen = ({ navigation }: any) => {
           <TouchableOpacity
             onPress={() => navigation.navigate('EditProfile')}
             activeOpacity={0.85}
-            style={[tw`w-24 h-24 rounded-full overflow-hidden mb-4`, { borderWidth: 2, borderColor: accent }]}
+            style={[tw`w-24 h-24 rounded-full overflow-hidden mb-4`]}
           >
             {buildImageUrl(profilePicture) ? (
               <Image
@@ -200,16 +221,27 @@ export const ProfileScreen = ({ navigation }: any) => {
 
         {/* Stats Row */}
         <View style={tw`flex-row px-4 gap-3 mb-6`}>
-          {STATS.map((stat) => (
-            <View
-              key={stat.label}
-              style={[tw`flex-1 items-center py-4 rounded-2xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
-            >
-              <MaterialIcons name={stat.icon} size={22} color={accent} />
-              <Text style={[tw`text-xl font-black mt-1`, { color: accent }]}>{stat.value}</Text>
-              <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{stat.label}</Text>
-            </View>
-          ))}
+          {STATS.map((stat) => {
+            const Wrapper = stat.label === 'Weight' ? TouchableOpacity : View;
+            const props = stat.label === 'Weight' ? { 
+              onPress: () => {
+                setWeightInput(userWeight ? String(userWeight) : '');
+                setIsWeightModalVisible(true);
+              },
+              activeOpacity: 0.7 
+            } : {};
+            return (
+              <Wrapper
+                key={stat.label}
+                {...props}
+                style={[tw`flex-1 items-center py-4 rounded-2xl`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+              >
+                <MaterialIcons name={stat.icon} size={22} color={accent} />
+                <Text style={[tw`text-xl font-black mt-1`, { color: accent }]}>{stat.value}</Text>
+                <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mt-0.5`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{stat.label}</Text>
+              </Wrapper>
+            );
+          })}
         </View>
 
         {/* Menu Sections */}
@@ -217,30 +249,41 @@ export const ProfileScreen = ({ navigation }: any) => {
           <View key={section.title} style={tw`px-4 mb-5`}>
             <Text style={[tw`text-xs font-bold uppercase tracking-widest mb-2 px-1`, { color: isDark ? '#64748b' : '#94a3b8' }]}>{section.title}</Text>
             <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: isDark ? '#111128' : '#ffffff', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-              {section.items.map((item, i) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => handleMenuPress(item.id)}
-                  style={[
-                    tw`flex-row items-center justify-between px-4 py-3.5`,
-                    i < section.items.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                  ]}
-                >
-                  <View style={tw`flex-row items-center gap-3`}>
-                    <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: accent + '14' }]}>
-                      <MaterialIcons name={item.icon as any} size={18} color={accent} />
+              {section.items.map((item, i) => {
+                const rowStyle = [
+                  tw`flex-row items-center justify-between px-4 py-3.5`,
+                  i < section.items.length - 1 && { borderBottomWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                ];
+                const rowContent = (
+                  <>
+                    <View style={tw`flex-row items-center gap-3 flex-1 mr-4`}>
+                      <View style={[tw`w-8 h-8 rounded-lg items-center justify-center`, { backgroundColor: accent + '14' }]}>
+                        <MaterialIcons name={item.icon as any} size={18} color={accent} />
+                      </View>
+                      <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#e2e8f0' : '#334155' }]}>{item.label}</Text>
                     </View>
-                    <Text style={[tw`text-sm font-semibold`, { color: isDark ? '#e2e8f0' : '#334155' }]}>{item.label}</Text>
+                    {item.isToggle ? (
+                      <Switch value={isDark} onValueChange={toggleTheme} />
+                    ) : (
+                      <MaterialIcons name="chevron-right" size={22} color={isDark ? '#475569' : '#94a3b8'} />
+                    )}
+                  </>
+                );
+
+                return item.isToggle ? (
+                  <View key={item.id} style={rowStyle}>
+                    {rowContent}
                   </View>
-                  {item.isToggle ? (
-                    <View style={[tw`w-12 h-7 rounded-full justify-center px-0.5`, { backgroundColor: isDark ? accent : '#cbd5e1' }]}>
-                      <View style={[tw`w-6 h-6 rounded-full bg-white shadow`, { alignSelf: isDark ? 'flex-end' : 'flex-start' }]} />
-                    </View>
-                  ) : (
-                    <MaterialIcons name="chevron-right" size={22} color={isDark ? '#475569' : '#94a3b8'} />
-                  )}
-                </TouchableOpacity>
-              ))}
+                ) : (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => handleMenuPress(item.id)}
+                    style={rowStyle}
+                  >
+                    {rowContent}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         ))}
@@ -282,6 +325,32 @@ export const ProfileScreen = ({ navigation }: any) => {
         ? <CoachBottomNav activeId="settings" navigation={navigation} totalUnread={totalUnread} />
         : <TraineeBottomNav activeId="profile" navigation={navigation} totalUnread={totalUnread} />
       }
+
+      {/* Weight Modal */}
+      <Modal visible={isWeightModalVisible} transparent animationType="fade" onRequestClose={() => setIsWeightModalVisible(false)}>
+        <View style={tw`flex-1 justify-center items-center bg-black bg-opacity-50 px-4`}>
+          <View style={[tw`w-full max-w-sm rounded-2xl p-6`, { backgroundColor: isDark ? '#111128' : '#ffffff' }]}>
+            <Text style={[tw`text-lg font-bold mb-4`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Update Weight</Text>
+            <TextInput
+              style={[tw`w-full rounded-xl p-4 text-base font-bold mb-6`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5', color: isDark ? '#f1f5f9' : '#1e293b', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}
+              placeholder="Enter weight in kg"
+              placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+              keyboardType="decimal-pad"
+              value={weightInput}
+              onChangeText={setWeightInput}
+              autoFocus
+            />
+            <View style={tw`flex-row gap-3`}>
+              <TouchableOpacity onPress={() => setIsWeightModalVisible(false)} style={[tw`flex-1 py-3 rounded-xl border items-center`, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                <Text style={[tw`font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSaveWeight} style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: accent }]}>
+                <Text style={tw`font-bold text-white`}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

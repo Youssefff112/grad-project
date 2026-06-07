@@ -1,80 +1,122 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useNetworkState, onNetworkReconnect } from '../services/networkService';
-import { getQueueSize, executeQueue } from '../services/syncQueueService';
-import apiService from '../services/api';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import * as Network from 'expo-network';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export interface OfflineContextType {
   isOnline: boolean;
-  isConnecting: boolean;
-  syncInProgress: boolean;
-  queuedCount: number;
-  networkType?: string;
 }
 
-const OfflineContext = createContext<OfflineContextType | undefined>(undefined);
+const OfflineContext = createContext<OfflineContextType>({ isOnline: true });
 
 export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const networkState = useNetworkState();
-  const [syncInProgress, setSyncInProgress] = useState(false);
-  const [queuedCount, setQueuedCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
 
-  // Update queued count on mount and periodically
   useEffect(() => {
-    const updateQueueSize = async () => {
-      const size = await getQueueSize();
-      setQueuedCount(size);
+    let mounted = true;
+
+    const checkNetwork = async () => {
+      try {
+        const state = await Network.getNetworkStateAsync();
+        if (mounted) {
+          setIsOnline(state.isConnected === true && state.isInternetReachable !== false);
+        }
+      } catch {
+        // If check fails, assume online to avoid false blocks
+        if (mounted) setIsOnline(true);
+      }
     };
 
-    updateQueueSize();
-    const interval = setInterval(updateQueueSize, 5000); // Check every 5 seconds
+    // Check immediately
+    checkNetwork();
 
-    return () => clearInterval(interval);
-  }, []);
+    // Poll every 3 seconds
+    const interval = setInterval(checkNetwork, 3000);
 
-  // Register callback for network reconnect
-  useEffect(() => {
-    const unsubscribe = onNetworkReconnect(async () => {
-      console.log('[Offline] Network reconnected, triggering sync');
-      setSyncInProgress(true);
-
-      try {
-        // Execute the queue
-        const result = await executeQueue(apiService.client);
-        console.log(`[Offline] Sync complete: ${result.successful} successful, ${result.failed} failed`);
-
-        // Update queue size
-        const size = await getQueueSize();
-        setQueuedCount(size);
-      } catch (error) {
-        console.error('[Offline] Error executing queue:', error);
-      } finally {
-        // Reset after a delay
-        setTimeout(() => setSyncInProgress(false), 1000);
-      }
-    });
-
-    return unsubscribe;
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
-    <OfflineContext.Provider
-      value={{
-        isOnline: networkState.isOnline,
-        isConnecting: networkState.isConnecting,
-        syncInProgress,
-        queuedCount,
-        networkType: networkState.type,
-      }}
-    >
+    <OfflineContext.Provider value={{ isOnline }}>
       {children}
+      {!isOnline && <NoInternetOverlay />}
     </OfflineContext.Provider>
   );
 };
 
-export const useOffline = () => {
-  const context = useContext(OfflineContext);
-  if (!context) {
-    throw new Error('useOffline must be used within OfflineProvider');
-  }
-  return context;
-};
+function NoInternetOverlay() {
+  return (
+    <View style={styles.overlay}>
+      <View style={styles.card}>
+        <View style={styles.iconContainer}>
+          <MaterialIcons name="wifi-off" size={48} color="#ffffff" />
+        </View>
+        <Text style={styles.title}>No Internet Connection</Text>
+        <Text style={styles.subtitle}>
+          VERTEX requires an internet connection to work.{'\n'}
+          Please connect to Wi-Fi or mobile data and try again.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    padding: 32,
+  },
+  card: {
+    backgroundColor: '#111118',
+    borderRadius: 28,
+    padding: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    width: '100%',
+    maxWidth: 360,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.6,
+    shadowRadius: 40,
+    elevation: 30,
+  },
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#f1f5f9',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+});
+
+export const useOffline = () => useContext(OfflineContext);

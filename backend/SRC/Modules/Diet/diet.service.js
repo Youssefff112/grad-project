@@ -6,6 +6,8 @@ import { Op } from 'sequelize';
 import { notificationService } from '../Notification/notification.service.js';
 import { generateAiDietPlan } from '../../Utils/aiService.js';
 import { pickFitnessGoal } from '../../Utils/mergeClientGoal.utils.js';
+import { subscriptionService } from '../Subscription/subscription.service.js';
+import { clientShouldRequireCoachPlanApproval } from '../../Utils/planAccess.utils.js';
 
 export const dietService = {
   // ─── AI INTEGRATION POINT ────────────────────────────────────────────────────
@@ -19,11 +21,14 @@ export const dietService = {
   // See: diet.model.js for the DietPlan schema, diet.service.js _generateDietPlanForUser for context.
   // ─────────────────────────────────────────────────────────────────────────────
   async generateDietPlan(userId) {
-    // Check if the user has an assigned coach — if so, plan starts as pending review
     const clientProfile = await ClientProfile.findOne({ where: { userId } });
-    const hasCoach = !!(clientProfile?.selectedCoachId);
-    const plan = await this._generateDietPlanForUser(userId, null, null, hasCoach);
-    if (hasCoach && plan?.pendingCoachReview && clientProfile?.selectedCoachId) {
+    const subscription = await subscriptionService.getActiveSubscription(userId, 'client').catch(() => null);
+    const needsCoachReview = clientShouldRequireCoachPlanApproval(
+      subscription,
+      clientProfile?.selectedCoachId
+    );
+    const plan = await this._generateDietPlanForUser(userId, null, null, needsCoachReview);
+    if (needsCoachReview && plan?.pendingCoachReview && clientProfile?.selectedCoachId) {
       const coachUid = Number(clientProfile.selectedCoachId);
       const user = await User.findByPk(userId, { attributes: ['firstName', 'lastName'] });
       const clientDisplayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';

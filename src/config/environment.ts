@@ -20,17 +20,32 @@ const getHostFromExpo = (): string | null => {
   return null;
 };
 
+const normalizeEnvUrl = (value: string | undefined): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
 const getBackendUrl = (): string => {
-  const explicit = process.env.EXPO_PUBLIC_BACKEND_URL;
-  if (explicit) return explicit;
+  // Physical devices load JS from Expo's LAN host — use that IP in dev so we
+  // never point at a stale address in .env after the machine changes networks.
+  if (__DEV__) {
+    const expoHost = getHostFromExpo();
+    if (expoHost) return `http://${expoHost}:5000`;
+  }
+  const explicit = normalizeEnvUrl(process.env.EXPO_PUBLIC_BACKEND_URL);
+  if (explicit) return explicit.replace(/\/$/, '');
   const host = getHostFromExpo();
   if (host) return `http://${host}:5000`;
   return 'http://localhost:5000';
 };
 
 const getAIBackendUrl = (): string => {
-  const explicit = process.env.EXPO_PUBLIC_AI_BACKEND_URL;
-  if (explicit) return explicit;
+  if (__DEV__) {
+    const expoHost = getHostFromExpo();
+    if (expoHost) return `http://${expoHost}:8000`;
+  }
+  const explicit = normalizeEnvUrl(process.env.EXPO_PUBLIC_AI_BACKEND_URL);
+  if (explicit) return explicit.replace(/\/$/, '');
   const host = getHostFromExpo();
   if (host) return `http://${host}:8000`;
   return 'http://localhost:8000';
@@ -50,5 +65,9 @@ export const environment = {
   isDevelopment: ENV === 'development',
   isProduction: ENV === 'production',
 };
+
+if (__DEV__) {
+  console.log('[Vertex] API_BASE_URL =', environment.API_BASE_URL);
+}
 
 export default environment;

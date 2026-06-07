@@ -36,8 +36,6 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
           width: size,
           height: size,
           borderRadius: size / 2,
-          borderWidth: 2,
-          borderColor: accent,
           overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',

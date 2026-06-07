@@ -271,20 +271,26 @@ async function seed() {
       : null;
 
     if (firstCoach) {
-      const clientEmails = SEED_USERS.filter(u => u.role === 'client').map(u => u.email);
-      for (const email of clientEmails) {
-        const clientUser = await User.unscoped().findOne({ where: { email } });
+      const COACH_ELIGIBLE_PLANS = ['Premium', 'Elite'];
+      const clientUsers = SEED_USERS.filter(u => u.role === 'client');
+      for (const seedUser of clientUsers) {
+        const clientUser = await User.unscoped().findOne({ where: { email: seedUser.email } });
         if (!clientUser) continue;
         const [profile] = await ClientProfile.findOrCreate({
           where: { userId: clientUser.id },
           defaults: { userId: clientUser.id },
         });
-        // Only assign if not already assigned to another coach
-        if (!profile.selectedCoachId) {
-          await profile.update({ selectedCoachId: firstCoach.id });
-          console.log(`  ✓ Assigned ${email} → ${firstCoachEmail}`);
-        } else {
-          console.log(`  – ${email} already has a coach (id=${profile.selectedCoachId})`);
+        const planName = seedUser.subscription?.planName;
+        if (COACH_ELIGIBLE_PLANS.includes(planName)) {
+          if (!profile.selectedCoachId) {
+            await profile.update({ selectedCoachId: firstCoach.id });
+            console.log(`  ✓ Assigned ${seedUser.email} (${planName}) → ${firstCoachEmail}`);
+          } else {
+            console.log(`  – ${seedUser.email} already has a coach (id=${profile.selectedCoachId})`);
+          }
+        } else if (profile.selectedCoachId) {
+          await profile.update({ selectedCoachId: null });
+          console.log(`  ✓ Cleared coach from ${seedUser.email} (${planName || 'Free'} — no coach tier)`);
         }
       }
     } else {

@@ -39,6 +39,7 @@ interface GeneratedWorkout {
   notes: string;
   status: 'pending' | 'approved' | 'rejected';
   approvedBy?: string;
+  isRestDay: boolean;
 }
 
 type WorkoutLocation = 'home' | 'gym';
@@ -66,23 +67,37 @@ const prettyLabel = (s?: string) =>
     .trim() || 'General';
 
 const planToWorkout = (plan: workoutService.WorkoutPlan): GeneratedWorkout[] => {
-  const workoutDays = plan.weeklySchedule?.filter((d) => !d.isRestDay) || [];
+  const schedule = plan.weeklySchedule || [];
+  const workoutDays = schedule.filter((d) => !d.isRestDay);
+  const restDays = schedule.filter((d) => d.isRestDay);
   const status = plan.pendingCoachReview ? 'pending' : 'approved';
-  return workoutDays.map((day) => ({
-    id: `${plan.id}-${day.day}`,
-    name: `${prettyLabel(day.day)}: ${prettyLabel(day.focus) || 'Workout'}`,
-    duration: day.duration || 60,
-    difficulty: mapExperienceToDifficulty(plan.experienceLevel),
-    focus: prettyLabel(day.focus) || 'Full Body',
-    exercises: (day.exercises || []).map((e) => ({
-      name: e.name,
-      sets: e.sets,
-      reps: e.reps,
-      rest: e.restTime,
-    })),
-    notes: `${workoutDays.length} workout days per week · Goal: ${prettyLabel(plan.goal) || 'Fitness'}`,
-    status,
-  }));
+  const planNotes = `${workoutDays.length} workout day${workoutDays.length === 1 ? '' : 's'}`
+    + (restDays.length > 0 ? ` · ${restDays.length} rest day${restDays.length === 1 ? '' : 's'}` : '')
+    + ` · Goal: ${prettyLabel(plan.goal) || 'Fitness'}`;
+
+  return schedule.map((day) => {
+    const isRest = !!day.isRestDay;
+    return {
+      id: `${plan.id}-${day.day}`,
+      name: isRest
+        ? `${prettyLabel(day.day)}: Rest Day`
+        : `${prettyLabel(day.day)}: ${prettyLabel(day.focus) || 'Workout'}`,
+      duration: isRest ? 0 : (day.duration || 60),
+      difficulty: mapExperienceToDifficulty(plan.experienceLevel),
+      focus: isRest ? 'Rest & Recovery' : (prettyLabel(day.focus) || 'Full Body'),
+      exercises: isRest
+        ? []
+        : (day.exercises || []).map((e) => ({
+            name: e.name,
+            sets: e.sets,
+            reps: e.reps,
+            rest: e.restTime,
+          })),
+      notes: planNotes,
+      status,
+      isRestDay: isRest,
+    };
+  });
 };
 
 export const WorkoutGenerationScreen = ({ navigation }: any) => {
@@ -467,7 +482,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
           <View style={tw`mt-8`}>
             <View style={tw`flex-row items-center justify-between mb-4`}>
               <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
-                Your Current Plan
+                Manage Plan
               </Text>
               <TouchableOpacity
                 onPress={() =>
@@ -502,7 +517,11 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                 }}
                 style={[
                   tw`rounded-xl p-4 mb-3`,
-                  { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
+                  {
+                    backgroundColor: workout.isRestDay ? (isDark ? '#0d0d1a' : '#f1f5f9') : cardBg,
+                    borderWidth: 1,
+                    borderColor: workout.isRestDay ? cardBorder : cardBorder,
+                  },
                 ]}
               >
                 <View style={tw`flex-row items-start justify-between mb-2`}>
@@ -511,30 +530,42 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                       {workout.name}
                     </Text>
                     <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>
-                      {workout.focus} • {workout.duration} mins
+                      {workout.isRestDay
+                        ? 'Rest & recovery — no workout scheduled'
+                        : `${workout.focus} • ${workout.duration} mins`}
                     </Text>
                   </View>
-                  <View
-                    style={[
-                      tw`px-2 py-1 rounded`,
-                      { backgroundColor: getDifficultyColor(workout.difficulty) + '20' },
-                    ]}
-                  >
-                    <Text
+                  {workout.isRestDay ? (
+                    <View style={[tw`px-2 py-1 rounded`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
+                      <Text style={[tw`text-xs font-bold`, { color: textSecondary }]}>Rest</Text>
+                    </View>
+                  ) : (
+                    <View
                       style={[
-                        tw`text-xs font-bold`,
-                        { color: getDifficultyColor(workout.difficulty) },
+                        tw`px-2 py-1 rounded`,
+                        { backgroundColor: getDifficultyColor(workout.difficulty) + '20' },
                       ]}
                     >
-                      {workout.difficulty}
-                    </Text>
-                  </View>
+                      <Text
+                        style={[
+                          tw`text-xs font-bold`,
+                          { color: getDifficultyColor(workout.difficulty) },
+                        ]}
+                      >
+                        {workout.difficulty}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <View style={[tw`w-full h-px`, { backgroundColor: cardBorder }]} />
                 <View style={tw`mt-2 flex-row items-center gap-1`}>
-                  <MaterialIcons name="fitness-center" size={14} color={accent} />
+                  <MaterialIcons
+                    name={workout.isRestDay ? 'hotel' : 'fitness-center'}
+                    size={14}
+                    color={workout.isRestDay ? textSecondary : accent}
+                  />
                   <Text style={[tw`text-xs`, { color: textSecondary }]}>
-                    {workout.exercises.length} exercises
+                    {workout.isRestDay ? 'Rest day' : `${workout.exercises.length} exercises`}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -821,7 +852,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
               <MaterialIcons name="close" size={22} color={accent} />
             </TouchableOpacity>
             <Text style={[tw`text-lg font-bold flex-1 text-center`, { color: textPrimary }]}>
-              Workout Preview
+              {generatedWorkout?.isRestDay ? 'Rest Day' : 'Workout Preview'}
             </Text>
             <View style={{ width: 44 }} />
           </View>
@@ -840,50 +871,58 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                         {generatedWorkout.focus}
                       </Text>
                     </View>
-                    <View
-                      style={[
-                        tw`px-3 py-1 rounded-full`,
-                        {
-                          backgroundColor:
-                            getDifficultyColor(generatedWorkout.difficulty) + '20',
-                        },
-                      ]}
-                    >
-                      <Text
+                    {generatedWorkout.isRestDay ? (
+                      <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}>
+                        <Text style={[tw`text-xs font-bold`, { color: textSecondary }]}>Rest Day</Text>
+                      </View>
+                    ) : (
+                      <View
                         style={[
-                          tw`text-xs font-bold`,
-                          { color: getDifficultyColor(generatedWorkout.difficulty) },
+                          tw`px-3 py-1 rounded-full`,
+                          {
+                            backgroundColor:
+                              getDifficultyColor(generatedWorkout.difficulty) + '20',
+                          },
                         ]}
                       >
-                        {generatedWorkout.difficulty}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={tw`flex-row gap-6 mt-4`}>
-                    <View style={tw`flex-row items-center gap-2`}>
-                      <MaterialIcons name="schedule" size={18} color={accent} />
-                      <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>
-                        {generatedWorkout.duration} min
-                      </Text>
-                    </View>
-                    <View style={tw`flex-row items-center gap-2`}>
-                      <MaterialIcons name="fitness-center" size={18} color={accent} />
-                      <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>
-                        {generatedWorkout.exercises.length} exercises
-                      </Text>
-                    </View>
-                    {workoutLocation && (
-                      <View style={tw`flex-row items-center gap-1`}>
-                        <Text style={tw`text-sm`}>
-                          {workoutLocation === 'home' ? '🏠' : '🏋️'}
-                        </Text>
-                        <Text style={[tw`text-sm font-bold capitalize`, { color: textSecondary }]}>
-                          {workoutLocation}
+                        <Text
+                          style={[
+                            tw`text-xs font-bold`,
+                            { color: getDifficultyColor(generatedWorkout.difficulty) },
+                          ]}
+                        >
+                          {generatedWorkout.difficulty}
                         </Text>
                       </View>
                     )}
                   </View>
+
+                  {!generatedWorkout.isRestDay && (
+                    <View style={tw`flex-row gap-6 mt-4`}>
+                      <View style={tw`flex-row items-center gap-2`}>
+                        <MaterialIcons name="schedule" size={18} color={accent} />
+                        <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>
+                          {generatedWorkout.duration} min
+                        </Text>
+                      </View>
+                      <View style={tw`flex-row items-center gap-2`}>
+                        <MaterialIcons name="fitness-center" size={18} color={accent} />
+                        <Text style={[tw`text-sm font-bold`, { color: textSecondary }]}>
+                          {generatedWorkout.exercises.length} exercises
+                        </Text>
+                      </View>
+                      {workoutLocation && (
+                        <View style={tw`flex-row items-center gap-1`}>
+                          <Text style={tw`text-sm`}>
+                            {workoutLocation === 'home' ? '🏠' : '🏋️'}
+                          </Text>
+                          <Text style={[tw`text-sm font-bold capitalize`, { color: textSecondary }]}>
+                            {workoutLocation}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
 
                 {generatedWorkout.notes && (
@@ -899,7 +938,23 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                   </View>
                 )}
 
-                {/* Exercises */}
+                {generatedWorkout.isRestDay ? (
+                  <View
+                    style={[
+                      tw`rounded-xl p-5 items-center gap-3`,
+                      { backgroundColor: isDark ? '#111128' : '#f1f5f9', borderWidth: 1, borderColor: cardBorder },
+                    ]}
+                  >
+                    <MaterialIcons name="hotel" size={36} color={textSecondary} />
+                    <Text style={[tw`text-base font-bold text-center`, { color: textPrimary }]}>
+                      Scheduled Rest Day
+                    </Text>
+                    <Text style={[tw`text-sm text-center leading-relaxed`, { color: textSecondary }]}>
+                      No exercises are planned for this day. Focus on recovery, mobility, or light stretching.
+                    </Text>
+                  </View>
+                ) : (
+                /* Exercises */
                 <View>
                   <View style={tw`flex-row items-center justify-between mb-3`}>
                     <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
@@ -953,6 +1008,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                     ))}
                   </View>
                 </View>
+                )}
               </>
             )}
           </ScrollView>

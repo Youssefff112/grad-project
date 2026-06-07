@@ -8,6 +8,8 @@ const router = Router();
 
 router.use(authenticate, restrictTo('client'));
 
+router.get('/health', requireActiveSubscription('client'), visionController.checkAiHealth);
+router.post('/analyze-frame', requireActiveSubscription('client'), visionController.analyzeFrame);
 router.post('/sessions', requireActiveSubscription('client'), visionController.startSession);
 router.patch('/sessions/:id', requireActiveSubscription('client'), visionController.updateSession);
 router.get('/sessions', requireActiveSubscription('client'), visionController.getHistory);

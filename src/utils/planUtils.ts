@@ -72,10 +72,31 @@ export function getUpgradeRecommendations(plan: SubscriptionPlan, featureName: s
 }
 
 /**
- * Check if plan is AI-focused (has AI features)
+ * Client tiers with self-serve AI generation (no coach approval required).
  */
 export function isAIPlan(plan: SubscriptionPlan): boolean {
-  return plan === 'Premium' || plan === 'Elite';
+  const features = PLAN_FEATURES[plan];
+  return !!(features.hasAIWorkoutGeneration || features.hasAIMealPlanGeneration || features.hasAIChat);
+}
+
+/**
+ * True when generated plans should wait for an assigned coach (Premium / Elite only).
+ */
+export function shouldPlansRequireCoachApproval(
+  plan: SubscriptionPlan,
+  hasCoach: boolean
+): boolean {
+  return hasCoach && canClientSelectPersonalCoach(plan);
+}
+
+/** Derive app user mode from subscription tier and coach assignment. */
+export function resolveUserMode(
+  plan: SubscriptionPlan,
+  coachId: string | null | undefined
+): 'Basic' | 'CoachAssisted' | 'AIDriven' {
+  if (canClientSelectPersonalCoach(plan) && coachId) return 'CoachAssisted';
+  if (isAIPlan(plan)) return 'AIDriven';
+  return 'Basic';
 }
 
 /**

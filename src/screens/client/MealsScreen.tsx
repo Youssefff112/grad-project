@@ -9,7 +9,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useFoodManagement } from '../../context/FoodManagementContext';
-import * as offlineService from '../../services/offlineService';
 import * as dietService from '../../services/dietService';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 import {
@@ -20,7 +19,9 @@ import {
   mlFromUsCups,
 } from '../../utils/waterConversions';
 
-const DEFAULT_DAILY_TARGET = { calories: 2000, protein: 150, carbs: 200, fats: 65 };
+// When there is no active plan there is no meaningful calorie target.
+// We use 0 so the ring and "Remaining" never show a fake 2000-kcal default.
+const DEFAULT_DAILY_TARGET = { calories: 0, protein: 0, carbs: 0, fats: 0 };
 
 const MEAL_TIME_MAP: Record<string, string> = {
   breakfast: '07:30',
@@ -144,14 +145,26 @@ export const MealsScreen = ({ navigation }: any) => {
       const { plan } = await dietService.getActiveDietPlan();
       if (plan) {
         setActivePlan(plan);
+        // Use the sum of today's individual meal calories as the target.
+        // This matches what the Daily Dial on the home screen shows and avoids
+        // the plan-level dailyCalorieTarget being different from the actual meals.
+        const todayDow = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+        const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const todayName = DAY_NAMES[todayDow];
+        const dayPlan =
+          plan.weeklyMealPlan.find((d) => d.day.toLowerCase() === todayName) ||
+          plan.weeklyMealPlan[todayDow] ||
+          plan.weeklyMealPlan[0];
+        const mealCalorieSum = (dayPlan?.meals ?? []).reduce((s, m) => s + (m.nutrition?.calories ?? 0), 0);
+        const targetCalories = mealCalorieSum > 0 ? mealCalorieSum : plan.dailyCalorieTarget > 0 ? plan.dailyCalorieTarget : 0;
         setDailyTarget({
-          calories: plan.dailyCalorieTarget,
+          calories: targetCalories,
           protein: plan.macronutrients.protein,
           carbs: plan.macronutrients.carbs,
           fats: plan.macronutrients.fats,
         });
       } else {
-        // No active plan — drop stale state and revert to defaults.
+        // No active plan — drop stale state and revert to zero defaults.
         setActivePlan(null);
         setDailyTarget(DEFAULT_DAILY_TARGET);
       }
@@ -229,27 +242,12 @@ export const MealsScreen = ({ navigation }: any) => {
           }
           return;
         }
+        // No log found for today — start with all meals unchecked
+        if (!cancelled) setCheckedMeals(base);
       } catch {
-        // network error — fall through to local cache
+        // Network error — start with all meals unchecked
+        if (!cancelled) setCheckedMeals(base);
       }
-
-      if (cancelled) return;
-
-      if (selectedDateStr === todayStr) {
-        // Fall back to local offline cache (scoped by userId + planId to avoid cross-plan bleed)
-        const cached = await offlineService.getCachedMealLog(selectedDateStr, userId, activePlan.id);
-        if (!cancelled && cached) {
-          setCheckedMeals({ ...base, ...cached.checkedMeals });
-          setWaterGlasses(cached.waterGlasses);
-          const w = (cached as { waterMl?: number }).waterMl;
-          if (typeof w === 'number' && w > 0) setWaterMlOverride(w);
-          else setWaterMlOverride(null);
-          return;
-        }
-      }
-
-      // No valid log found for this plan — initialise with all meals unchecked
-      if (!cancelled) setCheckedMeals(base);
     };
 
     load().finally(() => { if (!cancelled) setLogLoading(false); });
@@ -271,23 +269,6 @@ export const MealsScreen = ({ navigation }: any) => {
     // backend denominator is always the full assigned meal count, not just the
     // number of tapped meals.
     const fullMealMap: Record<string, boolean> = { ...buildBaseMealMap(mealsToDisplay), ...checkedMeals };
-
-    // Plan-scoped cache (meal completions keyed by planId to avoid cross-plan bleed)
-    offlineService.cacheMealLog(todayStr, {
-      checkedMeals: fullMealMap,
-      waterGlasses,
-      date: todayStr,
-      waterMl: waterMlEffective,
-    }, userId, activePlan?.id ?? null);
-
-    // User-scoped cache (no planId) — read by the home screen Daily Dial
-    // water tracker which doesn't know the active plan ID.
-    offlineService.cacheMealLog(todayStr, {
-      checkedMeals: fullMealMap,
-      waterGlasses,
-      date: todayStr,
-      waterMl: waterMlEffective,
-    }, userId, null);
 
     setSaveStatus('saving');
     if (logTimer.current) clearTimeout(logTimer.current);
@@ -376,7 +357,7 @@ export const MealsScreen = ({ navigation }: any) => {
   const strokeWidth = 12;
   const radius = (ringSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const calorieProgress = Math.min(consumed.calories / dailyTarget.calories, 1);
+  const calorieProgress = dailyTarget.calories > 0 ? Math.min(consumed.calories / dailyTarget.calories, 1) : 0;
   const strokeDashoffset = circumference * (1 - calorieProgress);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
@@ -570,7 +551,7 @@ export const MealsScreen = ({ navigation }: any) => {
                   {consumed.calories}
                 </Text>
                 <Text style={[tw`text-[10px] font-bold uppercase tracking-wider`, { color: textMuted }]}>
-                  / {dailyTarget.calories} kcal
+                  {dailyTarget.calories > 0 ? `/ ${dailyTarget.calories} kcal` : 'kcal'}
                 </Text>
               </View>
             </View>
@@ -579,7 +560,7 @@ export const MealsScreen = ({ navigation }: any) => {
             <View style={tw`flex-1 ml-5 gap-3`}>
               {[
                 { label: 'Eaten', value: `${consumed.calories}`, unit: 'kcal', icon: 'local-fire-department' as const, color: accent },
-                { label: 'Remaining', value: `${Math.max(dailyTarget.calories - consumed.calories, 0)}`, unit: 'kcal', icon: 'flag' as const, color: '#4ade80' },
+                { label: 'Remaining', value: `${dailyTarget.calories > 0 ? Math.max(dailyTarget.calories - consumed.calories, 0) : '--'}`, unit: dailyTarget.calories > 0 ? 'kcal' : '', icon: 'flag' as const, color: '#4ade80' },
                 { label: 'Meals Left', value: `${mealsToDisplay.length - checkedCount}`, unit: '', icon: 'schedule' as const, color: '#facc15' },
               ].map((stat) => (
                 <View key={stat.label} style={tw`flex-row items-center gap-2`}>

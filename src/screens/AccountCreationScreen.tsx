@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Text,
   Alert,
-  Switch,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { useUser } from '../context/UserContext';
 import { Button } from '../components/Button';
 import { FormInput } from '../components/FormInput';
 import { Card } from '../components/Card';
+import { Switch } from '../components/Switch';
 import * as authService from '../services/auth.service';
 import { resolveCoachGate } from '../utils/coachGate';
 
@@ -175,8 +175,6 @@ export const AccountCreationScreen = ({ navigation }: any) => {
           <Switch
             value={isCoachSignup}
             onValueChange={setIsCoachSignup}
-            trackColor={{ false: isDark ? '#1e293b' : '#e2e8f0', true: accent + '80' }}
-            thumbColor={isCoachSignup ? accent : isDark ? '#475569' : '#cbd5e1'}
           />
         </View>
 

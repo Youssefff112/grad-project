@@ -14,7 +14,6 @@ import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useFoodManagement } from '../../context/FoodManagementContext';
 import { useExerciseManagement } from '../../context/ExerciseManagementContext';
-import * as offlineService from '../../services/offlineService';
 import * as dietService from '../../services/dietService';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 import { WATER_ML_PER_GLASS } from '../../utils/waterConversions';
@@ -54,15 +53,10 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
 
   const firstName = fullName ? fullName.split(' ')[0] : 'Champ';
 
-  // Load cached data and active diet plan on mount
+  // Load active diet plan and today's server log on mount
   useEffect(() => {
     const loadData = async () => {
       const today = new Date().toISOString().split('T')[0];
-      const cachedMeals = await offlineService.getCachedMealLog(today);
-      if (cachedMeals) {
-        setCheckedMeals(cachedMeals.checkedMeals);
-        setWaterGlasses(cachedMeals.waterGlasses);
-      }
 
       try {
         const { plan } = await dietService.getActiveDietPlan();
@@ -77,8 +71,6 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
             workoutMinutes: DEFAULT_TARGETS.workoutMinutes,
           });
         } else {
-          // No active diet plan — drop stale state and revert to defaults so
-          // the tracker doesn't keep using last week's deleted targets.
           setActiveDietPlan(null);
           setDailyTargets(DEFAULT_TARGETS);
         }
@@ -86,23 +78,22 @@ export const DailyTrackerScreen = ({ navigation }: any) => {
         setActiveDietPlan(null);
         setDailyTargets(DEFAULT_TARGETS);
       }
+
+      // Restore today's checked meals and water from the server log
+      try {
+        const { log } = await dietService.getDietLog(today);
+        if (log?.mealsCompleted) setCheckedMeals(log.mealsCompleted as Record<string, boolean>);
+        if (log?.waterMl != null && log.waterMl > 0) {
+          setWaterGlasses(Math.round(log.waterMl / WATER_ML_PER_GLASS));
+        }
+      } catch {}
     };
     loadData();
   }, []);
 
-  // Cache data and save to backend whenever it changes
+  // Debounce backend save whenever meal/water state changes
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-
-    // Always save to local cache
-    offlineService.cacheMealLog(today, {
-      checkedMeals,
-      waterGlasses,
-      date: today,
-      waterMl: waterGlasses * WATER_ML_PER_GLASS,
-    });
-
-    // Debounce backend save
     if (dietLogTimer.current) clearTimeout(dietLogTimer.current);
     dietLogTimer.current = setTimeout(async () => {
       if (!activeDietPlan) return;

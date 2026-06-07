@@ -12,12 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useExerciseManagement } from '../../context/ExerciseManagementContext';
-import * as offlineService from '../../services/offlineService';
 import * as workoutService from '../../services/workoutService';
 import { COMMON_EXERCISES } from '../../services/exerciseService';
 
@@ -27,6 +27,11 @@ const prettyLabel = (s?: string) =>
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim() || '';
 import { hasFeatureAccess } from '../../utils/planUtils';
+import {
+  getHistorySubtitle,
+  getRedoLabel,
+  getSessionTitle,
+} from '../../utils/workoutSessionDisplay';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 
@@ -55,16 +60,15 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
   const [planName, setPlanName] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<number | undefined>(undefined);
   const [activePlanDay, setActivePlanDay] = useState<string | undefined>(undefined);
+  const [activePlanFocus, setActivePlanFocus] = useState<string | undefined>(undefined);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   // Swap state
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
   const [swapSearch, setSwapSearch] = useState('');
 
-  // History
-  const [cachedHistory, setCachedHistory] = useState<Array<{
-    date: string; type: string; duration: string; score: string; exercises: number;
-  }> | null>(null);
+  // History — server data shown live, local cache shown as instant fallback
+  const [cachedHistory, setCachedHistory] = useState<workoutService.WorkoutSession[]>([]);
   const [apiHistory, setApiHistory] = useState<workoutService.WorkoutSession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -88,6 +92,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
         setPlanName(`${prettyLabel(todaySchedule.day)}: ${prettyLabel(todaySchedule.focus) || 'Workout'}`);
         setActivePlanId(plan?.id);
         setActivePlanDay(todaySchedule.day?.toLowerCase());
+        setActivePlanFocus(todaySchedule.focus);
         setPlanExercises(
           todaySchedule.exercises.map((e: any) => ({
             name: e.name,
@@ -103,12 +108,14 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
         setPlanName(null);
         setActivePlanId(undefined);
         setActivePlanDay(undefined);
+        setActivePlanFocus(undefined);
         setPlanExercises([]);
       }
     } catch {
       setPlanName(null);
       setActivePlanId(undefined);
       setActivePlanDay(undefined);
+      setActivePlanFocus(undefined);
       setPlanExercises([]);
     } finally {
       setPlanLoading(false);
@@ -129,23 +136,30 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
     if (activeTab === 'history') loadWorkoutHistory();
   }, [activeTab]);
 
-  useEffect(() => {
-    if (preselectedExercise) loadCached();
-  }, []);
 
-  const loadCached = async () => {
-    try {
-      const cached = await offlineService.getCachedWorkoutHistory();
-      if (cached?.length) setCachedHistory(cached);
-    } catch { /* ignore */ }
-  };
+
+  const HISTORY_CACHE_KEY = 'workout_session_history_cache';
 
   const loadWorkoutHistory = async () => {
     setHistoryLoading(true);
+
+    // Show cached sessions immediately so the screen never looks empty
+    try {
+      const raw = await AsyncStorage.getItem(HISTORY_CACHE_KEY).catch(() => null);
+      if (raw) {
+        const parsed: workoutService.WorkoutSession[] = JSON.parse(raw);
+        setCachedHistory(parsed);
+      }
+    } catch {}
+
+    // Fetch fresh data from the server
     try {
       const { logs } = await workoutService.getWorkoutHistory();
-      setApiHistory(logs || []);
-    } catch { /* fallback */ }
+      const fresh = logs || [];
+      setApiHistory(fresh);
+      // Update the cache with the latest server data
+      AsyncStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(fresh)).catch(() => {});
+    } catch { /* server unavailable — cached sessions still visible */ }
     finally { setHistoryLoading(false); }
   };
 
@@ -303,9 +317,9 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
                       <View style={tw`flex-row items-center justify-between`}>
                         <View style={tw`flex-1 mr-2`}>
                           <View style={tw`flex-row items-center gap-2`}>
-                            <Text style={[tw`font-bold text-sm`, { color: isDone ? '#22c55e' : textPrimary }]}>{ex.name}</Text>
+                            <Text style={[tw`font-bold text-sm shrink`, { color: isDone ? '#22c55e' : textPrimary }]} numberOfLines={2}>{ex.name}</Text>
                             {isDone && (
-                              <View style={[tw`flex-row items-center gap-0.5 px-1.5 py-0.5 rounded-full`, { backgroundColor: '#22c55e20' }]}>
+                              <View style={[tw`flex-row items-center gap-0.5 px-1.5 py-0.5 rounded-full shrink-0`, { backgroundColor: '#22c55e20' }]}>
                                 <MaterialIcons name="check" size={10} color="#22c55e" />
                                 <Text style={[tw`text-[9px] font-black`, { color: '#22c55e' }]}>Done</Text>
                               </View>
@@ -324,7 +338,14 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
                             <Text style={[tw`text-xs font-bold`, { color: accent }]}>Swap</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            onPress={() => navigation.navigate('Calibration', { exerciseName: ex.name, workoutPlanId: activePlanId, workoutDay: activePlanDay })}
+                            onPress={() => navigation.navigate('Calibration', {
+                              exerciseName: ex.name,
+                              workoutPlanId: activePlanId,
+                              workoutDay: activePlanDay,
+                              workoutFocus: activePlanFocus,
+                              targetReps: ex.reps ? parseInt(String(ex.reps), 10) || undefined : undefined,
+                              targetSets: ex.sets,
+                            })}
                             style={[tw`px-2 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: isDone ? '#22c55e20' : '#4ade8018' }]}
                           >
                             <MaterialIcons name={isDone ? 'replay' : 'videocam'} size={14} color={isDone ? '#22c55e' : '#4ade80'} />
@@ -437,33 +458,64 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
                   <MaterialIcons name="fitness-center" size={24} color={accent} />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{session.day || 'Workout'}</Text>
+                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{getSessionTitle(session)}</Text>
                   <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>
-                    {session.date ? new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
-                    {session.duration ? ` · ${session.duration}m` : ''}
-                    {session.exercises?.length ? ` · ${session.exercises.length} exercises` : ''}
+                    {getHistorySubtitle(session)}
                   </Text>
                 </View>
                 <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, {
-                  backgroundColor: session.status === 'completed' ? '#22c55e20' : session.status === 'cancelled' ? '#ef444420' : accent + '20',
-                  color: session.status === 'completed' ? '#22c55e' : session.status === 'cancelled' ? '#ef4444' : accent,
+                  backgroundColor: getRedoLabel(session)
+                    ? '#f59e0b20'
+                    : session.status === 'completed'
+                      ? '#22c55e20'
+                      : session.status === 'cancelled'
+                        ? '#ef444420'
+                        : accent + '20',
+                  color: getRedoLabel(session)
+                    ? '#f59e0b'
+                    : session.status === 'completed'
+                      ? '#22c55e'
+                      : session.status === 'cancelled'
+                        ? '#ef4444'
+                        : accent,
                 }]}>
-                  {session.status === 'completed' ? 'Done' : session.status === 'cancelled' ? 'Cancelled' : session.status || '--'}
+                  {getRedoLabel(session) || (session.status === 'completed' ? 'Done' : session.status === 'cancelled' ? 'Cancelled' : session.status || '--')}
                 </Text>
               </TouchableOpacity>
             ))
-          ) : (
-            (cachedHistory || [{ date: 'No history yet', type: 'Start a workout to see history', duration: '--', score: '--', exercises: 0 }]).map((session, i) => (
-              <View key={i} style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
+          ) : cachedHistory.length > 0 ? (
+            // Server returned nothing yet — show cached sessions as a placeholder
+            cachedHistory.map((session, i) => (
+              <TouchableOpacity
+                key={session.id || i}
+                onPress={() => navigation.navigate('WorkoutSessionDetail', { session })}
+                style={[tw`flex-row items-center p-4 rounded-2xl gap-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder, opacity: 0.8 }]}
+              >
                 <View style={[tw`w-12 h-12 rounded-xl items-center justify-center`, { backgroundColor: accent + '18' }]}>
                   <MaterialIcons name="fitness-center" size={24} color={accent} />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{session.type}</Text>
-                  <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>{session.date}</Text>
+                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{getSessionTitle(session)}</Text>
+                  <Text style={[tw`text-xs mt-0.5`, { color: '#94a3b8' }]}>
+                    {getHistorySubtitle(session)}
+                  </Text>
                 </View>
-              </View>
+                <Text style={[tw`text-xs font-bold uppercase px-2 py-1 rounded-full`, {
+                  backgroundColor: getRedoLabel(session) ? '#f59e0b20' : '#22c55e20',
+                  color: getRedoLabel(session) ? '#f59e0b' : '#22c55e',
+                }]}>
+                  {getRedoLabel(session) || (session.status === 'completed' ? 'Done' : session.status || '--')}
+                </Text>
+              </TouchableOpacity>
             ))
+          ) : (
+            <View style={[tw`p-6 rounded-2xl items-center gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
+              <MaterialIcons name="fitness-center" size={36} color={textSecondary} />
+              <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>No workouts yet</Text>
+              <Text style={[tw`text-sm text-center`, { color: textSecondary }]}>
+                Complete a workout session to see your history here.
+              </Text>
+            </View>
           )}
         </ScrollView>
       )}

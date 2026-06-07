@@ -37,12 +37,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     loadedForRef.current = userId;
 
     const init = async () => {
-      // 1. Load cached (instant display)
+      // 1. Load cached for instant display while the server fetch runs
+      let cachedMap = new Map<string, number>();
       try {
         const key = cacheKey(userId)!;
         const raw = await AsyncStorage.getItem(key).catch(() => null);
         if (raw) {
-          setConversations(new Map<string, number>(JSON.parse(raw)));
+          cachedMap = new Map<string, number>(JSON.parse(raw));
+          setConversations(cachedMap);
         } else {
           setConversations(new Map());
         }
@@ -50,29 +52,25 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setConversations(new Map());
       }
 
-      // 2. Sync fresh unread counts from server (background — no await block on UI)
+      // 2. Fetch fresh unread counts from server — this is AUTHORITATIVE and REPLACES the cache entirely.
+      //    This prevents stale counts from persisting across sessions.
       try {
         const { getConversations } = require('../services/messaging.service');
         const convs: any[] = await getConversations().catch(() => []);
-        if (!convs.length) return;
-        const counts: Record<string, number> = {};
+        // Build a fresh map — only from server data (don't merge stale cache)
+        const freshMap = new Map<string, number>();
         for (const conv of convs) {
-          counts[String(conv.id)] = Math.max(0, Math.floor(Number(conv.unreadCount)) || 0);
+          const count = Math.max(0, Math.floor(Number(conv.unreadCount)) || 0);
+          freshMap.set(String(conv.id), count);
         }
-        // Use setConversations directly to avoid stale-closure issues with persist
-        setConversations((prev) => {
-          const next = new Map(prev);
-          for (const [id, count] of Object.entries(counts)) {
-            next.set(id, count);
-          }
-          const key = cacheKey(userId);
-          if (key) {
-            AsyncStorage.setItem(key, JSON.stringify(Array.from(next.entries()))).catch(() => {});
-          }
-          return next;
-        });
+        // Replace state and persist the authoritative map
+        setConversations(freshMap);
+        const key = cacheKey(userId);
+        if (key) {
+          AsyncStorage.setItem(key, JSON.stringify(Array.from(freshMap.entries()))).catch(() => {});
+        }
       } catch {
-        // offline or 401 — keep cached values
+        // Server unavailable — keep whatever the cache showed
       }
     };
 

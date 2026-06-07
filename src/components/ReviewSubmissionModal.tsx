@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { RatingStarPicker } from './RatingStarPicker';
+import { Switch } from './Switch';
 
 interface ReviewSubmissionModalProps {
   visible: boolean;
@@ -141,10 +142,6 @@ export const ReviewSubmissionModal: React.FC<ReviewSubmissionModalProps> = ({
               value={isAnonymous}
               onValueChange={setIsAnonymous}
               disabled={loading}
-              trackColor={{
-                false: isDark ? '#4b5563' : '#cbd5e1',
-                true: isDark ? '#3b82f6' : '#ff6a00'
-              }}
             />
           </View>
 

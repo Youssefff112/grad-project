@@ -70,7 +70,8 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     if (existingPlan) {
-      setPlanName(existingPlan.planName || `${existingPlan.goal || 'Workout'} Plan`);
+      const defaultName = existingPlan.goal || 'Workout';
+      setPlanName(existingPlan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
       const mapped = mapScheduleToUI(existingPlan.weeklySchedule || []);
       setDayExercises(mapped);
     }
@@ -115,7 +116,8 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
     try {
       const { plan } = await coachService.generateWorkoutForClient(apiClientId);
       if (plan) {
-        setPlanName(plan.planName || `${plan.goal || 'Workout'} Plan`);
+        const defaultName = plan.goal || 'Workout';
+        setPlanName(plan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
         setDayExercises(mapScheduleToUI(plan.weeklySchedule || []));
         Alert.alert('Plan Generated', 'The AI plan has been loaded. You can review and edit it before saving.');
       }

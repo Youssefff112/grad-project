@@ -223,7 +223,53 @@ export const invalidateCachedResponse = async (endpoints: string | string[]) => 
   }
 };
 
-// Clear all offline cache
+/** All statically-known AsyncStorage keys used across the app */
+const STATIC_KEYS = [
+  // Auth / tokens
+  'auth_token',
+  'refresh_token',
+  'token_expiry',
+
+  // User profile & preferences
+  'user_id',
+  'user_fullname',
+  'user_email',
+  'user_role',
+  'user_weight',
+  'user_body_fat_percentage',
+  'user_mode',
+  'user_subscription_plan',
+  'user_experience_level',
+  'user_diet_preferences',
+  'user_coach_id',
+  'user_coach_name',
+  'user_coach_application_status',
+  'user_notification_settings',
+  'user_cv_enabled',
+  'user_ai_enabled',
+  'user_last_plan_review',
+
+  // Theme
+  'theme_preference',
+
+  // Food & meals library
+  'foods_library',
+  'custom_meals',
+  'food_recent_searches',
+
+  // Exercises
+  'exercises',
+  'exercises_seed_version',
+  'workouts',
+
+  // Offline sync queue
+  'sync_queue',
+];
+
+/**
+ * Clear all offline / transient cache (meal logs, API response cache,
+ * workout cache, message cache).  Does NOT touch auth tokens or user profile.
+ */
 export const clearAllCache = async () => {
   try {
     const keys = await AsyncStorage.getAllKeys().catch(() => []);
@@ -231,10 +277,11 @@ export const clearAllCache = async () => {
 
     const cacheKeys = keys.filter(
       (key) =>
-        key.startsWith('meal_log_') ||    // covers both meal_log_<date> and meal_log_<uid>_<date>
+        key.startsWith('meal_log_') ||       // meal_log_<uid>_<planId>_<date> variants
         key.startsWith('workout_cache_') ||
         key.startsWith('messages_cache_') ||
-        key.startsWith('api_cache_')
+        key.startsWith('api_cache_') ||
+        key.startsWith('food_cache_')
     );
 
     if (cacheKeys.length > 0) {
@@ -246,5 +293,48 @@ export const clearAllCache = async () => {
     }
   } catch (error) {
     console.warn('[OfflineService] Error clearing cache:', error);
+  }
+};
+
+/**
+ * Nuclear option — wipes EVERY piece of persisted app data:
+ * auth tokens, user profile, offline cache, food library, exercises,
+ * sync queue, notification state, theme preference, and any dynamic keys
+ * (meal logs, API cache, etc.).
+ *
+ * After calling this the app is in a clean-install state.
+ * The user will be signed out automatically on the next cold start.
+ */
+export const nukeAllAppData = async (): Promise<void> => {
+  try {
+    // 1. Remove all statically-known keys
+    await Promise.all(
+      STATIC_KEYS.map((key) =>
+        AsyncStorage.removeItem(key).catch(() => {})
+      )
+    );
+
+    // 2. Remove all dynamic keys (prefixed patterns)
+    const allKeys = await AsyncStorage.getAllKeys().catch(() => [] as readonly string[]);
+    const dynamicKeys = (allKeys as string[]).filter(
+      (key) =>
+        key.startsWith('meal_log_') ||
+        key.startsWith('workout_cache_') ||
+        key.startsWith('messages_cache_') ||
+        key.startsWith('api_cache_') ||
+        key.startsWith('food_cache_') ||
+        key.startsWith('notif_read_') ||
+        key.startsWith('notif_')
+    );
+
+    if (dynamicKeys.length > 0) {
+      await Promise.all(
+        dynamicKeys.map((key) => AsyncStorage.removeItem(key).catch(() => {}))
+      );
+    }
+
+    console.log('[OfflineService] All app data wiped successfully.');
+  } catch (error) {
+    console.warn('[OfflineService] Error nuking app data:', error);
   }
 };

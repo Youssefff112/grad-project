@@ -24,7 +24,12 @@ import { NotificationsSettingsScreen } from './src/screens/NotificationsSettings
 import { MeasurementsSettingsScreen } from './src/screens/MeasurementsSettingsScreen';
 import { MessagesScreen } from './src/screens/MessagesScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
-import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { PrivacySecurityScreen } from './src/screens/PrivacySecurityScreen';
+import { HelpCenterScreen } from './src/screens/HelpCenterScreen';
+import { FeedbackScreen } from './src/screens/FeedbackScreen';
+import { AboutScreen } from './src/screens/AboutScreen';
+import { TermsScreen } from './src/screens/TermsScreen';
+import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 
 // Client (Trainee) screens
 import { SubscriptionSelectionScreen } from './src/screens/client/SubscriptionSelectionScreen';
@@ -121,7 +126,6 @@ function AppNavigator() {
       <Stack.Screen name="AccountCreation" component={AccountCreationScreen} />
       <Stack.Screen name="NotificationsSettings" component={NotificationsSettingsScreen} />
       <Stack.Screen name="MeasurementsSettings" component={MeasurementsSettingsScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
       <Stack.Screen name="TraineeCommandCenter" component={TraineeCommandCenterScreen} />
       <Stack.Screen name="VisionAnalysisLab" component={VisionAnalysisLabScreen} />
@@ -179,6 +183,14 @@ function AppNavigator() {
       <Stack.Screen name="CoachEarnings" component={CoachEarningsScreen} />
       <Stack.Screen name="CoachReviewManagement" component={CoachReviewManagementScreen} />
       <Stack.Screen name="CoachProgramTemplates" component={CoachProgramTemplatesScreen} />
+
+      {/* Settings / Info screens */}
+      <Stack.Screen name="PrivacySecurity" component={PrivacySecurityScreen} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="Feedback" component={FeedbackScreen} />
+      <Stack.Screen name="About" component={AboutScreen} />
+      <Stack.Screen name="TermsOfService" component={TermsScreen} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
     </Stack.Navigator>
   );
 }

@@ -8,6 +8,13 @@ import { useTheme } from '../../context/ThemeContext';
 import * as coachService from '../../services/coachService';
 import type { ClientActivitySnapshot, AdherenceSummary, DetailedDietLog } from '../../services/coachService';
 import type { WorkoutSession } from '../../services/workoutService';
+import {
+  formatDurationSeconds,
+  getFormScore,
+  getHistorySubtitle,
+  getSessionMeta,
+  getSessionTitle,
+} from '../../utils/workoutSessionDisplay';
 
 interface Measurement {
   date: string;
@@ -1033,23 +1040,11 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                     {workoutLogs.length} SESSION{workoutLogs.length !== 1 ? 'S' : ''} RECORDED
                   </Text>
                   {workoutLogs.map((session: any, i) => {
-                    const exerciseName =
-                      (Array.isArray(session.exercises) && session.exercises[0]?.name) ||
-                      capitalise(session.day || 'Workout');
-
-                    const dateLabel = session.date
-                      ? new Date(session.date).toLocaleDateString('en-US', {
-                          weekday: 'short', month: 'short', day: 'numeric',
-                        })
-                      : '--';
-
-                    // Parse form score from notes: "Form: 87%"
-                    const formMatch = String(session.notes || '').match(/Form:\s*(\d+(?:\.\d+)?)%/i);
-                    const formScore = formMatch ? Math.round(Number(formMatch[1])) : null;
-
-                    // Parse reps from notes: "Reps: 12 ·"
-                    const repsMatch = String(session.notes || '').match(/Reps:\s*(\d+)/i);
-                    const reps = repsMatch ? Number(repsMatch[1]) : null;
+                    const meta = getSessionMeta(session);
+                    const exerciseName = getSessionTitle(session);
+                    const dateLabel = getHistorySubtitle(session);
+                    const formScore = getFormScore(session);
+                    const reps = meta?.totalReps ?? null;
 
                     const formColor =
                       formScore == null ? subtextColor
@@ -1099,7 +1094,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
                             {
                               icon: 'timer' as const,
                               label: 'Duration',
-                              value: session.duration ? `${session.duration}m` : '--',
+                              value: formatDurationSeconds(meta?.durationSeconds ?? (session.duration ? session.duration * 60 : null)),
                               color: '#3b82f6',
                             },
                             {

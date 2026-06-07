@@ -122,7 +122,8 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     if (existingPlan) {
-      setPlanName(existingPlan.planName || `${existingPlan.goal || 'Diet'} Plan`);
+      const defaultName = existingPlan.goal || 'Diet';
+      setPlanName(existingPlan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
       if (existingPlan.dailyCalorieTarget) {
         setCalorieTarget(String(existingPlan.dailyCalorieTarget));
       }
@@ -220,7 +221,8 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     try {
       const { plan } = await coachService.generateDietForClient(apiClientId);
       if (plan) {
-        setPlanName(plan.planName || `${plan.goal || 'Diet'} Plan`);
+        const defaultName = plan.goal || 'Diet';
+        setPlanName(plan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
         if (plan.dailyCalorieTarget) setCalorieTarget(String(plan.dailyCalorieTarget));
         setDayPlans(mapMealPlanToUI(plan.weeklyMealPlan || []));
         Alert.alert('Plan Generated', 'The AI diet plan has been loaded. Review and edit it before saving.');

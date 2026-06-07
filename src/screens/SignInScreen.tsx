@@ -22,6 +22,7 @@ import * as subscriptionService from '../services/subscriptionService';
 import { getClientSubscriptionStatus } from '../services/clientService';
 import { PLAN_FEATURES } from '../constants/plans';
 import { resolveCoachGate } from '../utils/coachGate';
+import { environment } from '../config/environment';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -116,17 +117,9 @@ export const SignInScreen = ({ navigation }: any) => {
           await setCoachApplicationStatus(null);
         }
 
+        // Set a sensible default subscription immediately so the app doesn't block
         if (user.role === 'client') {
-          try {
-            const { subscription } = await getClientSubscriptionStatus();
-            if (subscription?.planName) {
-              setSubscriptionPlan(subscription.planName as any);
-            } else {
-              setSubscriptionPlan(((user as any).subscriptionPlan ?? 'Free') as any);
-            }
-          } catch {
-            setSubscriptionPlan(((user as any).subscriptionPlan ?? 'Free') as any);
-          }
+          setSubscriptionPlan(((user as any).subscriptionPlan ?? 'Free') as any);
         } else if (user.role === 'coach') {
           if (coachGate === 'pending' || coachGate === 'rejected') {
             setSubscriptionPlan('Free');
@@ -137,10 +130,7 @@ export const SignInScreen = ({ navigation }: any) => {
           setSubscriptionPlan('Free');
         }
 
-        // Pull full profile (weight, check-in date, preferences) for old + new accounts
-        syncProfileFromServer().catch(() => {});
-
-        // Navigate based on role
+        // Navigate immediately — don't wait for background fetches
         if (user.role === 'admin') {
           navigation.navigate('AdminDashboard');
         } else if (user.role === 'coach' && coachGate) {
@@ -150,6 +140,16 @@ export const SignInScreen = ({ navigation }: any) => {
         } else {
           navigation.navigate('TraineeCommandCenter');
         }
+
+        // Background: refine subscription plan & sync profile (non-blocking)
+        if (user.role === 'client') {
+          getClientSubscriptionStatus()
+            .then(({ subscription }) => {
+              if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
+            })
+            .catch(() => {});
+        }
+        syncProfileFromServer().catch(() => {});
       }
     } catch (error: any) {
       let errorMessage = 'Sign in failed. Please try again.';
@@ -159,7 +159,7 @@ export const SignInScreen = ({ navigation }: any) => {
       } else if (error.response?.status === 429) {
         errorMessage = 'Too many login attempts. Please try again later.';
       } else if (error.message === 'Network Error' || !error.response) {
-        errorMessage = 'Backend is unavailable. Please check your connection.';
+        errorMessage = `Cannot reach the server at ${environment.API_BASE_URL}.\n\n• Backend running? (npm run dev in /backend)\n• Phone on the same Wi-Fi as this PC\n• Reload Expo after network changes (npx expo start --clear)`;
       }
 
       Alert.alert('Sign In Error', errorMessage);
@@ -250,10 +250,6 @@ export const SignInScreen = ({ navigation }: any) => {
                     saveEmail(u.email);
                     setRole(u.role as any);
 
-                    if (u.role === 'client' || u.role === 'coach') {
-                      await _ensureDemoQuickLoginSubscription(user).catch(() => { /* may already exist */ });
-                    }
-
                     const coachGate = u.role === 'coach' ? resolveCoachGate((u as any).coachProfile) : null;
                     if (u.role === 'coach' && coachGate) {
                       await setCoachApplicationStatus(coachGate);
@@ -261,6 +257,7 @@ export const SignInScreen = ({ navigation }: any) => {
                       await setCoachApplicationStatus(null);
                     }
 
+                    // Set immediate defaults then navigate right away
                     if (u.role === 'admin') {
                       navigation.navigate('AdminDashboard');
                     } else if (u.role === 'coach' && coachGate) {
@@ -275,30 +272,30 @@ export const SignInScreen = ({ navigation }: any) => {
                         navigation.navigate('CoachCommandCenter');
                       }
                     } else {
-                      try {
-                        const { subscription } = await getClientSubscriptionStatus();
-                        if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
-                        else setSubscriptionPlan(user.subscriptionPlan as any);
-                      } catch {
-                        setSubscriptionPlan(user.subscriptionPlan as any);
-                      }
+                      setSubscriptionPlan(user.subscriptionPlan as any);
                       navigation.navigate('TraineeCommandCenter');
                     }
+
+                    // Background: ensure demo subscription & refine plan (non-blocking)
+                    if (u.role === 'client' || u.role === 'coach') {
+                      _ensureDemoQuickLoginSubscription(user).catch(() => {});
+                    }
+                    if (u.role === 'client') {
+                      getClientSubscriptionStatus()
+                        .then(({ subscription }) => {
+                          if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
+                        })
+                        .catch(() => {});
+                    }
                   }
-                } catch {
-                  // Backend unavailable — fall back to local navigation without a token
-                  setFullName(user.fullName);
-                  saveEmail(user.email);
-                  setRole(user.role as any);
-                  if (user.role === 'admin') {
-                    navigation.navigate('AdminDashboard');
-                  } else if (user.role === 'coach') {
-                    setSubscriptionPlan('ProCoach');
-                    navigation.navigate('CoachCommandCenter');
-                  } else {
-                    setSubscriptionPlan(user.subscriptionPlan);
-                    navigation.navigate('TraineeCommandCenter');
-                  }
+                } catch (err: any) {
+                  const msg =
+                    err?.response?.data?.message ||
+                    (err?.message === 'Network Error' || !err?.response
+                      ? `Cannot reach the server at ${environment.API_BASE_URL}.\n\n• Backend running? (npm run dev in /backend)\n• Phone on the same Wi-Fi as this PC\n• Reload Expo after network changes (npx expo start --clear)`
+                      : err?.message || 'Quick login failed. Please try again.');
+                  Alert.alert('Quick Login Error', msg);
+                  console.error('Quick login error:', err);
                 } finally {
                   setIsLoading(false);
                 }

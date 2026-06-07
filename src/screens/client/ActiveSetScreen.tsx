@@ -29,6 +29,8 @@ interface RouteParams {
   workoutPlanId?: number;
   /** Weekday name for this session's plan day (e.g. 'monday') */
   workoutDay?: string;
+  /** Plan split label (e.g. 'Day 1', 'Push') — stored separately from exercise name */
+  workoutFocus?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const targetHoldSeconds = params.targetHoldSeconds ?? 60;
   const workoutPlanId: number | undefined = params.workoutPlanId;
   const workoutDay: string | undefined = params.workoutDay;
+  const workoutFocus: string | undefined = params.workoutFocus ?? params.workoutName;
 
   // Camera refs
   const cameraRef = useRef<CameraView | null>(null);
@@ -358,32 +361,53 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     const summary = aiVisionService.buildSessionSummary(summaryInput);
 
     // ── Save session to history (awaited so it's always written before navigating)
-    // day must be a weekday name (DB ENUM); exercise name goes into notes + exercises list
     const todayWeekday = new Date()
       .toLocaleDateString('en-US', { weekday: 'long' })
       .toLowerCase() as workoutService.LogWorkoutRequest['day'];
+    const planDay = (workoutDay as workoutService.LogWorkoutRequest['day']) || todayWeekday;
+    const actualReps = isHold ? holdSeconds : totalRepsRef.current;
 
     setSaving(true);
     try {
       await workoutService.logWorkout({
-        day: (workoutDay as workoutService.LogWorkoutRequest['day']) || todayWeekday,
+        day: planDay,
         duration: Math.max(1, Math.round(elapsedSeconds / 60)),
         exercises: [{
-          // Use the original name from params so it matches the plan exactly.
-          // exerciseDisplay is an AI-profile display variant (e.g. "Jumping Jack"
-          // vs the plan's "Jumping Jacks") and would break the Done badge lookup.
           name: rawExerciseName,
           sets: currentSet,
-          reps: String(totalRepsRef.current),
+          reps: String(actualReps),
           restTime: 60,
         }],
         notes: isHold
-          ? `${exerciseDisplay} · Hold: ${holdSeconds}s · Sets: ${currentSet}/${targetSets} · Form: ${avgFormScore}%`
-          : `${exerciseDisplay} · Reps: ${totalRepsRef.current} · Sets: ${currentSet}/${targetSets} · Form: ${avgFormScore}% · Correct: ${summary.correctReps} · Incorrect: ${summary.incorrectReps}`,
-        rating: Math.min(5, Math.max(1, Math.round(avgFormScore / 20))),
-        formScore: avgFormScore,
-        totalReps: totalRepsRef.current,
+          ? `${exerciseDisplay} · ${planDay} · Hold: ${holdSeconds}s · Sets: ${currentSet}/${targetSets} · Form: ${summary.performanceScore}%`
+          : `${exerciseDisplay} · ${planDay} · Reps: ${totalRepsRef.current} · Sets: ${currentSet}/${targetSets} · Form: ${summary.performanceScore}% · Correct: ${summary.correctReps} · Incorrect: ${summary.incorrectReps}`,
+        rating: Math.min(5, Math.max(1, Math.round(summary.performanceScore / 20))),
+        formScore: summary.performanceScore,
+        totalReps: actualReps,
         workoutPlanId,
+        sessionMeta: {
+          exerciseName: rawExerciseName,
+          planDay,
+          planFocus: workoutFocus && workoutFocus !== rawExerciseName ? workoutFocus : undefined,
+          redoNumber: 0,
+          isRedo: false,
+          formScore: avgFormScore,
+          avgFormScore: summary.avgFormScore,
+          peakFormScore: summary.peakFormScore,
+          performanceScore: summary.performanceScore,
+          formAccuracy: summary.formAccuracy,
+          totalReps: actualReps,
+          correctReps: summary.correctReps,
+          incorrectReps: summary.incorrectReps,
+          completedSets: totalSetsRef.current,
+          targetSets,
+          targetReps,
+          durationSeconds: elapsedSeconds,
+          isHold,
+          holdSeconds: isHold ? holdSeconds : undefined,
+          topMistakes: summary.topMistakes,
+          tips: summary.tips,
+        },
       });
     } catch {
       // Network failure — summary screen still shows; log will be retried by sync queue
@@ -394,7 +418,8 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     navigation.replace('WorkoutSummary', { summary, exerciseName: exerciseDisplay });
   }, [
     elapsedSeconds, formScore, holdSeconds, isHold,
-    currentSet, targetSets, targetReps, exerciseDisplay, navigation,
+    currentSet, targetSets, targetReps, exerciseDisplay, rawExerciseName,
+    workoutDay, workoutFocus, workoutPlanId, navigation,
   ]);
 
   const handleStop = useCallback(() => {

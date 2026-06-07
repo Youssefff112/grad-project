@@ -1,5 +1,8 @@
-import React, { useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ViewStyle, Animated, Easing } from 'react-native';
+import React, { useRef, useCallback, useEffect } from 'react';
+import { View, Text, Pressable, ViewStyle, Animated, Easing, PanResponder, StyleSheet, Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
+
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -28,114 +31,112 @@ const AnimatedTabItem: React.FC<{
   onPress: () => void;
 }> = React.memo(({ item, isActive, isCompact, accent, textMuted, errorColor, onPress }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const indicatorOpacity = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  const activeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
 
-  // Animate indicator on active change
-  React.useEffect(() => {
-    Animated.timing(indicatorOpacity, {
+  useEffect(() => {
+    Animated.timing(activeAnim, {
       toValue: isActive ? 1 : 0,
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
+      duration: 300,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       useNativeDriver: true,
     }).start();
-  }, [isActive, indicatorOpacity]);
+  }, [isActive, activeAnim]);
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(scaleAnim, { toValue: 0.85, friction: 5, tension: 200, useNativeDriver: true }).start();
+  }, [scaleAnim]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 200, useNativeDriver: true }).start();
+  }, [scaleAnim]);
 
   const handlePress = useCallback(() => {
-    Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 0.92,
-        useNativeDriver: true,
-        speed: 28,
-        bounciness: 0,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 14,
-        bounciness: 4,
-      }),
-    ]).start();
     onPress();
-  }, [scaleAnim, onPress]);
+  }, [onPress]);
 
   return (
-    <Animated.View
-      style={{
-        flex: 1,
-        alignItems: 'center',
-        transform: [{ scale: scaleAnim }],
-      }}
-    >
-      <TouchableOpacity
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Pressable
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         onPress={handlePress}
-        activeOpacity={1}
         style={{
           width: '100%',
           alignItems: 'center',
           justifyContent: 'flex-start',
-          paddingHorizontal: 2,
+          paddingVertical: 4,
         }}
       >
-        {/* Active top-bar indicator */}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: -(isCompact ? 10 : 10),
-            width: isCompact ? 20 : 24,
-            height: 2.5,
-            borderRadius: 2,
-            backgroundColor: accent,
-            opacity: indicatorOpacity,
-          }}
-        />
-
-        {/* Icon pill */}
-        <View
-          style={{
-            width: isCompact ? 40 : 46,
-            height: isCompact ? 30 : 34,
-            borderRadius: isCompact ? 10 : 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: isActive ? accent + '18' : 'transparent',
-            marginBottom: 2,
-          }}
-        >
-          <MaterialIcons
-            name={item.icon}
-            size={isCompact ? 20 : 22}
-            color={isActive ? accent : textMuted}
-          />
-        </View>
-
-        {!!item.badge && item.badge > 0 && (
-          <Text
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <View
             style={{
-              fontSize: isCompact ? 10 : 11,
-              fontWeight: '800',
-              color: errorColor,
-              marginBottom: 1,
-              lineHeight: isCompact ? 12 : 14,
+              width: isCompact ? 40 : 48,
+              height: isCompact ? 30 : 36,
+              borderRadius: 100,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+              marginBottom: 4,
             }}
           >
-            {item.badge > 99 ? '99+' : item.badge}
-          </Text>
+            <MaterialIcons
+              name={item.icon}
+              size={isCompact ? 22 : 24}
+              color={isActive ? accent : textMuted}
+            />
+          </View>
+        </Animated.View>
+
+        {!!item.badge && item.badge > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: '25%',
+              backgroundColor: errorColor,
+              borderRadius: 10,
+              minWidth: 16,
+              height: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 4,
+              borderWidth: 1.5,
+              borderColor: '#000',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: '900',
+                color: '#fff',
+                lineHeight: 10,
+              }}
+            >
+              {item.badge > 99 ? '99+' : item.badge}
+            </Text>
+          </View>
         )}
 
-        <Text
+        <Animated.Text
           numberOfLines={1}
-          style={{
-            fontSize: isCompact ? 9 : 10,
-            fontWeight: isActive ? '800' : '600',
-            color: isActive ? accent : textMuted,
-            letterSpacing: 0.3,
-            textTransform: 'uppercase',
-          }}
+          style={[
+            {
+              fontSize: isCompact ? 9 : 10,
+              fontWeight: isActive ? '700' : '500',
+              color: isActive ? accent : textMuted,
+            },
+            {
+              opacity: activeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.7, 1]
+              })
+            }
+          ]}
         >
           {item.label}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
+        </Animated.Text>
+      </Pressable>
+    </View>
   );
 });
 
@@ -148,46 +149,152 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const { isDark, accent, colors } = useTheme();
   const insets = useSafeAreaInsets();
   const isCompact = items.length > 5;
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  const pillTranslateX = useRef(new Animated.Value(0)).current;
+
+  const activeIndex = items.findIndex(i => i.id === activeId);
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+
+  useEffect(() => {
+    if (containerWidth === 0) return;
+    const itemWidth = containerWidth / items.length;
+    const center = (activeIndex + 0.5) * itemWidth;
+    const pillWidth = isCompact ? 40 : 48;
+    const destX = center - pillWidth / 2;
+
+    Animated.spring(pillTranslateX, {
+      toValue: destX,
+      friction: 8,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  }, [activeIndex, containerWidth, isCompact, items.length]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        if (containerWidth === 0) return;
+        const x = evt.nativeEvent.locationX;
+        const index = Math.floor(x / (containerWidth / items.length));
+        if (items[index] && items[index].id !== activeIdRef.current) {
+          onSelect(items[index].id);
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (containerWidth === 0) return;
+        const x = evt.nativeEvent.locationX;
+        const index = Math.floor(x / (containerWidth / items.length));
+        if (items[index] && items[index].id !== activeIdRef.current) {
+          onSelect(items[index].id);
+        }
+      },
+    })
+  ).current;
+
+  const glass = isDark
+    ? {
+        barIntensity: 72,
+        barTint: 'dark' as const,
+        barOverlay: 'rgba(255,255,255,0.04)',
+        barBorder: 'rgba(255,255,255,0.12)',
+        pillIntensity: 48,
+        pillTint: 'light' as const,
+        pillBorder: 'rgba(255,255,255,0.14)',
+        pillBg: 'rgba(255,255,255,0.08)',
+        shadowOpacity: 0.45,
+      }
+    : {
+        barIntensity: 64,
+        barTint: 'light' as const,
+        barOverlay: 'rgba(255,255,255,0.82)',
+        barBorder: 'rgba(0,0,0,0.08)',
+        pillIntensity: 40,
+        pillTint: 'light' as const,
+        pillBorder: accent + '35',
+        pillBg: accent + '18',
+        shadowOpacity: 0.1,
+      };
+
+  const shellStyle = {
+    position: 'absolute' as const,
+    bottom: Math.max(insets.bottom, 12),
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    borderRadius: 30,
+    overflow: 'hidden' as const,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: glass.shadowOpacity,
+    shadowRadius: 24,
+    elevation: 16,
+  };
+
+  const blurProps = Platform.OS === 'android'
+    ? { experimentalBlurMethod: 'dimezisBlurView' as const }
+    : {};
 
   return (
-    <View
-      style={[
-        {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 20,
-          backgroundColor: colors.navBg,
-          borderTopWidth: 1,
-          borderTopColor: colors.navBorder,
-          paddingTop: 10,
-          paddingBottom: Math.max(insets.bottom, 8) + 4,
-          paddingHorizontal: 4,
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          justifyContent: 'space-around',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: isDark ? 0.4 : 0.06,
-          shadowRadius: 12,
-          elevation: 16,
-        },
-        containerStyle,
-      ]}
-    >
-      {items.map((item) => (
-        <AnimatedTabItem
-          key={item.id}
-          item={item}
-          isActive={item.id === activeId}
-          isCompact={isCompact}
-          accent={accent}
-          textMuted={colors.textMuted}
-          errorColor={colors.error}
-          onPress={() => onSelect(item.id)}
-        />
-      ))}
+    <View style={[shellStyle, containerStyle]}>
+      <BlurView
+        intensity={glass.barIntensity}
+        tint={glass.barTint}
+        {...blurProps}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View
+        style={{
+          borderRadius: 30,
+          borderWidth: 1,
+          borderColor: glass.barBorder,
+          backgroundColor: glass.barOverlay,
+          paddingTop: 8,
+          paddingBottom: 8,
+          paddingHorizontal: 8,
+        }}
+      >
+        <View
+          {...panResponder.panHandlers}
+          onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+          style={{ flex: 1, flexDirection: 'row', position: 'relative' }}
+        >
+          {containerWidth > 0 && (
+            <AnimatedBlurView
+              intensity={glass.pillIntensity}
+              tint={glass.pillTint}
+              {...blurProps}
+              style={{
+                position: 'absolute',
+                top: 4,
+                left: 0,
+                width: isCompact ? 40 : 48,
+                height: isCompact ? 30 : 36,
+                borderRadius: 100,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: glass.pillBorder,
+                backgroundColor: glass.pillBg,
+                transform: [{ translateX: pillTranslateX }],
+              }}
+            />
+          )}
+          {items.map((item) => (
+            <AnimatedTabItem
+              key={item.id}
+              item={item}
+              isActive={item.id === activeId}
+              isCompact={isCompact}
+              accent={accent}
+              textMuted={colors.textMuted}
+              errorColor={colors.error}
+              onPress={() => onSelect(item.id)}
+            />
+          ))}
+        </View>
+      </View>
     </View>
   );
 };
