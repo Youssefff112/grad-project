@@ -3,8 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  Image,
-  ScrollView,
+  FlatList,
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -18,7 +17,8 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationContext';
-import { buildImageUrl } from '../utils/imageUrl';
+import { ProfileAvatar } from '../components/ProfileAvatar';
+import { normalizeProfilePicturePath } from '../utils/imageUrl';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../config/environment';
 import {
@@ -29,8 +29,6 @@ import {
   normalizeChatMessage,
 } from '../services/messaging.service';
 import tokenManager from '../utils/tokenManager';
-
-const QUICK_REPLIES = ['Got it! 💪', 'Thanks for the tip', 'Ready to go', "I'll focus on form", 'What about nutrition?'];
 
 export const ChatScreen = ({ navigation, route }: any) => {
   const {
@@ -48,13 +46,12 @@ export const ChatScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
   const { userId, profilePicture: myProfilePicture } = useUser();
   const { markAsRead } = useNotifications();
-  const otherUserAvatarUrl = buildImageUrl(routeOtherUserAvatar);
-  const myAvatarUrl = buildImageUrl(myProfilePicture);
+  const otherUserAvatar = normalizeProfilePicturePath(routeOtherUserAvatar);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationIdFromRoute);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const socketRef = useRef<Socket | null>(null);
   const activeConversationIdRef = useRef<string | null>(conversationIdFromRoute);
 
@@ -171,7 +168,9 @@ export const ChatScreen = ({ navigation, route }: any) => {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    if (messages.length > 0) {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }
   }, [messages]);
 
   const bgColor = isDark ? '#0a0a12' : '#f8f7f5';
@@ -210,11 +209,6 @@ export const ChatScreen = ({ navigation, route }: any) => {
       console.error('Failed to send message:', error);
       Alert.alert('Cannot send message', serverMsg);
     }
-  };
-
-  const handleQuickReply = (reply: string) => {
-    setInputText(reply);
-    setTimeout(() => handleSend(), 300);
   };
 
   const showMessageOptions = (message: ChatMessage) => {
@@ -285,26 +279,15 @@ export const ChatScreen = ({ navigation, route }: any) => {
     currentUserIdRef.current = userId;
   }, [userId]);
 
-  const renderAvatar = (isSent: boolean) => {
-    const url = isSent ? myAvatarUrl : otherUserAvatarUrl;
-    return (
-      <View
-        style={[
-          tw`w-7 h-7 rounded-full overflow-hidden`,
-          isSent ? tw`ml-1.5` : tw`mr-1.5`,
-          { backgroundColor: accent + '20' },
-        ]}
-      >
-        {url ? (
-          <Image source={{ uri: url }} style={tw`w-full h-full`} />
-        ) : (
-          <View style={[tw`w-full h-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
-            <MaterialIcons name="person" size={14} color={accent} />
-          </View>
-        )}
-      </View>
-    );
-  };
+  const renderAvatar = (isSent: boolean) => (
+    <View style={isSent ? tw`ml-1.5` : tw`mr-1.5`}>
+      <ProfileAvatar
+        profilePicture={isSent ? myProfilePicture : otherUserAvatar}
+        size={28}
+        accent={accent}
+      />
+    </View>
+  );
 
   const renderMessage = (message: ChatMessage) => {
     const isSent = currentUserIdRef.current === String(message.senderId);
@@ -377,15 +360,7 @@ export const ChatScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
         {/* Avatar + name */}
         <View style={tw`flex-1 flex-row items-center ml-3 gap-2`}>
-          <View style={[tw`w-9 h-9 rounded-full overflow-hidden`, { backgroundColor: accent + '20' }]}>
-            {otherUserAvatarUrl ? (
-              <Image source={{ uri: otherUserAvatarUrl }} style={tw`w-full h-full`} />
-            ) : (
-              <View style={[tw`w-full h-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
-                <MaterialIcons name="person" size={20} color={accent} />
-              </View>
-            )}
-          </View>
+          <ProfileAvatar profilePicture={otherUserAvatar} size={36} accent={accent} />
           <Text style={[tw`text-base font-bold flex-1`, { color: primaryText }]} numberOfLines={1}>
             {conversationName}
           </Text>
@@ -401,79 +376,46 @@ export const ChatScreen = ({ navigation, route }: any) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        <ScrollView
-          ref={scrollViewRef}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item }) => renderMessage(item)}
           style={tw`flex-1`}
           contentContainerStyle={tw`px-4 py-4 pb-2`}
           showsVerticalScrollIndicator={false}
-        >
-          {/* Date separator */}
-          <View style={tw`items-center mb-4`}>
-            <View
-              style={[
-                tw`px-3 py-1.5 rounded-full`,
-                { backgroundColor: isDark ? '#1a1a2e' : '#e2e8f0' },
-              ]}
-            >
-              <Text style={{ color: secondaryText, fontSize: 11, fontWeight: '600' }}>
-                Today
-              </Text>
-            </View>
-          </View>
-
-          {messages.map(renderMessage)}
-
-          {/* Typing indicator */}
-          {isTyping && (
-            <View style={[tw`flex-row items-center gap-1 mb-3`, tw`self-start`]}>
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListHeaderComponent={
+            <View style={tw`items-center mb-4`}>
               <View
                 style={[
-                  tw`px-4 py-3 rounded-2xl rounded-bl-none flex-row items-center gap-1`,
-                  { backgroundColor: receivedBubble, borderWidth: 1, borderColor: borderColor },
+                  tw`px-3 py-1.5 rounded-full`,
+                  { backgroundColor: isDark ? '#1a1a2e' : '#e2e8f0' },
                 ]}
               >
-                <View
-                  style={[
-                    tw`h-2 w-2 rounded-full`,
-                    { backgroundColor: secondaryText },
-                  ]}
-                />
-                <View
-                  style={[
-                    tw`h-2 w-2 rounded-full ml-1`,
-                    { backgroundColor: secondaryText },
-                  ]}
-                />
-                <View
-                  style={[
-                    tw`h-2 w-2 rounded-full ml-1`,
-                    { backgroundColor: secondaryText },
-                  ]}
-                />
+                <Text style={{ color: secondaryText, fontSize: 11, fontWeight: '600' }}>
+                  Today
+                </Text>
               </View>
             </View>
-          )}
-        </ScrollView>
-
-        {/* Quick Replies */}
-        {!isTyping && inputText === '' && (
-          <View style={[tw`px-4 py-2`, { borderTopWidth: 1, borderColor: borderColor }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`gap-2`}>
-              {QUICK_REPLIES.map((reply, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => handleQuickReply(reply)}
+          }
+          ListFooterComponent={
+            isTyping ? (
+              <View style={[tw`flex-row items-center gap-1 mb-3`, tw`self-start`]}>
+                <View
                   style={[
-                    tw`px-3 py-2 rounded-full`,
-                    { backgroundColor: accent + '20' },
+                    tw`px-4 py-3 rounded-2xl rounded-bl-none flex-row items-center gap-1`,
+                    { backgroundColor: receivedBubble, borderWidth: 1, borderColor: borderColor },
                   ]}
                 >
-                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>{reply}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+                  <View style={[tw`h-2 w-2 rounded-full`, { backgroundColor: secondaryText }]} />
+                  <View style={[tw`h-2 w-2 rounded-full ml-1`, { backgroundColor: secondaryText }]} />
+                  <View style={[tw`h-2 w-2 rounded-full ml-1`, { backgroundColor: secondaryText }]} />
+                </View>
+              </View>
+            ) : null
+          }
+        />
 
         {/* Input Bar */}
         <View

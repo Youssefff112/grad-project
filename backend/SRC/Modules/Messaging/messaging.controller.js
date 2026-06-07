@@ -1,9 +1,11 @@
 // src/Modules/Messaging/messaging.controller.js
-import { Op } from 'sequelize';
+import { Op, fn, col } from 'sequelize';
 import { Conversation, Message } from './messaging.model.js';
 import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
+import { CoachProfile } from '../Coach/coach.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+import { successResponse } from '../../Utils/successResponse.utils.js';
 
 /**
  * Open (or create) the coach–client thread and return existing messages — no new message required.
@@ -57,13 +59,9 @@ export const getThreadWithUser = async (req, res, next) => {
     const convPlain = typeof conversation.get === 'function' ? conversation.get({ plain: true }) : conversation;
     const rowsPlain = messages.map((m) => (typeof m.get === 'function' ? m.get({ plain: true }) : m));
 
-    res.status(200).json({
-      success: true,
-      message: 'Thread loaded',
-      data: {
-        conversation: convPlain,
-        messages: rowsPlain,
-      },
+    successResponse(res, 200, 'Thread loaded', {
+      conversation: convPlain,
+      messages: rowsPlain,
     });
   } catch (error) {
     next(error);
@@ -96,24 +94,65 @@ export const getConversations = async (req, res, next) => {
       order: [['lastMessageAt', 'DESC']]
     });
 
-    const conversationsWithUnread = await Promise.all(
-      conversations.map(async (conv) => {
-        const json = typeof conv.toJSON === 'function' ? conv.toJSON() : conv.get({ plain: true });
-        const unreadCount = await Message.count({
-          where: {
-            conversationId: conv.id,
-            senderId: { [Op.ne]: userId },
-            read: false,
-          },
-        });
-        return { ...json, unreadCount };
-      })
-    );
+    const conversationIds = conversations.map((conv) => conv.id);
+    const unreadMap = new Map();
 
-    res.status(200).json({
-      success: true,
-      message: 'Conversations retrieved successfully',
-      data: { conversations: conversationsWithUnread }
+    if (conversationIds.length) {
+      const unreadRows = await Message.findAll({
+        attributes: [
+          'conversationId',
+          [fn('COUNT', col('id')), 'unreadCount'],
+        ],
+        where: {
+          conversationId: { [Op.in]: conversationIds },
+          senderId: { [Op.ne]: userId },
+          read: false,
+        },
+        group: ['conversationId'],
+        raw: true,
+      });
+
+      for (const row of unreadRows) {
+        unreadMap.set(row.conversationId, Number(row.unreadCount) || 0);
+      }
+    }
+
+    const coachProfileMap = new Map();
+    if (userRole === 'client' && conversations.length > 0) {
+      const coachUserIds = [...new Set(conversations.map((conv) => conv.coachId).filter(Boolean))];
+      if (coachUserIds.length) {
+        const coachProfiles = await CoachProfile.findAll({
+          where: { userId: { [Op.in]: coachUserIds } },
+          attributes: ['userId', 'profilePicture'],
+        });
+        for (const row of coachProfiles) {
+          coachProfileMap.set(row.userId, row.profilePicture || null);
+        }
+      }
+    }
+
+    const conversationsWithUnread = conversations.map((conv) => {
+      const json = typeof conv.toJSON === 'function' ? conv.toJSON() : conv.get({ plain: true });
+      const otherKey = userRole === 'coach' ? 'client' : 'coach';
+      const other = json[otherKey];
+      if (other) {
+        const fromUserProfile = other.profile?.profilePicture || null;
+        const fromCoachProfile =
+          userRole === 'client' ? coachProfileMap.get(other.id) || null : null;
+        const avatarPath = fromCoachProfile || fromUserProfile || null;
+        json[otherKey] = {
+          ...other,
+          profile: {
+            ...(other.profile || {}),
+            profilePicture: avatarPath,
+          },
+        };
+      }
+      return { ...json, unreadCount: unreadMap.get(conv.id) || 0 };
+    });
+
+    successResponse(res, 200, 'Conversations retrieved successfully', {
+      conversations: conversationsWithUnread,
     });
   } catch (error) {
     next(error);
@@ -160,17 +199,17 @@ export const getMessages = async (req, res, next) => {
       typeof m.get === 'function' ? m.get({ plain: true }) : m
     );
 
-    res.status(200).json({
-      success: true,
-      data: {
-        messages: rowsPlain,
-        pagination: {
-          total: messages.count,
-          page: parseInt(page),
-          pages: Math.ceil(messages.count / limit)
-        }
-      }
-    });
+    successResponse(
+      res,
+      200,
+      'Messages retrieved',
+      { messages: rowsPlain },
+      {
+        total: messages.count,
+        page: parseInt(page, 10),
+        pages: Math.ceil(messages.count / limit),
+      },
+    );
   } catch (error) {
     next(error);
   }
@@ -260,11 +299,7 @@ export const sendMessage = async (req, res, next) => {
       io.to(targetUserId.toString()).emit('new_message', messagePlain);
     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Message sent successfully',
-      data: { message: messagePlain }
-    });
+    successResponse(res, 201, 'Message sent successfully', { message: messagePlain });
   } catch (error) {
     next(error);
   }

@@ -11,9 +11,33 @@ import { environment } from '../config/environment';
  * conditional rendering.
  */
 export function buildImageUrl(path: string | null | undefined): string | undefined {
-  if (!path) return undefined;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  // Relative path — prepend backend origin (no API prefix, just the host)
+  const normalized = normalizeProfilePicturePath(path);
+  if (!normalized) return undefined;
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return normalized;
   const base = environment.BACKEND_URL.replace(/\/$/, '');
-  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  return `${base}${normalized.startsWith('/') ? normalized : `/${normalized}`}`;
+}
+
+/** Trim and validate a stored profile-picture path; empty strings become null. */
+export function normalizeProfilePicturePath(path: string | null | undefined): string | null {
+  if (typeof path !== 'string') return null;
+  const trimmed = path.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Client avatars live in the user JSONB profile blob. */
+export function getProfilePictureFromUserProfile(profile: unknown): string | null {
+  if (!profile || typeof profile !== 'object') return null;
+  return normalizeProfilePicturePath((profile as { profilePicture?: string }).profilePicture);
+}
+
+/** Prefer coach_profiles.picture, then fall back to user.profile.profilePicture. */
+export function resolveCoachAvatarPath(
+  coachProfile?: { profilePicture?: string | null } | null,
+  userProfile?: unknown,
+): string | null {
+  return (
+    normalizeProfilePicturePath(coachProfile?.profilePicture) ??
+    getProfilePictureFromUserProfile(userProfile)
+  );
 }

@@ -21,11 +21,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import * as coachService from '../../services/coachService';
 
 export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { fullName } = useUser();
+  const { fullName, profilePicture } = useUser();
   const { totalUnread } = useNotifications();
   const firstName = fullName?.split(' ')[0] || 'Coach';
 
@@ -34,7 +35,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
 
-  type ClientRow = { id: string; userId: number; name: string; plan: string; lastCheckin: string; lastCheckinRaw: string; progress: number; status: string; };
+  type ClientRow = { id: string; userId: number; name: string; profilePicture: string | null; plan: string; lastCheckin: string; lastCheckinRaw: string; progress: number; status: string; };
 
   const [allClients, setAllClients] = useState<ClientRow[]>([]);
   const [analytics, setAnalytics] = useState<coachService.CoachAnalytics>({
@@ -69,10 +70,11 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
     navigation.navigate(type === 'workout' ? 'CoachWorkoutPlan' : 'CoachMealPlan', params);
   };
 
-  const mapClient = (c: coachService.CoachClient): ClientRow => ({
+  const mapClient = (c: any): ClientRow => ({
     id: String(c.id),
     userId: Number(c.userId),
     name: c.User ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}` : `Client #${c.id}`,
+    profilePicture: c.User?.profilePicture || null,
     plan: (c.goals as any)?.primary || 'General Fitness',
     lastCheckin: formatLastActive(c.lastActivity),
     lastCheckinRaw: c.lastActivity || '',
@@ -125,6 +127,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
         conversationName: client.name,
         receiverId: client.userId,
         conversationId: null,
+        otherUserAvatar: client.profilePicture,
       });
     } catch {
       setShowQuickMessage(false);
@@ -149,21 +152,14 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
         borderBottomWidth: 1,
         borderColor: borderColor,
       }]}>
-        <TouchableOpacity style={tw`relative p-2`} onPress={() => navigation.navigate('Notifications')}>
-          <MaterialIcons name="notifications" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
-          {!!totalUnread && (
-            <View style={[tw`absolute top-1 right-0 rounded-full items-center justify-center h-5 w-5`, { backgroundColor: accent }]}>
-              <Text style={tw`text-white text-xs font-bold`}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={tw`w-10`} />
         <Text style={[tw`text-lg font-bold tracking-tighter`, { color: accent }]}>Vertex</Text>
         <TouchableOpacity onPress={() => navigation.navigate('CoachSettings')} style={tw`flex size-10 items-center justify-center`}>
-          <MaterialIcons name="person" size={24} color={isDark ? '#e2e8f0' : '#1e293b'} />
+          <ProfileAvatar profilePicture={profilePicture} size={32} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-28`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-28`}>
         {/* Greeting */}
         <View style={tw`px-4 pt-6 pb-2`}>
           <Text style={[tw`text-sm font-medium`, { color: subtextColor }]}>Welcome back,</Text>
@@ -244,12 +240,10 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
           ) : recentClients.map(client => (
             <TouchableOpacity
               key={client.id}
-              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name })}
+              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name, clientProfilePicture: client.profilePicture })}
               style={[tw`flex-row items-center gap-3 p-4 rounded-xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
             >
-              <View style={[tw`w-11 h-11 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '20' }]}>
-                <MaterialIcons name="person" size={22} color={accent} />
-              </View>
+              <ProfileAvatar profilePicture={client.profilePicture} size={44} />
               <View style={tw`flex-1`}>
                 <View style={tw`flex-row items-center justify-between mb-1`}>
                   <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{client.name}</Text>
@@ -364,7 +358,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
               <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No clients yet</Text>
             </View>
           ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {allClients.map((client, i) => {
                 const isSending = messagingClientId === client.id;
                 return (
@@ -445,7 +439,7 @@ export const CoachCommandCenterScreen = ({ navigation }: any) => {
                   <Text style={[tw`text-sm mt-2`, { color: subtextColor }]}>No clients yet</Text>
                 </View>
               ) : (
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                   {allClients.map((client, i) => (
                     <TouchableOpacity
                       key={client.id}

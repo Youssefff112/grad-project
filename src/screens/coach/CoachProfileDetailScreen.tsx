@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -12,7 +12,7 @@ import { RatingStarPicker } from '../../components/RatingStarPicker';
 import { ReviewSubmissionModal } from '../../components/ReviewSubmissionModal';
 import * as coachService from '../../services/coachService';
 import * as clientService from '../../services/clientService';
-import { buildImageUrl } from '../../utils/imageUrl';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import type { CoachDetail, Review } from '../../services/coachService';
 import { canClientSelectPersonalCoach } from '../../utils/planUtils';
 import { coachDisplayName } from '../../utils/coachDisplayName';
@@ -175,16 +175,10 @@ export const CoachProfileDetailScreen: React.FC<{ navigation: any; route: any }>
         <View style={tw`w-8`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={showCoachActions ? tw`pb-28` : tw`pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={showCoachActions ? tw`pb-28` : tw`pb-8`}>
         {/* Hero */}
         <View style={tw`items-center pt-8 pb-6 px-4`}>
-          <View style={[tw`w-24 h-24 rounded-full overflow-hidden mb-4 items-center justify-center`, { backgroundColor: accent + '20' }]}>
-            {coach.profilePicture ? (
-              <Image source={{ uri: buildImageUrl(coach.profilePicture) }} style={tw`w-full h-full`} />
-            ) : (
-              <MaterialIcons name="person" size={52} color={accent} />
-            )}
-          </View>
+          <ProfileAvatar profilePicture={coach.profilePicture} size={96} accent={accent} style={tw`mb-4`} />
           <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{coach.displayName}</Text>
           {coach.specialties && coach.specialties.length > 0 && (
             <View style={tw`flex-row flex-wrap justify-center gap-2 mt-3`}>

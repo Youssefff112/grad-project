@@ -126,7 +126,7 @@ export const WorkoutSessionDetailScreen = ({ navigation, route }: any) => {
         <View style={tw`flex size-12 items-center justify-center`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
         <View
           style={[
             tw`mx-4 mt-6 p-6 rounded-2xl`,

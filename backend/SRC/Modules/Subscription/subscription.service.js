@@ -1,25 +1,50 @@
 // src/Modules/Subscription/subscription.service.js
 import { Subscription, Payment } from './subscription.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+import {
+  isValidPlanForRole,
+  resolvePlanPrice,
+} from '../../Utils/subscriptionPlans.utils.js';
 import { Op } from 'sequelize';
 
+const canActivateViaDemoPayment = (provider, requestedStatus) => {
+  if (requestedStatus !== 'paid') return false;
+  if (provider !== 'demo') return false;
+  return process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_PAYMENTS !== 'false';
+};
+
 export const subscriptionService = {
-  async createSubscription(userId, data) {
-    const { role, planName, price, currency, autoRenew, startDate, endDate } = data;
-    if (!role || !planName || price === undefined) {
-      throw new AppError('role, planName and price are required', 400);
+  async createSubscription(userId, data, authenticatedRole) {
+    const { role, planName, currency, autoRenew, startDate, endDate } = data;
+    if (!role || !planName) {
+      throw new AppError('role and planName are required', 400);
     }
+
+    if (role !== authenticatedRole) {
+      throw new AppError('Subscription role must match your account role', 403);
+    }
+
+    if (!isValidPlanForRole(role, planName)) {
+      throw new AppError(`Invalid plan "${planName}" for role "${role}"`, 400);
+    }
+
+    const serverPrice = resolvePlanPrice(planName);
+    if (serverPrice == null) {
+      throw new AppError('Unknown plan', 400);
+    }
+
+    const isFreePlan = serverPrice === 0;
 
     const subscription = await Subscription.create({
       userId,
       role,
       planName,
-      price,
+      price: serverPrice,
       currency: currency || 'USD',
       autoRenew: !!autoRenew,
-      startDate: startDate ? new Date(startDate) : null,
+      startDate: startDate ? new Date(startDate) : (isFreePlan ? new Date() : null),
       endDate: endDate ? new Date(endDate) : null,
-      status: 'pending'
+      status: isFreePlan ? 'active' : 'pending',
     });
 
     return subscription;
@@ -29,12 +54,12 @@ export const subscriptionService = {
     const where = {
       userId,
       status: 'active',
-      ...(role ? { role } : {})
+      ...(role ? { role } : {}),
     };
 
     return Subscription.findOne({
       where,
-      order: [['endDate', 'DESC']]
+      order: [['endDate', 'DESC']],
     });
   },
 
@@ -46,7 +71,7 @@ export const subscriptionService = {
 
     return Subscription.findAll({
       where,
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
     });
   },
 
@@ -64,49 +89,69 @@ export const subscriptionService = {
     return subscription;
   },
 
-  async recordPayment(userId, subscriptionId, payload) {
+  async _activateSubscription(subscription) {
+    subscription.status = 'active';
+    subscription.startDate = subscription.startDate || new Date();
+    if (!subscription.endDate) {
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      subscription.endDate = nextMonth;
+    }
+    await subscription.save();
+    return subscription;
+  },
+
+  async recordPayment(userId, subscriptionId, payload, { isAdmin = false } = {}) {
     const { amount, currency, provider, status, reference, paidAt, meta } = payload;
-    if (amount === undefined) {
-      throw new AppError('amount is required', 400);
+    const requestedStatus = status || 'pending';
+
+    if (!isAdmin && requestedStatus === 'paid' && !canActivateViaDemoPayment(provider, requestedStatus)) {
+      throw new AppError(
+        'Payment activation requires admin approval or a verified payment provider',
+        403,
+      );
     }
 
+    const subscription = subscriptionId ? await Subscription.findByPk(subscriptionId) : null;
+    if (subscription && subscription.userId !== userId && !isAdmin) {
+      throw new AppError('Subscription does not belong to this user', 403);
+    }
+
+    const effectiveStatus = isAdmin
+      ? requestedStatus
+      : (canActivateViaDemoPayment(provider, requestedStatus) ? 'paid' : 'pending');
+
+    const paymentAmount = amount !== undefined ? amount : (subscription?.price ?? 0);
+
     const payment = await Payment.create({
-      userId,
-      subscriptionId,
-      amount,
+      userId: subscription?.userId ?? userId,
+      subscriptionId: subscriptionId || null,
+      amount: paymentAmount,
       currency: currency || 'USD',
       provider: provider || 'manual',
-      status: status || 'paid',
+      status: effectiveStatus,
       reference,
-      paidAt: paidAt ? new Date(paidAt) : new Date(),
-      meta: meta || {}
+      paidAt: effectiveStatus === 'paid' ? (paidAt ? new Date(paidAt) : new Date()) : null,
+      meta: meta || {},
     });
 
-    if (subscriptionId && (status || 'paid') === 'paid') {
-      const subscription = await Subscription.findByPk(subscriptionId);
-      if (subscription) {
-        if (subscription.userId !== userId) {
-          throw new AppError('Subscription does not belong to this user', 403);
-        }
-        subscription.status = 'active';
-        subscription.startDate = subscription.startDate || new Date();
-        if (!subscription.endDate) {
-          const nextMonth = new Date();
-          nextMonth.setMonth(nextMonth.getMonth() + 1);
-          subscription.endDate = nextMonth;
-        }
-        await subscription.save();
-      }
+    if (subscription && effectiveStatus === 'paid') {
+      await this._activateSubscription(subscription);
     }
 
     return payment;
   },
 
+  /**
+   * Requires an active subscription. Coach profile/onboarding routes intentionally
+   * skip this middleware so coaches can subscribe after signing up.
+   */
   async requireActiveSubscription(userId, role) {
-    // Coaches use roster / messaging / plans without a separate billing row in dev & small teams.
     if (role === 'coach') {
       const subscription = await this.getActiveSubscription(userId, 'coach');
-      if (!subscription) return null;
+      if (!subscription) {
+        throw new AppError('Active coach subscription (ProCoach) required', 403);
+      }
       if (subscription.endDate && subscription.endDate < new Date()) {
         subscription.status = 'expired';
         await subscription.save();
@@ -135,10 +180,9 @@ export const subscriptionService = {
       {
         where: {
           status: 'active',
-          endDate: { [Op.lt]: new Date() }
-        }
-      }
+          endDate: { [Op.lt]: new Date() },
+        },
+      },
     );
-  }
+  },
 };
-

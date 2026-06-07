@@ -37,7 +37,7 @@ export const EditExperienceScreen = ({ navigation }: any) => {
         <View style={tw`w-12`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-8`}>
         <Text style={[tw`text-2xl font-bold mb-2`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
           {"What's your fitness level?"}
         </Text>

@@ -112,7 +112,7 @@ export const AdminSubscriptionScreen = ({ navigation }: any) => {
         <Text style={[tw`text-xs mb-4`, { color: subtextColor }]}>{subscriptions.length} total records</Text>
 
         {/* Status filter chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-2`}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`mb-2`}>
           <View style={tw`flex-row gap-2`}>
             {(['all', ...STATUS_OPTIONS] as StatusFilter[]).map(s => {
               const cfg = s === 'all' ? null : STATUS_CONFIG[s];
@@ -164,7 +164,7 @@ export const AdminSubscriptionScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-4 pb-28`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-4 pb-28`}>
           {subscriptions.length === 0 && (
             <View style={tw`items-center py-16`}>
               <MaterialIcons name="card-membership" size={48} color={isDark ? '#334155' : '#cbd5e1'} />

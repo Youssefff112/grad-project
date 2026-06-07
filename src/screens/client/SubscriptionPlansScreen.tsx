@@ -159,14 +159,22 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
         autoRenew: true,
       });
 
-      // Record payment to activate the subscription
       if (fullPlan.price > 0 && subscription?.id) {
+        const isDev = __DEV__;
         await subscriptionService.recordPayment(subscription.id, {
           amount: fullPlan.price,
           currency: 'USD',
-          provider: 'card',
-          status: 'paid',
+          provider: isDev ? 'demo' : 'card',
+          status: isDev ? 'paid' : 'pending',
         });
+        if (!isDev) {
+          Alert.alert(
+            'Payment pending',
+            'Your plan will activate after payment is confirmed.',
+          );
+          setIsConfirming(false);
+          return;
+        }
       }
 
       setActiveSubscriptionData(subscription || null);
@@ -209,7 +217,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
         </Text>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-6`}>
         {/* Info Banner */}
         <View style={[tw`mb-6 rounded-xl p-4 flex-row gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
           <MaterialIcons name="info" size={20} color={accent} />
@@ -314,9 +322,9 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
           <View style={tw`flex-row gap-1 mb-2 px-3`}>
             <View style={tw`flex-1`} />
             {['Free', 'AI', 'Coach', 'Elite'].map((plan) => {
-              const currentAlias = subscriptionPlan === 'Standard' || subscriptionPlan === 'AI Plan' ? 'AI' : 
-                                   subscriptionPlan === 'Premium' || subscriptionPlan === 'Coach Plan' ? 'Coach' : 
-                                   subscriptionPlan;
+              const currentAlias = subscriptionPlan === 'Standard' ? 'AI'
+                : subscriptionPlan === 'Premium' ? 'Coach'
+                : subscriptionPlan;
               const isCurrent = currentAlias === plan;
               
               return (
@@ -711,7 +719,7 @@ export const SubscriptionPlansScreen = ({ navigation }: any) => {
             </Text>
           </View>
 
-          <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-6`}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-6`}>
             {selectedPlanData && (
               <>
                 {/* Overview */}

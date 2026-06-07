@@ -50,12 +50,19 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
         price: planData.price,
         autoRenew: true,
       });
-      // Always record a payment (even $0 for Free) so the subscription becomes 'active'
-      await subscriptionService.recordPayment(subscription.id, {
-        amount: planData.price,
-        provider: 'manual',
-        status: 'paid',
-      });
+      if (planData.price > 0 && subscription?.id) {
+        const isDev = __DEV__;
+        await subscriptionService.recordPayment(subscription.id, {
+          amount: planData.price,
+          provider: isDev ? 'demo' : 'card',
+          status: isDev ? 'paid' : 'pending',
+        });
+        if (!isDev) {
+          Alert.alert('Payment pending', 'Your plan will activate after payment is confirmed.');
+          setIsConfirming(false);
+          return;
+        }
+      }
       setSubscriptionPlan(selectedPlan);
       navigation.navigate('OnboardingPreferences');
     } catch (err: any) {
@@ -79,7 +86,7 @@ export const SubscriptionSelectionScreen = ({ navigation }: any) => {
         <View style={tw`w-10`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-6`}>
         {/* Info Section */}
         <View style={tw`mb-6`}>
           <Text style={[tw`text-2xl font-bold mb-2`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>

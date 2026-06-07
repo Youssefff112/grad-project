@@ -179,7 +179,7 @@ export const CoachProgramTemplatesScreen = ({ navigation }: any) => {
           <Text style={[tw`text-sm mt-3`, { color: subtextColor }]}>Loading your plans...</Text>
         </View>
       ) : (
-        <ScrollView
+        <ScrollView keyboardShouldPersistTaps="handled"
           style={tw`flex-1`}
           contentContainerStyle={tw`px-4 py-4 pb-8`}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accent} />}
@@ -188,7 +188,7 @@ export const CoachProgramTemplatesScreen = ({ navigation }: any) => {
             <Text style={[tw`text-xs font-semibold uppercase tracking-wider`, { color: subtextColor }]}>
               {filtered.length} template{filtered.length !== 1 ? 's' : ''}
             </Text>
-            <Text style={[tw`text-xs`, { color: subtextColor }]}>Pulled from assigned client plans</Text>
+            <Text style={[tw`text-xs`, { color: subtextColor }]}>Uses client-visible exercise & food libraries when building</Text>
           </View>
 
           {filtered.map(template => (

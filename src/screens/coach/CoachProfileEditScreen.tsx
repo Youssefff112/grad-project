@@ -275,12 +275,12 @@ export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigati
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={tw`px-4 pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={tw`px-4 pb-8`}>
         {/* Profile Picture */}
         <View style={tw`mt-6 items-center mb-6`}>
           <TouchableOpacity onPress={handleUploadProfilePicture} activeOpacity={0.8} disabled={isUploadingPhoto}>
             <ProfileAvatar
-              profilePicture={profile?.profilePicture ?? globalProfilePicture}
+              profilePicture={profile?.profilePicture}
               size={96}
               accent={isDark ? '#3b82f6' : '#ff6a00'}
               isDark={isDark}
@@ -429,7 +429,7 @@ export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigati
               Add Transformation
             </Text>
 
-            <ScrollView style={tw`max-h-96`}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={tw`max-h-96`}>
               {/* Before Image */}
               <TouchableOpacity
                 onPress={async () => {
@@ -540,7 +540,7 @@ export const CoachProfileEditScreen: React.FC<{ navigation: any }> = ({ navigati
               Add Certification
             </Text>
 
-            <ScrollView style={tw`max-h-80`}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={tw`max-h-80`}>
               {/* Name */}
               <TextInput
                 style={tw`p-3 rounded-lg ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-100 text-gray-900'} border mb-3`}

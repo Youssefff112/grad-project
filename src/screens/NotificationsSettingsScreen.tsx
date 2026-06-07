@@ -44,7 +44,7 @@ export const NotificationsSettingsScreen = ({ navigation }: any) => {
         <View style={tw`w-12`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
         <View style={[tw`mx-4 mt-6 p-4 rounded-2xl flex-row items-center gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
           <MaterialIcons name="info-outline" size={24} color={accent} />
           <View style={tw`flex-1`}>

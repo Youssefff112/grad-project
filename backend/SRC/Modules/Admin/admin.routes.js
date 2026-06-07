@@ -15,10 +15,7 @@ router.get('/users', adminController.getUsers);
 router.patch('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
 
-// Exercise Management
-router.post('/exercises', adminController.createExercise);
-router.patch('/exercises/:id', adminController.updateExercise);
-router.delete('/exercises/:id', adminController.deleteExercise);
+// Exercise CRUD lives at /api/v1/exercises (admin-restricted POST/PATCH/DELETE there).
 
 // Coach Management
 router.post('/coaches', adminController.createCoach);

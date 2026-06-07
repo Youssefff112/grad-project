@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
@@ -11,6 +11,12 @@ import { FormInput } from '../../components/FormInput';
 import { Card } from '../../components/Card';
 import * as authService from '../../services/auth.service';
 import * as progressService from '../../services/progressService';
+import {
+  validateAge,
+  validateBodyFat,
+  validateHeightCm,
+  validateWeightKg,
+} from '../../utils/validation';
 
 export const BiometricsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -25,13 +31,33 @@ export const BiometricsScreen = ({ navigation }: any) => {
   const subtextColor = isDark ? '#94a3b8' : '#64748b';
 
   const handleContinue = async () => {
+    const ageErr = age ? validateAge(age) : 'Please enter your age';
+    const heightErr = height ? validateHeightCm(height) : 'Please enter your height';
+    const weightErr = weight ? validateWeightKg(weight) : 'Please enter your weight';
+    if (!gender) {
+      Alert.alert('Validation', 'Please select your gender');
+      return;
+    }
+    if (ageErr || heightErr || weightErr) {
+      Alert.alert('Validation', ageErr || heightErr || weightErr || 'Invalid input');
+      return;
+    }
+    if (bodyFat) {
+      const bfErr = validateBodyFat(bodyFat);
+      if (bfErr) {
+        Alert.alert('Validation', bfErr);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      const profileData: Record<string, any> = {};
-      if (gender) profileData.gender = gender;
-      if (age) profileData.age = parseInt(age, 10);
-      if (height) profileData.height = parseFloat(height);
-      if (weight) profileData.currentWeight = parseFloat(weight);
+      const profileData: Record<string, any> = {
+        gender,
+        age: parseInt(age, 10),
+        height: parseFloat(height),
+        currentWeight: parseFloat(weight),
+      };
       if (bodyFat) profileData.bodyFat = parseFloat(bodyFat);
 
       if (Object.keys(profileData).length > 0) {
@@ -62,7 +88,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
 
       <ProgressBar progress={16.66} containerStyle={tw`px-4 pt-0`} />
 
-      <ScrollView style={tw`flex-1 px-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1 px-6`}>
         <View style={tw`py-6`}>
           <Text style={[tw`text-3xl font-bold leading-tight mb-2`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             Core Biometrics
@@ -75,10 +101,9 @@ export const BiometricsScreen = ({ navigation }: any) => {
         <View style={tw`flex-col gap-6`}>
           <FormInput
             label="Age"
-            placeholder="Enter age (16+)"
+            placeholder="16–80"
             value={age}
             onChangeText={setAge}
-            icon={<MaterialIcons name="calendar-month" size={20} color={accent} />}
             keyboardType="numeric"
           />
 
@@ -120,7 +145,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
             <View style={tw`flex-1`}>
               <FormInput
                 label="Height (cm)"
-                placeholder="180"
+                placeholder="80–250"
                 value={height}
                 onChangeText={setHeight}
                 keyboardType="numeric"
@@ -129,7 +154,7 @@ export const BiometricsScreen = ({ navigation }: any) => {
             <View style={tw`flex-1`}>
               <FormInput
                 label="Weight (kg)"
-                placeholder="75"
+                placeholder="40–200"
                 value={weight}
                 onChangeText={setWeight}
                 keyboardType="numeric"
@@ -139,10 +164,10 @@ export const BiometricsScreen = ({ navigation }: any) => {
 
           <FormInput
             label="Body Fat %"
-            placeholder="15"
+            placeholder="10–45"
             value={bodyFat}
             onChangeText={setBodyFat}
-            helperText="If unknown, we will estimate based on other metrics."
+            helperText="Typical adult range is 10–45%. Leave blank if unknown."
             keyboardType="numeric"
           />
 

@@ -11,6 +11,7 @@ import { connectDB } from './DB/connection.js';
 import { globalErrorHandler } from './SRC/Utils/globalErrorHandler.utils.js';
 import appController from './app.controller.js';
 import { startNotificationScheduler } from './SRC/Modules/Notification/notification.scheduler.js';
+import { authenticateSocket } from './SRC/Utils/socketAuth.utils.js';
 // Note: coach management (admin CRUD) is served via /api/v1/admin — see admin.routes.js
 
 // Load environment variables
@@ -18,23 +19,33 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
+const socketCorsOrigin = process.env.NODE_ENV === 'production'
+  ? (process.env.FRONTEND_URL || false)
+  : '*';
+
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+    origin: socketCorsOrigin,
+    methods: ['GET', 'POST'],
+  },
 });
 app.set('io', io);
 
 const PORT = process.env.PORT || 5000;
 
+io.use(authenticateSocket);
+
 // Socket Connection Handling
 io.on('connection', (socket) => {
-  console.log(`🔌 New client connected: ${socket.id}`);
-  
-  // Clients join a private room based on their userId
-  socket.on('join_room', (userId) => {
-    socket.join(userId.toString());
+  const userId = socket.data.userId;
+  console.log(`🔌 Client connected: ${socket.id} (user ${userId})`);
+
+  socket.on('join_room', (requestedUserId) => {
+    if (String(requestedUserId) !== String(userId)) {
+      console.warn(`Socket ${socket.id} blocked join_room for user ${requestedUserId}`);
+      return;
+    }
+    socket.join(String(userId));
     console.log(`User ${userId} joined their personal room`);
   });
 

@@ -149,49 +149,57 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const { isDark, accent, colors } = useTheme();
   const insets = useSafeAreaInsets();
   const isCompact = items.length > 5;
+  const pillWidth = isCompact ? 40 : 48;
+  const pillHeight = isCompact ? 30 : 36;
   const [containerWidth, setContainerWidth] = React.useState(0);
+  const containerWidthRef = useRef(0);
+  const itemsRef = useRef(items);
+  const onSelectRef = useRef(onSelect);
   const pillTranslateX = useRef(new Animated.Value(0)).current;
 
-  const activeIndex = items.findIndex(i => i.id === activeId);
+  const activeIndex = items.findIndex((i) => i.id === activeId);
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
+  itemsRef.current = items;
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
-    if (containerWidth === 0) return;
-    const itemWidth = containerWidth / items.length;
-    const center = (activeIndex + 0.5) * itemWidth;
-    const pillWidth = isCompact ? 40 : 48;
-    const destX = center - pillWidth / 2;
-
+    if (containerWidth <= 0 || activeIndex < 0 || items.length === 0) return;
+    const tabWidth = containerWidth / items.length;
+    const targetX = activeIndex * tabWidth + (tabWidth - pillWidth) / 2;
     Animated.spring(pillTranslateX, {
-      toValue: destX,
+      toValue: targetX,
+      useNativeDriver: true,
       friction: 8,
       tension: 100,
-      useNativeDriver: true,
     }).start();
-  }, [activeIndex, containerWidth, isCompact, items.length]);
+  }, [activeIndex, containerWidth, pillWidth, pillTranslateX, items.length]);
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        if (containerWidth === 0) return;
-        const x = evt.nativeEvent.locationX;
-        const index = Math.floor(x / (containerWidth / items.length));
-        if (items[index] && items[index].id !== activeIdRef.current) {
-          onSelect(items[index].id);
-        }
-      },
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+      onPanResponderTerminationRequest: () => true,
       onPanResponderMove: (evt) => {
-        if (containerWidth === 0) return;
-        const x = evt.nativeEvent.locationX;
-        const index = Math.floor(x / (containerWidth / items.length));
-        if (items[index] && items[index].id !== activeIdRef.current) {
-          onSelect(items[index].id);
+        const width = containerWidthRef.current;
+        const navItems = itemsRef.current;
+        if (width === 0 || navItems.length === 0) return;
+        const index = Math.floor(evt.nativeEvent.locationX / (width / navItems.length));
+        if (navItems[index] && navItems[index].id !== activeIdRef.current) {
+          onSelectRef.current(navItems[index].id);
         }
       },
-    })
+      onPanResponderRelease: (evt) => {
+        const width = containerWidthRef.current;
+        const navItems = itemsRef.current;
+        if (width === 0 || navItems.length === 0) return;
+        const index = Math.floor(evt.nativeEvent.locationX / (width / navItems.length));
+        if (navItems[index] && navItems[index].id !== activeIdRef.current) {
+          onSelectRef.current(navItems[index].id);
+        }
+      },
+    }),
   ).current;
 
   const glass = isDark
@@ -200,10 +208,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         barTint: 'dark' as const,
         barOverlay: 'rgba(255,255,255,0.04)',
         barBorder: 'rgba(255,255,255,0.12)',
-        pillIntensity: 48,
-        pillTint: 'light' as const,
-        pillBorder: 'rgba(255,255,255,0.14)',
-        pillBg: 'rgba(255,255,255,0.08)',
+        pillIntensity: 20,
+        pillTint: 'dark' as const,
+        pillBorder: accent + '40',
+        pillBg: accent + '30',
         shadowOpacity: 0.45,
       }
     : {
@@ -211,10 +219,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         barTint: 'light' as const,
         barOverlay: 'rgba(255,255,255,0.82)',
         barBorder: 'rgba(0,0,0,0.08)',
-        pillIntensity: 40,
+        pillIntensity: 20,
         pillTint: 'light' as const,
-        pillBorder: accent + '35',
-        pillBg: accent + '18',
+        pillBorder: accent + '40',
+        pillBg: accent + '30',
         shadowOpacity: 0.1,
       };
 
@@ -258,11 +266,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       >
         <View
           {...panResponder.panHandlers}
-          onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+          onLayout={(e) => {
+            const width = e.nativeEvent.layout.width;
+            containerWidthRef.current = width;
+            setContainerWidth(width);
+          }}
           style={{ flex: 1, flexDirection: 'row', position: 'relative' }}
         >
           {containerWidth > 0 && (
             <AnimatedBlurView
+              pointerEvents="none"
               intensity={glass.pillIntensity}
               tint={glass.pillTint}
               {...blurProps}
@@ -270,8 +283,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 position: 'absolute',
                 top: 4,
                 left: 0,
-                width: isCompact ? 40 : 48,
-                height: isCompact ? 30 : 36,
+                width: pillWidth,
+                height: pillHeight,
                 borderRadius: 100,
                 overflow: 'hidden',
                 borderWidth: 1,

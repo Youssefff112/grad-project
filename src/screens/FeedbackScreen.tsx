@@ -31,7 +31,7 @@ export const FeedbackScreen = ({ navigation }: any) => {
           <Text style={[tw`text-lg font-bold tracking-tight flex-1 text-center`, { color: textPrimary }]}>Send Feedback</Text>
           <View style={tw`w-12`} />
         </View>
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`p-4 pb-12 gap-6`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`p-4 pb-12 gap-6`}>
           <View style={[tw`p-5 rounded-2xl items-center gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
             <MaterialIcons name="rate-review" size={40} color={accent} />
             <Text style={[tw`text-lg font-bold text-center`, { color: textPrimary }]}>We value your thoughts!</Text>

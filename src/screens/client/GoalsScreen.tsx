@@ -59,7 +59,7 @@ export const GoalsScreen = ({ navigation, route }: any) => {
         <ProgressBar progress={83.33} label="Your Progress" stepText="Step 5 of 6" containerStyle={tw`px-4`} />
       )}
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-6`}>
         <View style={tw`px-4 pb-4 pt-2`}>
           <Text style={[tw`tracking-tight text-3xl font-bold leading-tight text-center`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             What is your primary goal?

@@ -7,6 +7,7 @@ import {
   TextInput,
   Alert,
   KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -167,7 +168,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
-      <KeyboardAvoidingView behavior="padding" style={tw`flex-1`}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={tw`flex-1`}>
         {/* Header */}
         <View
           style={[
@@ -184,7 +185,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
           <View style={tw`flex size-10`} />
         </View>
 
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 py-4 gap-4`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-5 py-4 gap-4`}>
           {/* Meal Info Section */}
           <View style={[tw`rounded-2xl p-4 gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
             <Text style={[tw`text-sm font-bold uppercase tracking-wider`, { color: textSecondary }]}>
@@ -369,21 +370,13 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
         </ScrollView>
 
         {/* Footer Buttons */}
-        <View style={[tw`px-5 py-4 gap-3 flex-row`, { backgroundColor: bgColor }]}>
-          <Button
-            title="Cancel"
-            variant="secondary"
-            size="md"
-            onPress={() => navigation.goBack()}
-            style={tw`flex-1`}
-            disabled={isLoading}
-          />
+        <View style={[tw`px-5 py-4 gap-3`, { backgroundColor: bgColor }]}>
           <Button
             title={isEditing ? 'Update Meal' : 'Save Meal'}
             variant="primary"
             size="md"
             onPress={handleSave}
-            style={tw`flex-1`}
+            containerStyle={tw`w-full`}
             loading={isLoading}
           />
         </View>

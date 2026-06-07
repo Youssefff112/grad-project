@@ -1,6 +1,7 @@
 // src/Modules/User/user.controller.js
 import { userService } from './user.service.js';
 import { successResponse } from '../../Utils/successResponse.utils.js';
+import { syncUserProfileToAi } from '../../Utils/aiService.js';
 
 export const userController = {
   async getProfile(req, res, next) {
@@ -15,6 +16,9 @@ export const userController = {
   async updateProfile(req, res, next) {
     try {
       const user = await userService.updateProfile(req.user.id, req.body);
+      if (req.body?.profile) {
+        syncUserProfileToAi(user).catch(() => {});
+      }
       successResponse(res, 200, 'Profile updated successfully', { user });
     } catch (error) {
       next(error);

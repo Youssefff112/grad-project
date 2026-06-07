@@ -281,7 +281,9 @@ export const clearAllCache = async () => {
         key.startsWith('workout_cache_') ||
         key.startsWith('messages_cache_') ||
         key.startsWith('api_cache_') ||
-        key.startsWith('food_cache_')
+        key.startsWith('food_cache_') ||
+        key.startsWith('persist_diet_plan_') ||
+        key.startsWith('persist_workout_plan_')
     );
 
     if (cacheKeys.length > 0) {
@@ -323,6 +325,8 @@ export const nukeAllAppData = async (): Promise<void> => {
         key.startsWith('messages_cache_') ||
         key.startsWith('api_cache_') ||
         key.startsWith('food_cache_') ||
+        key.startsWith('persist_diet_plan_') ||
+        key.startsWith('persist_workout_plan_') ||
         key.startsWith('notif_read_') ||
         key.startsWith('notif_')
     );

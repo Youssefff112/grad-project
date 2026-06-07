@@ -80,7 +80,7 @@ export const OnboardingPreferencesScreen = ({ navigation }: any) => {
 
       <ProgressBar progress={8.33} containerStyle={tw`px-4 pt-0`} />
 
-      <ScrollView style={tw`flex-1 px-6`} contentContainerStyle={tw`pb-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1 px-6`} contentContainerStyle={tw`pb-6`}>
         <View style={tw`py-6`}>
           <Text style={[tw`text-3xl font-bold leading-tight mb-2`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             Personalize Your Experience

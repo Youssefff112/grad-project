@@ -14,6 +14,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Exercise } from '../context/ExerciseManagementContext';
 import { ExerciseCard } from './ExerciseCard';
+import { DismissKeyboard } from './DismissKeyboard';
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -97,8 +98,9 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
-        <KeyboardAvoidingView behavior="padding" style={tw`flex-1`}>
+      <DismissKeyboard>
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
+          <KeyboardAvoidingView behavior="padding" style={tw`flex-1`}>
           {/* Header */}
           <View
             style={[
@@ -287,7 +289,7 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
               </View>
 
               {/* Exercises List */}
-              <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-4`}>
+              <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-4`}>
                 {filteredExercises.length > 0 ? (
                   filteredExercises.map((exercise) => (
                     <ExerciseCard
@@ -306,8 +308,9 @@ export const ExercisePickerModal: React.FC<ExercisePickerModalProps> = ({
               </ScrollView>
             </>
           )}
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </DismissKeyboard>
     </Modal>
   );
 };

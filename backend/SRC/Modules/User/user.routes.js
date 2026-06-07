@@ -5,6 +5,7 @@ import { authenticate } from '../../Middlewares/auth.middleware.js';
 import { validate } from '../../Middlewares/validation.middleware.js';
 import { updateProfileSchema, completeOnboardingSchema } from './user.validation.js';
 import { upload } from '../../Utils/fileUpload.js';
+import { validateUploadedImages } from '../../Middlewares/validateUpload.middleware.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.use(authenticate);
 
 router.get('/profile', userController.getProfile);
 router.patch('/profile', validate(updateProfileSchema), userController.updateProfile);
-router.post('/profile-picture', upload.single('image'), userController.uploadProfilePicture);
+router.post('/profile-picture', upload.single('image'), validateUploadedImages, userController.uploadProfilePicture);
 router.post('/onboarding', validate(completeOnboardingSchema), userController.completeOnboarding);
 router.delete('/account', userController.deleteAccount);
 

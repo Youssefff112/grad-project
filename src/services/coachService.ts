@@ -22,7 +22,7 @@ export interface Coach {
   isApproved?: boolean;
   applicationStatus?: 'pending' | 'approved' | 'rejected';
   /** Populated from User association by the backend */
-  User?: { firstName?: string; lastName?: string; email?: string };
+  User?: { firstName?: string; lastName?: string; email?: string; profilePicture?: string | null };
   /** Convenience field computed from User.firstName + User.lastName */
   displayName?: string;
 }
@@ -162,10 +162,10 @@ export const uploadProfilePicture = async (imageFile: FormData): Promise<{ image
 };
 
 export const addTransformation = async (formData: FormData): Promise<{ transformation: Transformation; profile: Coach }> => {
-  const response = await apiUpload('/coach/transformations', formData);
+  const data = await apiUpload<{ transformation: Transformation; profile: Coach }>('/coach/transformations', formData);
   return {
-    transformation: response.data?.transformation || {},
-    profile: response.data?.profile || {}
+    transformation: data.transformation || ({} as Transformation),
+    profile: data.profile || ({} as Coach),
   };
 };
 
@@ -182,10 +182,10 @@ export const deleteTransformation = async (transformId: string): Promise<void> =
 };
 
 export const addCertification = async (formData: FormData): Promise<{ certification: Certification; profile: Coach }> => {
-  const response = await apiUpload('/coach/certifications', formData);
+  const data = await apiUpload<{ certification: Certification; profile: Coach }>('/coach/certifications', formData);
   return {
-    certification: response.data?.certification || {},
-    profile: response.data?.profile || {}
+    certification: data.certification || ({} as Certification),
+    profile: data.profile || ({} as Coach),
   };
 };
 
@@ -199,10 +199,11 @@ export interface CoachClient {
   id: number;
   userId: number;
   selectedCoachId?: number;
-  goals?: Record<string, any>;
+  goals?: Record<string, unknown>;
   status?: string;
   lastActivity?: string;
-  User?: { firstName?: string; lastName?: string; email?: string };
+  todayPercent?: number;
+  User?: { firstName?: string; lastName?: string; email?: string; profilePicture?: string | null };
 }
 
 export interface CoachAnalytics {
@@ -213,8 +214,9 @@ export interface CoachAnalytics {
   monthlyRevenue?: number;
 }
 
-export const getMyClients = async (): Promise<{ clients: CoachClient[] }> => {
-  const response = await apiGet('/coach/clients');
+export const getMyClients = async (options?: { includeActivity?: boolean }): Promise<{ clients: CoachClient[] }> => {
+  const params = options?.includeActivity ? '?includeActivity=true' : '';
+  const response = await apiGet(`/coach/clients${params}`);
   return { clients: response.data?.clients || [] };
 };
 
@@ -271,7 +273,13 @@ export const updateClientWorkoutPlan = async (
 
 export const updateClientDietPlan = async (
   planId: number,
-  updates: { weeklyMealPlan?: any; dailyCalorieTarget?: number; macronutrients?: any; planName?: string }
+  updates: {
+    weeklyMealPlan?: any;
+    dailyCalorieTarget?: number;
+    hydrationGoal?: number;
+    macronutrients?: any;
+    planName?: string;
+  }
 ): Promise<{ plan: any }> => {
   const response = await apiPatch(`/coach/plans/diet/${planId}`, updates);
   return { plan: response.data?.plan };

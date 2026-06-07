@@ -16,7 +16,6 @@ export const CoachBottomNav: React.FC<CoachBottomNavProps> = ({
     dashboard: 'CoachCommandCenter',
     clients: 'CoachClientList',
     messages: 'Messages',
-    schedule: 'CoachSchedule',
     profile: 'CoachSettings',
   };
 
@@ -35,7 +34,6 @@ export const CoachBottomNav: React.FC<CoachBottomNavProps> = ({
         { id: 'dashboard', icon: 'dashboard' as const, label: 'Dashboard' },
         { id: 'clients', icon: 'group' as const, label: 'Clients' },
         { id: 'messages', icon: 'chat-bubble' as const, label: 'Messages', badge: totalUnread },
-        { id: 'schedule', icon: 'calendar-today' as const, label: 'Schedule' },
         { id: 'profile', icon: 'person' as const, label: 'Profile' },
       ]}
     />

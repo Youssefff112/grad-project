@@ -13,6 +13,7 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { Food } from '../context/FoodManagementContext';
 import { FoodCard } from './FoodCard';
+import { DismissKeyboard } from './DismissKeyboard';
 
 interface FoodPickerModalProps {
   visible: boolean;
@@ -79,9 +80,10 @@ export const FoodPickerModal: React.FC<FoodPickerModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
-        <KeyboardAvoidingView behavior="padding" style={tw`flex-1`}>
-          {/* Header */}
+      <DismissKeyboard>
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
+          <KeyboardAvoidingView behavior="padding" style={tw`flex-1`}>
+            {/* Header */}
           <View
             style={[
               tw`flex-row items-center p-4 justify-between z-10`,
@@ -254,7 +256,7 @@ export const FoodPickerModal: React.FC<FoodPickerModalProps> = ({
               </View>
 
               {/* Foods List */}
-              <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-4`}>
+              <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-4`}>
                 {filteredFoods.length > 0 ? (
                   filteredFoods.map((food) => (
                     <FoodCard
@@ -273,8 +275,9 @@ export const FoodPickerModal: React.FC<FoodPickerModalProps> = ({
               </ScrollView>
             </>
           )}
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </DismissKeyboard>
     </Modal>
   );
 };

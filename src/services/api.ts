@@ -7,6 +7,20 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 import { environment } from '../config/environment';
 import * as tokenManager from '../utils/tokenManager';
 import { unwrapApiData } from '../utils/apiResponse';
+import { emitSessionExpired } from './sessionEvents';
+
+const REFRESH_TIMEOUT_MS = 10_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+export class ApiError extends Error {
+  response?: { status: number; data: unknown };
+
+  constructor(message: string, response?: { status: number; data: unknown }) {
+    super(message);
+    this.name = 'ApiError';
+    this.response = response;
+  }
+}
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -91,9 +105,11 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const response = await axios.post(`${environment.API_BASE_URL}/auth/refresh-token`, {
-          refreshToken,
-        });
+        const response = await axios.post(
+          `${environment.API_BASE_URL}/auth/refresh-token`,
+          { refreshToken },
+          { timeout: REFRESH_TIMEOUT_MS },
+        );
 
         const { token, refreshToken: newRefreshToken } = response.data.data;
         if (token) {
@@ -116,8 +132,8 @@ apiClient.interceptors.response.use(
         processQueue(err, null);
         isRefreshing = false;
 
-        // Clear tokens and force logout
         await tokenManager.clearTokens();
+        emitSessionExpired();
         throw error;
       }
     }
@@ -165,27 +181,40 @@ export const apiDelete = <T = any>(url: string, config?: any): Promise<T> => {
  * Upload FormData via fetch (not axios) so React Native can inject the
  * correct multipart/form-data boundary automatically.
  */
-export const apiUpload = async <T = any>(url: string, formData: FormData): Promise<T> => {
+export const apiUpload = async <T = unknown>(url: string, formData: FormData): Promise<T> => {
   const token = await tokenManager.getAccessToken();
   const fullUrl = `${environment.API_BASE_URL}${url}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
-  const response = await fetch(fullUrl, {
-    method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: formData,
-  });
+  try {
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+      signal: controller.signal,
+    });
 
-  const json = await response.json().catch(() => ({}));
+    const json = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    const err = new Error(json.message || `Upload failed (${response.status})`) as any;
-    err.response = { status: response.status, data: json };
+    if (!response.ok) {
+      throw new ApiError(
+        (json as { message?: string }).message || `Upload failed (${response.status})`,
+        { status: response.status, data: json },
+      );
+    }
+
+    return unwrapApiData<T>(json);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError('Upload timed out. Check your connection and try again.');
+    }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return unwrapApiData<T>(json);
 };
 
 /**
@@ -209,6 +238,7 @@ export default {
   apiPatch,
   apiPut,
   apiDelete,
+  apiUpload,
   checkBackendHealth,
   client: apiClient,
 };

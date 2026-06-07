@@ -290,17 +290,121 @@ export const coachService = {
   },
 
   async updateProfile(userId, updates) {
+    const ALLOWED_FIELDS = [
+      'bio',
+      'specialties',
+      'experienceYears',
+      'certifications',
+      'availability',
+      'profilePicture',
+      'gallery',
+      'transformations',
+    ];
+
+    const BLOCKED_FIELDS = [
+      'isApproved',
+      'applicationStatus',
+      'approvedBy',
+      'approvedAt',
+      'rating',
+      'ratingCount',
+      'userId',
+      'id',
+    ];
+
+    const sanitized = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (updates[key] !== undefined) sanitized[key] = updates[key];
+    }
+
+    for (const blocked of BLOCKED_FIELDS) {
+      if (updates[blocked] !== undefined) {
+        throw new AppError(`Field "${blocked}" cannot be updated via this endpoint`, 403);
+      }
+    }
+
     let profile = await CoachProfile.findOne({ where: { userId } });
     if (!profile) {
-      profile = await CoachProfile.create({ userId, ...updates });
+      profile = await CoachProfile.create({ userId, ...sanitized });
       return profile;
     }
 
-    await CoachProfile.update(updates, { where: { userId } });
+    await CoachProfile.update(sanitized, { where: { userId } });
     return CoachProfile.findOne({ where: { userId } });
   },
 
-  async getClients(userId, page = 1, limit = 20) {
+  async getClientsTodayProgress(clientUserIds) {
+    if (!clientUserIds.length) return new Map();
+
+    const today = todayYmdUTC();
+    const since = new Date(`${today}T00:00:00.000Z`);
+
+    const [dietLogs, workoutLogs, dietPlans, workoutPlans] = await Promise.all([
+      DietLog.findAll({
+        where: { userId: { [Op.in]: clientUserIds }, date: { [Op.gte]: since } },
+      }),
+      WorkoutLog.findAll({
+        where: {
+          userId: { [Op.in]: clientUserIds },
+          status: 'completed',
+          date: { [Op.gte]: since },
+        },
+      }),
+      DietPlan.findAll({
+        where: { userId: { [Op.in]: clientUserIds }, isActive: true },
+        order: [['updatedAt', 'DESC']],
+      }),
+      WorkoutPlan.findAll({
+        where: { userId: { [Op.in]: clientUserIds }, isActive: true },
+        order: [['updatedAt', 'DESC']],
+      }),
+    ]);
+
+    const dietByUser = new Map();
+    const woByUser = new Map();
+    const dietPlanByUser = new Map();
+    const woPlanByUser = new Map();
+
+    for (const row of dietLogs) {
+      const uid = row.userId;
+      if (!dietByUser.has(uid)) dietByUser.set(uid, []);
+      dietByUser.get(uid).push(row);
+    }
+    for (const row of workoutLogs) {
+      const uid = row.userId;
+      if (!woByUser.has(uid)) woByUser.set(uid, []);
+      woByUser.get(uid).push(row);
+    }
+    for (const row of dietPlans) {
+      if (!dietPlanByUser.has(row.userId)) dietPlanByUser.set(row.userId, row);
+    }
+    for (const row of workoutPlans) {
+      if (!woPlanByUser.has(row.userId)) woPlanByUser.set(row.userId, row);
+    }
+
+    const progressMap = new Map();
+    for (const uid of clientUserIds) {
+      const activeDiet = dietPlanByUser.get(uid) || null;
+      const activeWorkout = woPlanByUser.get(uid) || null;
+      const hasActiveDietPlan = activeDiet != null;
+      const hydrationGoalMl = activeDiet?.hydrationGoal != null ? Number(activeDiet.hydrationGoal) : null;
+      const trainingDayKeys = trainingDayKeysFromSchedule(activeWorkout?.weeklySchedule);
+      const adherence = buildAdherenceSummary(
+        dietByUser.get(uid) || [],
+        woByUser.get(uid) || [],
+        hydrationGoalMl,
+        trainingDayKeys,
+        activeDiet?.weeklyMealPlan || [],
+        hasActiveDietPlan,
+        activeWorkout?.weeklySchedule || [],
+      );
+      progressMap.set(uid, adherence.todayPercent ?? 0);
+    }
+
+    return progressMap;
+  },
+
+  async getClients(userId, page = 1, limit = 20, { includeActivity = false } = {}) {
     const offset = (page - 1) * limit;
 
     const { rows, count } = await ClientProfile.findAndCountAll({
@@ -316,18 +420,29 @@ export const coachService = {
       : [];
 
     const userMap = new Map(users.map(user => [user.id, user]));
+    const progressMap = includeActivity
+      ? await this.getClientsTodayProgress(clientIds)
+      : new Map();
 
-    // Return flat objects that match the CoachClient interface on the frontend
     const clients = rows.map(row => {
       const user = userMap.get(row.userId);
-      return {
+      const base = {
         ...row.toJSON(),
         User: user
-          ? { firstName: user.firstName, lastName: user.lastName, email: user.email }
+          ? {
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              profilePicture: user.profile?.profilePicture || null,
+            }
           : null,
         status: 'active',
         lastActivity: row.updatedAt ? row.updatedAt.toISOString() : null,
       };
+      if (includeActivity) {
+        base.todayPercent = progressMap.get(row.userId) ?? 0;
+      }
+      return base;
     });
 
     return {
@@ -557,6 +672,7 @@ export const coachService = {
    */
   async getClientWorkoutLogs(coachUserId, clientUserId, { page = 1, limit = 20 } = {}) {
     await this.requireApprovedCoach(coachUserId);
+    await this.ensureCoachOwnsClient(coachUserId, clientUserId);
 
     const offset = (Math.max(1, page) - 1) * Math.min(50, limit);
     const { count, rows } = await WorkoutLog.findAndCountAll({

@@ -120,7 +120,7 @@ export const AddExerciseScreen = ({ navigation, route }: any) => {
           <View style={tw`flex size-10`} />
         </View>
 
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 py-4 gap-4`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-5 py-4 gap-4`}>
           {/* Exercise Name */}
           <View style={[tw`rounded-2xl p-4 gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
             <Text style={[tw`text-sm font-bold uppercase tracking-wider`, { color: textSecondary }]}>

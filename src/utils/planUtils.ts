@@ -1,4 +1,10 @@
-import { SubscriptionPlan, PLAN_FEATURES, isClientPlan } from '../constants/plans';
+import {
+  SubscriptionPlan,
+  PLAN_FEATURES,
+  isClientPlan,
+  CLIENT_SUBSCRIPTION_PLANS,
+  type PlanFeatures,
+} from '../constants/plans';
 
 /**
  * Check if a user with a specific plan has access to a feature
@@ -38,7 +44,7 @@ export function getFeatureAccessMessage(plan: SubscriptionPlan, featureName: str
   const featureKey = featureMap[featureName];
   if (!featureKey) return { hasAccess: true };
 
-  const hasAccess = (planFeatures as any)[featureKey] as boolean;
+  const hasAccess = Boolean(planFeatures[featureKey as keyof PlanFeatures]);
 
   if (!hasAccess) {
     const recommendations = getUpgradeRecommendations(plan, featureName);
@@ -119,5 +125,5 @@ export function hasCoachingFeatures(plan: SubscriptionPlan): boolean {
  * Get all available plans
  */
 export function getAllPlans(): SubscriptionPlan[] {
-  return ['Free', 'Standard', 'Premium', 'ProCoach', 'Elite'];
+  return [...CLIENT_SUBSCRIPTION_PLANS, 'ProCoach'];
 }

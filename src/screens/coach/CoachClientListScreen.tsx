@@ -7,6 +7,7 @@ import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { CoachBottomNav } from '../../components/coach/CoachBottomNav';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import * as coachService from '../../services/coachService';
 
 /** Format an ISO date string as "May 16, 2:30 PM" — or return "Recently" for invalid values. */
@@ -29,6 +30,7 @@ interface Client {
   id: string;
   userId: string;
   name: string;
+  profilePicture: string | null;
   email: string;
   plan: string;
   status: ClientStatus;
@@ -55,7 +57,7 @@ export const CoachClientListScreen = ({ navigation }: any) => {
   const loadClients = useCallback(async () => {
     setLoading(true);
     try {
-      const { clients: raw } = await coachService.getMyClients();
+      const { clients: raw } = await coachService.getMyClients({ includeActivity: true });
       const mapped: Client[] = raw.map((c) => {
         const uid = c.userId != null ? Number(c.userId) : NaN;
         return {
@@ -64,36 +66,18 @@ export const CoachClientListScreen = ({ navigation }: any) => {
           name: c.User
             ? `${c.User.firstName || ''} ${c.User.lastName || ''}`.trim() || `Client #${c.id}`
             : `Client #${c.id}`,
+          profilePicture: c.User?.profilePicture ?? null,
           email: c.User?.email || '',
           plan: (c.goals as any)?.primary || 'General Fitness',
           status: (c.status as ClientStatus) || 'active',
           joinedDate: '',
           lastActivity: formatLastActive(c.lastActivity),
-          progress: 0,
+          progress: typeof c.todayPercent === 'number' ? Math.round(c.todayPercent) : 0,
           weight: null,
         };
       });
 
-      // Fetch today's adherence for every active client in parallel.
-      // todayPercent is the real meal/workout completion percentage for the day.
-      const activeClients = mapped.filter((c) => c.status === 'active');
-      const activityResults = await Promise.allSettled(
-        activeClients.map((c) =>
-          coachService.getClientActivity(Number(c.id), 1),
-        ),
-      );
-      const progressById: Record<string, number> = {};
-      activityResults.forEach((result, idx) => {
-        if (result.status === 'fulfilled') {
-          const pct = result.value.adherence?.todayPercent;
-          progressById[activeClients[idx].id] = pct != null ? Math.round(pct) : 0;
-        }
-      });
-
-      setClients(mapped.map((c) => ({
-        ...c,
-        progress: progressById[c.id] ?? c.progress,
-      })));
+      setClients(mapped);
     } catch {
       setClients([]);
     } finally {
@@ -161,7 +145,7 @@ export const CoachClientListScreen = ({ navigation }: any) => {
           />
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false}>
           <View style={tw`flex-row gap-2`}>
             {(['all', 'active', 'pending', 'inactive'] as const).map(f => (
               <TouchableOpacity
@@ -180,7 +164,7 @@ export const CoachClientListScreen = ({ navigation }: any) => {
         </ScrollView>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 pb-28`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 pb-28`}>
         {filtered.length === 0 && (
           <View style={tw`items-center py-16`}>
             <MaterialIcons name="group-off" size={48} color={isDark ? '#334155' : '#cbd5e1'} />
@@ -193,13 +177,11 @@ export const CoachClientListScreen = ({ navigation }: any) => {
           return (
             <TouchableOpacity
               key={client.id}
-              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name })}
+              onPress={() => navigation.navigate('CoachClientDetail', { clientId: client.id, userId: client.userId, clientName: client.name, clientProfilePicture: client.profilePicture })}
               style={[tw`p-4 rounded-2xl mb-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor: borderColor }]}
             >
               <View style={tw`flex-row items-start gap-3`}>
-                <View style={[tw`w-12 h-12 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '20' }]}>
-                  <MaterialIcons name="person" size={24} color={accent} />
-                </View>
+                <ProfileAvatar profilePicture={client.profilePicture} size={48} />
                 <View style={tw`flex-1`}>
                   <View style={tw`flex-row items-center justify-between mb-0.5`}>
                     <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{client.name}</Text>

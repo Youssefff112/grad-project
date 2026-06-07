@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COMMON_EXERCISES } from '../services/exerciseService';
+import { COMMON_EXERCISES } from '../constants/sharedCatalog';
 
 export interface Exercise {
   id: string;
@@ -118,38 +118,25 @@ export const ExerciseManagementProvider: React.FC<{ children: React.ReactNode }>
     loadData();
   }, []);
 
-  // Save exercises to AsyncStorage (with debounce via dependency array)
+  // Debounced AsyncStorage persistence (400ms)
   useEffect(() => {
-    if (isLoading) return; // Don't save while loading
-
-    const saveExercises = async () => {
-      try {
-        await AsyncStorage.setItem('exercises', JSON.stringify(exercises)).catch((error) => {
-          console.warn('[ExerciseContext] Error saving exercises:', error);
-        });
-      } catch (error) {
-        console.warn('[ExerciseContext] Unexpected error in saveExercises:', error);
-      }
-    };
-
-    saveExercises();
+    if (isLoading) return;
+    const timer = setTimeout(() => {
+      AsyncStorage.setItem('exercises', JSON.stringify(exercises)).catch((error) => {
+        console.warn('[ExerciseContext] Error saving exercises:', error);
+      });
+    }, 400);
+    return () => clearTimeout(timer);
   }, [exercises, isLoading]);
 
-  // Save workouts to AsyncStorage (with debounce via dependency array)
   useEffect(() => {
-    if (isLoading) return; // Don't save while loading
-
-    const saveWorkouts = async () => {
-      try {
-        await AsyncStorage.setItem('workouts', JSON.stringify(workouts)).catch((error) => {
-          console.warn('[ExerciseContext] Error saving workouts:', error);
-        });
-      } catch (error) {
-        console.warn('[ExerciseContext] Unexpected error in saveWorkouts:', error);
-      }
-    };
-
-    saveWorkouts();
+    if (isLoading) return;
+    const timer = setTimeout(() => {
+      AsyncStorage.setItem('workouts', JSON.stringify(workouts)).catch((error) => {
+        console.warn('[ExerciseContext] Error saving workouts:', error);
+      });
+    }, 400);
+    return () => clearTimeout(timer);
   }, [workouts, isLoading]);
 
   const addExercise = useCallback(async (exercise: Omit<Exercise, 'id' | 'createdAt'>) => {
@@ -188,20 +175,27 @@ export const ExerciseManagementProvider: React.FC<{ children: React.ReactNode }>
     setWorkouts((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      exercises,
+      workouts,
+      isLoading,
+      addExercise,
+      deleteExercise,
+      updateExercise,
+      saveWorkout,
+      updateWorkout,
+      deleteWorkout,
+    }),
+    [
+      exercises, workouts, isLoading,
+      addExercise, deleteExercise, updateExercise,
+      saveWorkout, updateWorkout, deleteWorkout,
+    ],
+  );
+
   return (
-    <ExerciseManagementContext.Provider
-      value={{
-        exercises,
-        workouts,
-        isLoading,
-        addExercise,
-        deleteExercise,
-        updateExercise,
-        saveWorkout,
-        updateWorkout,
-        deleteWorkout,
-      }}
-    >
+    <ExerciseManagementContext.Provider value={contextValue}>
       {children}
     </ExerciseManagementContext.Provider>
   );

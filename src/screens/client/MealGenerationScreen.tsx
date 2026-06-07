@@ -296,7 +296,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
         </Text>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6`}>
         {/* Mode Info Banner */}
         <View style={[tw`mb-6 rounded-xl p-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
           <View style={tw`flex-row items-start gap-3 mb-2`}>
@@ -566,7 +566,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
             <View style={{ width: 44 }} />
           </View>
 
-          <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
             {generatedMeal && (
               <>
                 <View>
@@ -785,7 +785,7 @@ export const MealGenerationScreen = ({ navigation }: any) => {
                   </View>
                   <Text style={[tw`text-xs mb-3`, { color: textSecondary }]}>Tap to replace the selected item</Text>
                 </View>
-                <ScrollView contentContainerStyle={tw`px-4 pb-8 gap-2`} showsVerticalScrollIndicator={false}>
+                <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={tw`px-4 pb-8 gap-2`} showsVerticalScrollIndicator={false}>
                   {(() => {
                     const meal = generatedMeal?.meals[substituteTarget.mealIdx];
                     const timeKey = meal?.time?.toLowerCase() || 'snack';

@@ -1,16 +1,21 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as tokenManager from '../utils/tokenManager';
-import authService, { type User as AuthUser } from '../services/auth.service';
+import authService, { type User as AuthUser, type UpdateProfileRequest } from '../services/auth.service';
 import { getClientSubscriptionStatus, getClientProfile, removeCoach } from '../services/clientService';
 import * as progressService from '../services/progressService';
 import * as coachService from '../services/coachService';
-import { isClientPlan } from '../constants/plans';
+import { isClientPlan, type SubscriptionPlan } from '../constants/plans';
 import { canClientSelectPersonalCoach, resolveUserMode } from '../utils/planUtils';
 import type { CoachApplicationStatus } from '../utils/coachGate';
+import {
+  getProfilePictureFromUserProfile,
+  normalizeProfilePicturePath,
+  resolveCoachAvatarPath,
+} from '../utils/imageUrl';
 
 export type UserMode = 'Basic' | 'CoachAssisted' | 'AIDriven';
-export type SubscriptionPlan = 'Free' | 'Standard' | 'Premium' | 'ProCoach' | 'Elite';
+export type { SubscriptionPlan };
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type DietPreference = 'omnivore' | 'vegetarian' | 'vegan' | 'keto' | 'paleo' | 'gluten-free' | 'pescatarian' | 'dairy-free' | 'nut-free' | 'low-carb' | 'mediterranean' | 'other';
 
@@ -25,6 +30,11 @@ export interface NotificationSettings {
   hydrationReminders: boolean;
 }
 
+export interface PrivacyPreferences {
+  analytics: boolean;
+  dataSharing: boolean;
+}
+
 export type UserRole = 'client' | 'coach' | 'admin';
 
 interface UserContextType {
@@ -35,6 +45,7 @@ interface UserContextType {
   profilePicture: string | null;
   weight: number | null;
   bodyFatPercentage: number | null;
+  waterGoalMl: number;
   userMode: UserMode;
   subscriptionPlan: SubscriptionPlan;
   isCoach: boolean;
@@ -46,10 +57,9 @@ interface UserContextType {
   canUseAIAssistant: boolean;
   lastPlanReviewDate: string | null;
   notificationSettings: NotificationSettings;
+  privacyPreferences: PrivacyPreferences;
 
-  // Authentication fields
-  authToken: string | null;
-  refreshToken: string | null;
+  // Authentication fields (tokens live in secure storage — not exposed via context)
   userId: string | null;
   isAuthenticated: boolean;
 
@@ -60,6 +70,7 @@ interface UserContextType {
   setEmail: (email: string) => void;
   setWeight: (weight: number) => void;
   setBodyFatPercentage: (percentage: number) => void;
+  setWaterGoalMl: (ml: number) => void;
   setUserMode: (mode: UserMode) => void;
   setSubscriptionPlan: (plan: SubscriptionPlan) => void;
   setExperienceLevel: (level: ExperienceLevel) => void;
@@ -69,7 +80,10 @@ interface UserContextType {
   setComputerVisionEnabled: (enabled: boolean) => void;
   setAIAssistantEnabled: (enabled: boolean) => void;
   updateLastPlanReview: () => void;
+  /** Starts the 7-day weigh-in timer without recording a weigh-in (new accounts). */
+  initializeWeeklyWeighInCycle: () => void;
   setNotificationSettings: (settings: NotificationSettings) => void;
+  setPrivacyPreferences: (prefs: PrivacyPreferences) => void;
   setRole: (role: UserRole) => void;
   /** Apply server profile fields (login response or GET /users/profile). */
   hydrateFromAuthUser: (user: AuthUser) => void;
@@ -95,6 +109,7 @@ const UserContext = createContext<UserContextType>({
   profilePicture: null,
   weight: null,
   bodyFatPercentage: null,
+  waterGoalMl: 2000,
   userMode: 'Basic',
   subscriptionPlan: 'Free',
   isCoach: false,
@@ -114,10 +129,12 @@ const UserContext = createContext<UserContextType>({
     restTimer: true,
     hydrationReminders: true,
   },
+  privacyPreferences: {
+    analytics: true,
+    dataSharing: false,
+  },
 
   // Authentication defaults
-  authToken: null,
-  refreshToken: null,
   userId: null,
   isAuthenticated: false,
 
@@ -128,6 +145,7 @@ const UserContext = createContext<UserContextType>({
   setEmail: () => {},
   setWeight: () => {},
   setBodyFatPercentage: () => {},
+  setWaterGoalMl: () => {},
   setUserMode: () => {},
   setSubscriptionPlan: () => {},
   setExperienceLevel: () => {},
@@ -137,7 +155,9 @@ const UserContext = createContext<UserContextType>({
   setComputerVisionEnabled: () => {},
   setAIAssistantEnabled: () => {},
   updateLastPlanReview: () => {},
+  initializeWeeklyWeighInCycle: () => {},
   setNotificationSettings: () => {},
+  setPrivacyPreferences: () => {},
   setRole: () => {},
   hydrateFromAuthUser: () => {},
   syncProfileFromServer: async () => {},
@@ -159,6 +179,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profilePicture, setProfilePictureState] = useState<string | null>(null);
   const [weight, setWeightState] = useState<number | null>(null);
   const [bodyFatPercentage, setBodyFatPercentageState] = useState<number | null>(null);
+  const [waterGoalMl, setWaterGoalMlState] = useState<number>(2000);
   const [userMode, setUserModeState] = useState<UserMode>('Basic');
   const [subscriptionPlan, setSubscriptionPlanState] = useState<SubscriptionPlan>('Free');
   const [experienceLevel, setExperienceLevelState] = useState<ExperienceLevel | null>(null);
@@ -177,10 +198,34 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restTimer: true,
     hydrationReminders: true,
   });
+  const [privacyPreferences, setPrivacyPreferencesState] = useState<PrivacyPreferences>({
+    analytics: true,
+    dataSharing: false,
+  });
+
+  const pendingProfileRef = useRef<UpdateProfileRequest>({});
+  const profileSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const queueProfileUpdate = useCallback((patch: UpdateProfileRequest) => {
+    const prev = pendingProfileRef.current;
+    pendingProfileRef.current = {
+      ...prev,
+      ...patch,
+      profile: { ...prev.profile, ...patch.profile },
+    };
+    if (profileSyncTimerRef.current) clearTimeout(profileSyncTimerRef.current);
+    profileSyncTimerRef.current = setTimeout(async () => {
+      profileSyncTimerRef.current = null;
+      const payload = pendingProfileRef.current;
+      pendingProfileRef.current = {};
+      const token = await tokenManager.getAccessToken();
+      if (token && Object.keys(payload).length > 0) {
+        authService.updateProfile(payload).catch(console.error);
+      }
+    }, 800);
+  }, []);
 
   // Authentication state
-  const [authToken, setAuthTokenState] = useState<string | null>(null);
-  const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [userId, setUserIdState] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticatedState] = useState(false);
 
@@ -194,12 +239,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const savedCoachAppStatus = await AsyncStorage.getItem('user_coach_application_status').catch(() => null);
         // Load user profile data with defensive error handling
-        const [savedName, savedEmail, savedWeight, savedBodyFat, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId, savedNotifs, savedRole] =
+        const [savedName, savedEmail, savedWeight, savedBodyFat, savedWaterGoalMl, savedMode, savedPlan, savedExperience, savedDiet, savedCoachId, savedCoachName, savedCV, savedAI, savedReviewDate, savedUserId, savedNotifs, savedPrivacy, savedRole, savedProfilePicture] =
           await Promise.all([
             AsyncStorage.getItem('user_fullname').catch(() => null),
             AsyncStorage.getItem('user_email').catch(() => null),
             AsyncStorage.getItem('user_weight').catch(() => null),
             AsyncStorage.getItem('user_body_fat_percentage').catch(() => null),
+            AsyncStorage.getItem('user_water_goal_ml').catch(() => null),
             AsyncStorage.getItem('user_mode').catch(() => null),
             AsyncStorage.getItem('user_subscription_plan').catch(() => null),
             AsyncStorage.getItem('user_experience_level').catch(() => null),
@@ -211,7 +257,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             AsyncStorage.getItem('user_last_plan_review').catch(() => null),
             AsyncStorage.getItem('user_id').catch(() => null),
             AsyncStorage.getItem('user_notification_settings').catch(() => null),
+            AsyncStorage.getItem('user_privacy_preferences').catch(() => null),
             AsyncStorage.getItem('user_role').catch(() => null),
+            AsyncStorage.getItem('user_profile_picture').catch(() => null),
           ]);
 
         // Load authentication data
@@ -233,6 +281,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setBodyFatPercentageState(parseFloat(savedBodyFat));
           } catch (e) {
             console.warn('[UserContext] Failed to parse body fat:', e);
+          }
+        }
+        if (savedWaterGoalMl) {
+          try {
+            setWaterGoalMlState(parseFloat(savedWaterGoalMl));
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse water goal:', e);
           }
         }
         if (savedMode) setUserModeState(savedMode as UserMode);
@@ -279,17 +334,32 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.warn('[UserContext] Failed to parse notification settings:', e);
           }
         }
+        if (savedPrivacy) {
+          try {
+            const parsed = JSON.parse(savedPrivacy) as Partial<PrivacyPreferences>;
+            setPrivacyPreferencesState({
+              analytics: true,
+              dataSharing: false,
+              ...parsed,
+            });
+          } catch (e) {
+            console.warn('[UserContext] Failed to parse privacy preferences:', e);
+          }
+        }
         if (savedRole) setRoleState(savedRole as UserRole);
+        if (savedProfilePicture) {
+          setProfilePictureState(normalizeProfilePicturePath(savedProfilePicture));
+        }
 
         // Set authentication state if tokens are valid
         if (tokens.accessToken && isTokenValid) {
-          setAuthTokenState(tokens.accessToken);
-          setRefreshTokenState(tokens.refreshToken);
           if (savedUserId) setUserIdState(savedUserId);
           setIsAuthenticatedState(true);
         } else if (tokens.accessToken) {
-          // Token expired, clear it
           await tokenManager.clearTokens();
+          setIsAuthenticatedState(false);
+          setFullNameState('');
+          await AsyncStorage.removeItem('user_fullname').catch(() => {});
         }
 
         if (savedRole !== 'coach') {
@@ -374,10 +444,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_notification_settings', JSON.stringify(settings)).catch((error) =>
       console.log('Failed to save notification settings:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { notificationSettings: settings } } as any).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { notificationSettings: settings } });
+  }, [queueProfileUpdate]);
+
+  const setPrivacyPreferences = useCallback((prefs: PrivacyPreferences) => {
+    setPrivacyPreferencesState(prefs);
+    AsyncStorage.setItem('user_privacy_preferences', JSON.stringify(prefs)).catch((error) =>
+      console.log('Failed to save privacy preferences:', error)
+    );
+    queueProfileUpdate({ profile: { privacyPreferences: prefs } });
+  }, [queueProfileUpdate]);
 
   const setRole = useCallback((r: UserRole) => {
     setRoleState(r);
@@ -409,10 +485,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Failed to save fullname:', error)
     );
     const parts = name.split(' ');
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ firstName: parts[0], lastName: parts.slice(1).join(' ') }).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ firstName: parts[0], lastName: parts.slice(1).join(' ') });
+  }, [queueProfileUpdate]);
 
   const setEmail = useCallback((email: string) => {
     setEmailState(email);
@@ -426,20 +500,26 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_weight', w.toString()).catch((error) =>
       console.log('Failed to save weight:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { currentWeight: w } } as any).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { currentWeight: w } });
+  }, [queueProfileUpdate]);
 
   const setBodyFatPercentage = useCallback((percentage: number) => {
     setBodyFatPercentageState(percentage);
     AsyncStorage.setItem('user_body_fat_percentage', percentage.toString()).catch((error) =>
       console.log('Failed to save body fat percentage:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { bodyFat: percentage } } as any).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { bodyFat: percentage } });
+  }, [queueProfileUpdate]);
+
+  const setWaterGoalMl = useCallback((ml: number) => {
+    setWaterGoalMlState(ml);
+    AsyncStorage.setItem('user_water_goal_ml', ml.toString()).catch((error) =>
+      console.log('Failed to save water goal:', error)
+    );
+    // Goals object is fetched and merged below in syncProfileFromServer
+    // For local update we just merge into the next request
+    queueProfileUpdate({ profile: { waterGoalMl: ml } });
+  }, [queueProfileUpdate]);
 
   const setUserMode = useCallback((mode: UserMode) => {
     setUserModeState(mode);
@@ -460,20 +540,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_experience_level', level).catch((error) =>
       console.log('Failed to save experience level:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { experienceLevel: level } } as any).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { experienceLevel: level } });
+  }, [queueProfileUpdate]);
 
   const setDietPreferences = useCallback((preferences: DietPreference[]) => {
     setDietPreferencesState(preferences);
     AsyncStorage.setItem('user_diet_preferences', JSON.stringify(preferences)).catch((error) =>
       console.log('Failed to save diet preferences:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { dietaryPreferences: preferences } } as any).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { dietaryPreferences: preferences } });
+  }, [queueProfileUpdate]);
 
   const setCoach = useCallback((id: string, name: string) => {
     setCoachIdState(id);
@@ -556,29 +632,38 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_cv_enabled', JSON.stringify(enabled)).catch((error) =>
       console.log('Failed to save CV setting:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { canUseComputerVision: enabled } } as any).catch(console.error);
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { canUseComputerVision: enabled } });
+  }, [queueProfileUpdate]);
 
   const setAIAssistantEnabled = useCallback((enabled: boolean) => {
     setCanUseAIAssistantState(enabled);
     AsyncStorage.setItem('user_ai_enabled', JSON.stringify(enabled)).catch((error) =>
       console.log('Failed to save AI setting:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) authService.updateProfile({ profile: { canUseAIAssistant: enabled } } as any).catch(console.error);
-    }).catch(console.error);
+    queueProfileUpdate({ profile: { canUseAIAssistant: enabled } });
+  }, [queueProfileUpdate]);
+
+  const persistProfilePicture = useCallback((path: string | null) => {
+    if (path) {
+      AsyncStorage.setItem('user_profile_picture', path).catch(() => {});
+    } else {
+      AsyncStorage.removeItem('user_profile_picture').catch(() => {});
+    }
   }, []);
 
+  const applyProfilePicture = useCallback(
+    (path: string | null) => {
+      setProfilePictureState(path);
+      persistProfilePicture(path);
+    },
+    [persistProfilePicture],
+  );
+
   const hydrateFromAuthUser = useCallback((user: AuthUser) => {
+    applyProfilePicture(getProfilePictureFromUserProfile(user.profile));
+
     const p = user.profile;
     if (!p) return;
-
-    // Profile picture (stored in profile.profilePicture for clients)
-    if (typeof (p as any).profilePicture === 'string' && (p as any).profilePicture) {
-      setProfilePictureState((p as any).profilePicture);
-    }
 
     if (p.currentWeight != null && Number.isFinite(Number(p.currentWeight))) {
       const w = Number(p.currentWeight);
@@ -614,11 +699,23 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (p.notificationSettings && typeof p.notificationSettings === 'object') {
       setNotificationSettingsState((prev) => ({ ...prev, ...p.notificationSettings }));
     }
-  }, []);
+    if (p.privacyPreferences && typeof p.privacyPreferences === 'object') {
+      setPrivacyPreferencesState((prev) => ({ ...prev, ...p.privacyPreferences }));
+      AsyncStorage.setItem('user_privacy_preferences', JSON.stringify(p.privacyPreferences)).catch(() => {});
+    }
+    if (p.waterGoalMl != null && Number.isFinite(Number(p.waterGoalMl))) {
+      const ml = Number(p.waterGoalMl);
+      setWaterGoalMlState(ml);
+      AsyncStorage.setItem('user_water_goal_ml', ml.toString()).catch(() => {});
+    }
+  }, [applyProfilePicture]);
 
-  const setProfilePicture = useCallback((path: string | null) => {
-    setProfilePictureState(path);
-  }, []);
+  const setProfilePicture = useCallback(
+    (path: string | null) => {
+      applyProfilePicture(normalizeProfilePicturePath(path));
+    },
+    [applyProfilePicture],
+  );
 
   const syncProfileFromServer = useCallback(async () => {
     try {
@@ -631,11 +728,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user.role === 'coach') {
         try {
           const { profile } = await coachService.getMyCoachProfile();
-          if (profile?.profilePicture) {
-            setProfilePictureState(profile.profilePicture);
-          }
+          applyProfilePicture(resolveCoachAvatarPath(profile, user.profile));
         } catch {
-          /* coach profile optional during sync */
+          applyProfilePicture(getProfilePictureFromUserProfile(user.profile));
         }
       }
 
@@ -652,9 +747,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const w = Number(latest.weight);
               setWeightState(w);
               AsyncStorage.setItem('user_weight', w.toString()).catch(() => {});
-              authService
-                .updateProfile({ profile: { currentWeight: w } } as any)
-                .catch(() => {});
+              queueProfileUpdate({ profile: { currentWeight: w } });
             }
             if (p.bodyFat == null && latest.bodyFat != null) {
               const bf = Number(latest.bodyFat);
@@ -669,7 +762,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       /* offline — keep cached profile */
     }
-  }, [hydrateFromAuthUser]);
+  }, [applyProfilePicture, hydrateFromAuthUser, queueProfileUpdate]);
 
   // Sync weight, body fat, check-in date, and preferences from server for every account.
   useEffect(() => {
@@ -683,14 +776,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     AsyncStorage.setItem('user_last_plan_review', today).catch((error) =>
       console.log('Failed to save plan review date:', error)
     );
-    tokenManager.getAccessToken().then((token) => {
-      if (token) {
-        authService
-          .updateProfile({ profile: { lastPlanReviewDate: today } } as any)
-          .catch(console.error);
-      }
-    }).catch(console.error);
-  }, []);
+    queueProfileUpdate({ profile: { lastPlanReviewDate: today } });
+  }, [queueProfileUpdate]);
+
+  const initializeWeeklyWeighInCycle = useCallback(() => {
+    if (lastPlanReviewDate) return;
+    const today = new Date().toISOString().split('T')[0];
+    setLastPlanReviewDateState(today);
+    AsyncStorage.setItem('user_last_plan_review', today).catch(() => {});
+    queueProfileUpdate({ profile: { lastPlanReviewDate: today } });
+  }, [lastPlanReviewDate, queueProfileUpdate]);
 
   const setUserId = useCallback(async (id: string) => {
     setUserIdState(id);
@@ -701,11 +796,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setAuthTokens = useCallback(async (accessToken: string, refreshToken: string) => {
     try {
-      setAuthTokenState(accessToken);
-      setRefreshTokenState(refreshToken);
       setIsAuthenticatedState(true);
 
-      // Save tokens using tokenManager — 7 days matches JWT_EXPIRES_IN on the backend
       await tokenManager.saveTokens({
         accessToken,
         refreshToken,
@@ -719,8 +811,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearAuth = useCallback(async () => {
     try {
-      setAuthTokenState(null);
-      setRefreshTokenState(null);
       setUserIdState(null);
       setIsAuthenticatedState(false);
 
@@ -753,11 +843,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfilePictureState(null);
 
       // Clear all stored data
+      const { clearAllCache } = await import('../services/offlineService');
+      await clearAllCache();
+
       await Promise.all([
+        AsyncStorage.removeItem('user_profile_picture'),
         AsyncStorage.removeItem('user_fullname'),
         AsyncStorage.removeItem('user_email'),
         AsyncStorage.removeItem('user_weight'),
         AsyncStorage.removeItem('user_body_fat_percentage'),
+        AsyncStorage.removeItem('user_water_goal_ml'),
         AsyncStorage.removeItem('user_mode'),
         AsyncStorage.removeItem('user_subscription_plan'),
         AsyncStorage.removeItem('user_experience_level'),
@@ -779,8 +874,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [clearAuth]);
 
-  return (
-    <UserContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       fullName,
       email,
       role,
@@ -798,19 +893,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       canUseComputerVision,
       canUseAIAssistant,
       lastPlanReviewDate,
+      waterGoalMl,
       notificationSettings,
-
-      // Authentication fields
-      authToken,
-      refreshToken,
+      privacyPreferences,
       userId,
       isAuthenticated,
       coachApplicationStatus,
-
       setFullName,
       setEmail,
       setWeight,
       setBodyFatPercentage,
+      setWaterGoalMl,
       setUserMode,
       setSubscriptionPlan,
       setExperienceLevel,
@@ -820,21 +913,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setComputerVisionEnabled,
       setAIAssistantEnabled,
       updateLastPlanReview,
+      initializeWeeklyWeighInCycle,
       setNotificationSettings,
+      setPrivacyPreferences,
       setRole,
       setCoachApplicationStatus,
       hydrateFromAuthUser,
       syncProfileFromServer,
       setProfilePicture,
-
-      // Authentication methods
       setAuthTokens,
       setUserId,
       clearAuth,
       logout,
-
       isLoading,
-    }}>
+    }),
+    [
+      fullName, email, role, profilePicture, weight, bodyFatPercentage, userMode,
+      subscriptionPlan, experienceLevel, dietPreferences, coachId, coachName,
+      canUseComputerVision, canUseAIAssistant, lastPlanReviewDate, waterGoalMl, notificationSettings, privacyPreferences,
+      userId, isAuthenticated, coachApplicationStatus, isLoading,
+      setFullName, setEmail, setWeight, setBodyFatPercentage, setWaterGoalMl, setUserMode, setSubscriptionPlan,
+      setExperienceLevel, setDietPreferences, setCoach, clearCoach, setComputerVisionEnabled,
+      setAIAssistantEnabled, updateLastPlanReview, initializeWeeklyWeighInCycle, setNotificationSettings, setPrivacyPreferences, setRole,
+      setCoachApplicationStatus, hydrateFromAuthUser, syncProfileFromServer, setProfilePicture,
+      setAuthTokens, setUserId, clearAuth, logout,
+    ],
+  );
+
+  return (
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );

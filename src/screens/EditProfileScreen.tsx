@@ -231,61 +231,23 @@ export const EditProfileScreen = ({ navigation }: any) => {
 
               {/* Name */}
               <View style={tw`gap-5 mb-6`}>
-                <View>
-                  <Text
-                    style={[
-                      tw`text-xs font-bold uppercase tracking-wider mb-2`,
-                      { color: labelColor },
-                    ]}
-                  >
-                    Full Name
-                  </Text>
-                  <TextInput
-                    style={[
-                      tw`w-full h-14 rounded-xl px-4 text-base`,
-                      {
-                        backgroundColor: inputBg,
-                        borderWidth: 2,
-                        borderColor: inputBorder,
-                        color: inputText,
-                      },
-                    ]}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Your full name"
-                    placeholderTextColor="#94a3b8"
-                    autoCapitalize="words"
-                  />
-                </View>
+                <FormInput
+                  label="Full Name"
+                  placeholder="Your full name"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                />
 
-                <View>
-                  <Text
-                    style={[
-                      tw`text-xs font-bold uppercase tracking-wider mb-2`,
-                      { color: labelColor },
-                    ]}
-                  >
-                    Email Address
-                  </Text>
-                  <TextInput
-                    style={[
-                      tw`w-full h-14 rounded-xl px-4 text-base`,
-                      {
-                        backgroundColor: inputBg,
-                        borderWidth: 2,
-                        borderColor: inputBorder,
-                        color: inputText,
-                      },
-                    ]}
-                    value={emailInput}
-                    onChangeText={setEmailInput}
-                    placeholder="you@email.com"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                  />
-                </View>
+                <FormInput
+                  label="Email Address"
+                  placeholder="you@email.com"
+                  value={emailInput}
+                  onChangeText={setEmailInput}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                />
               </View>
             </>
           ) : (

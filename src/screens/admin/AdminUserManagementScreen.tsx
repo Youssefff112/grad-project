@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { AdminBottomNav } from '../../components/admin/AdminBottomNav';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import * as adminService from '../../services/adminService';
 
 type FilterTab = 'all' | 'active' | 'inactive';
@@ -151,7 +152,7 @@ export const AdminUserManagementScreen = ({ navigation }: any) => {
         </View>
 
         {/* Filter tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false}>
           <View style={tw`flex-row gap-2`}>
             {(['all', 'active', 'inactive'] as FilterTab[]).map(f => (
               <TouchableOpacity
@@ -181,7 +182,7 @@ export const AdminUserManagementScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-4 pb-28`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-5 pt-4 pb-28`}>
           {users.length === 0 && (
             <View style={tw`items-center py-16`}>
               <MaterialIcons name="person-search" size={48} color={isDark ? '#334155' : '#cbd5e1'} />
@@ -204,9 +205,7 @@ export const AdminUserManagementScreen = ({ navigation }: any) => {
               >
                 {/* User info row */}
                 <View style={tw`flex-row items-center gap-3`}>
-                  <View style={[tw`w-11 h-11 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '18' }]}>
-                    <MaterialIcons name="person" size={22} color={accent} />
-                  </View>
+                  <ProfileAvatar profilePicture={user.profile?.profilePicture} size={44} />
                   <View style={tw`flex-1`}>
                     <View style={tw`flex-row items-center gap-2 flex-wrap`}>
                       <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>

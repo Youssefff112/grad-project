@@ -8,6 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PENDING_WEEKLY_WEIGH_IN_INTRO_KEY } from '../utils/weeklyWeighIn';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
@@ -19,6 +21,7 @@ import { Card } from '../components/Card';
 import { Switch } from '../components/Switch';
 import * as authService from '../services/auth.service';
 import { resolveCoachGate } from '../utils/coachGate';
+import { validateEmail, validateName, validatePassword } from '../utils/validation';
 
 export const AccountCreationScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -35,36 +38,17 @@ export const AccountCreationScreen = ({ navigation }: any) => {
 
   const validateForm = (): Record<string, string> => {
     const newErrors: Record<string, string> = {};
-
-    if (!name.trim()) {
-      newErrors.name = 'Please enter your full name';
-    } else {
-      const parts = name.trim().split(/\s+/);
-      const first = parts[0];
-      const last = parts.slice(1).join(' ') || first;
-      if (first.length < 2 || last.length < 2) {
-        newErrors.name = 'Use at least 2 characters for first and last name (e.g. Jane Doe).';
-      }
-    }
-    if (!email.trim()) {
-      newErrors.email = 'Please enter your email address';
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        newErrors.email = 'Please enter a valid email address';
-      }
-    }
-    if (!password) {
-      newErrors.password = 'Please enter a password';
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters long';
-    }
+    const nameErr = validateName(name);
+    if (nameErr) newErrors.name = nameErr;
+    const emailErr = validateEmail(email);
+    if (emailErr) newErrors.email = emailErr;
+    const passErr = validatePassword(password);
+    if (passErr) newErrors.password = passErr;
     if (!confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-
     return newErrors;
   };
 
@@ -108,6 +92,7 @@ export const AccountCreationScreen = ({ navigation }: any) => {
           setSubscriptionPlan('Free');
           navigation.navigate('CoachPendingApproval');
         } else {
+          await AsyncStorage.setItem(PENDING_WEEKLY_WEIGH_IN_INTRO_KEY, '1');
           navigation.navigate('SubscriptionSelection');
         }
       }

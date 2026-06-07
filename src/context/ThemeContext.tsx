@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import tw from '../tw';
@@ -61,7 +61,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     tw.setColorScheme(theme);
   }, [theme]);
 
-  const toggleTheme = useCallback(async () => {
+  const toggleTheme = useCallback(() => {
     setOverride((prev) => {
       const newTheme =
         prev === null
@@ -78,8 +78,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [systemScheme]);
 
+  const contextValue = useMemo(
+    () => ({ isDark, theme, accent, accentMuted, colors, toggleTheme, isLoading }),
+    [isDark, theme, accent, accentMuted, colors, toggleTheme, isLoading],
+  );
+
   return (
-    <ThemeContext.Provider value={{ isDark, theme, accent, accentMuted, colors, toggleTheme, isLoading }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

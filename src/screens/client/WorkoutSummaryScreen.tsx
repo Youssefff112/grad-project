@@ -43,7 +43,7 @@ const scoreGrade = (score: number): { label: string; color: string; emoji: strin
   if (score >= 80) return { label: 'Great', color: '#84cc16', emoji: '⭐' };
   if (score >= 70) return { label: 'Good', color: '#eab308', emoji: '👍' };
   if (score >= 55) return { label: 'Fair', color: '#f97316', emoji: '💪' };
-  return { label: 'Needs Work', color: '#ef4444', emoji: '🔧' };
+  return { label: 'Needs Practice', color: '#ef4444', emoji: '🔧' };
 };
 
 const ScoreRing = ({ score, size = 96, dark = true }: { score: number; size?: number; dark?: boolean }) => {
@@ -85,7 +85,7 @@ const ScoreRing = ({ score, size = 96, dark = true }: { score: number; size?: nu
           stroke={grade.color}
           strokeWidth={strokeWidth}
           fill="none"
-          strokeDasharray={circumference}
+          strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
         />
@@ -103,14 +103,16 @@ const ScoreRing = ({ score, size = 96, dark = true }: { score: number; size?: nu
 const StatCard = ({ label, value, sub, accent, isDark }: {
   label: string; value: string; sub?: string; accent?: string; isDark: boolean;
 }) => (
-  <View style={[tw`flex-1 rounded-2xl px-2 py-4 items-center justify-center`, {
+  <View style={[tw`flex-1 rounded-2xl px-1 py-4 items-center justify-between`, {
     backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     borderWidth: 1,
     borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
   }]}>
-    <Text style={[tw`text-xl font-black text-center`, { color: accent ?? (isDark ? 'white' : '#1e293b') }]}>{value}</Text>
-    {sub && <Text style={[tw`text-[10px] font-semibold mt-0.5 text-center`, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>{sub}</Text>}
-    <Text style={[tw`text-[10px] font-bold uppercase tracking-wider mt-1 text-center`, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }]}>{label}</Text>
+    <View style={tw`items-center`}>
+      <Text style={[tw`text-xl font-black text-center`, { color: accent ?? (isDark ? 'white' : '#1e293b') }]}>{value}</Text>
+      {sub ? <Text style={[tw`text-[10px] font-semibold mt-0.5 text-center`, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>{sub}</Text> : <Text style={[tw`text-[10px] mt-0.5 opacity-0`]}>-</Text>}
+    </View>
+    <Text style={[tw`text-[9px] font-bold uppercase tracking-wider mt-2 text-center leading-tight`, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }]}>{label}</Text>
   </View>
 );
 
@@ -150,7 +152,7 @@ export const WorkoutSummaryScreen = ({ navigation, route }: any) => {
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
+        <ScrollView keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 48 }}
           showsVerticalScrollIndicator={false}
         >
@@ -198,14 +200,14 @@ export const WorkoutSummaryScreen = ({ navigation, route }: any) => {
           <Section title="Rep quality" isDark={isDark}>
             <View style={tw`flex-row gap-2`}>
               <StatCard
-                label="Correct Reps"
+                label="Solid Reps"
                 value={`${summary.correctReps}`}
                 sub="≥ 70% form"
                 accent="#22c55e"
                 isDark={isDark}
               />
               <StatCard
-                label="Incorrect Reps"
+                label="Needs Practice"
                 value={`${summary.incorrectReps}`}
                 sub="< 70% form"
                 accent={summary.incorrectReps > 0 ? '#ef4444' : '#22c55e'}
@@ -348,21 +350,21 @@ export const WorkoutSummaryScreen = ({ navigation, route }: any) => {
           </Section>
 
           {/* ── CTA buttons ───────────────────────────────────────────────── */}
-          <View style={tw`gap-3 mt-8`}>
-            <TouchableOpacity
-              onPress={handleDone}
-              style={[tw`w-full py-4 rounded-2xl items-center justify-center flex-row gap-2`, { backgroundColor: accent }]}
-            >
-              <MaterialIcons name="check" size={20} color="white" />
-              <Text style={tw`text-white text-base font-black`}>Done</Text>
-            </TouchableOpacity>
-
+          <View style={tw`flex-row gap-3 mt-8`}>
             <TouchableOpacity
               onPress={handleDoAgain}
-              style={[tw`w-full py-4 rounded-2xl items-center flex-row justify-center gap-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
+              style={[tw`flex-1 py-4 rounded-2xl items-center flex-row justify-center gap-2`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}
             >
               <MaterialIcons name="replay" size={20} color={textPrimary} />
               <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>Do again</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={handleDone}
+              style={[tw`flex-[1.5] py-4 rounded-2xl items-center justify-center flex-row gap-2`, { backgroundColor: accent }]}
+            >
+              <MaterialIcons name="check" size={20} color="white" />
+              <Text style={tw`text-white text-base font-black`}>Done</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

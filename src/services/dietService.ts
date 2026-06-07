@@ -8,7 +8,35 @@
  * this frontend call will automatically use the AI-generated plans.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet, apiPost, apiDelete } from './api';
+
+async function dietPlanCacheKey(): Promise<string | null> {
+  const userId = await AsyncStorage.getItem('user_id');
+  return userId ? `persist_diet_plan_${userId}` : null;
+}
+
+async function saveDietPlanLocally(plan: DietPlan | null) {
+  const key = await dietPlanCacheKey();
+  if (!key) return;
+  if (plan) {
+    await AsyncStorage.setItem(key, JSON.stringify(plan));
+  } else {
+    await AsyncStorage.removeItem(key);
+  }
+}
+
+async function loadDietPlanLocally(): Promise<DietPlan | null> {
+  const key = await dietPlanCacheKey();
+  if (!key) return null;
+  const raw = await AsyncStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DietPlan;
+  } catch {
+    return null;
+  }
+}
 
 export interface MacroNutrients {
   protein: number;
@@ -84,7 +112,9 @@ export interface DietLogRequest {
 export const generateDietPlan = async (): Promise<{ plan: DietPlan }> => {
   // AI generation can take 60-120 s on a cold start — use a generous timeout.
   const response: any = await apiPost('/diet/generate', {}, { timeout: 120000 });
-  return { plan: response.data?.plan };
+  const plan = response.data?.plan ?? null;
+  if (plan) await saveDietPlanLocally(plan);
+  return { plan };
 };
 
 /**
@@ -92,12 +122,21 @@ export const generateDietPlan = async (): Promise<{ plan: DietPlan }> => {
  * Returns ``{ plan: null }`` if the user has no active plan.
  */
 export const getActiveDietPlan = async (): Promise<{ plan: DietPlan | null }> => {
-  const response: any = await apiGet('/diet/active');
-  return { plan: response.data?.plan ?? null };
+  try {
+    const response: any = await apiGet('/diet/active');
+    const plan = response.data?.plan ?? null;
+    await saveDietPlanLocally(plan);
+    return { plan };
+  } catch (err) {
+    const cached = await loadDietPlanLocally();
+    if (cached) return { plan: cached };
+    throw err;
+  }
 };
 
 export const deleteActiveDietPlan = async (): Promise<void> => {
   await apiDelete('/diet/active');
+  await saveDietPlanLocally(null);
 };
 
 /**

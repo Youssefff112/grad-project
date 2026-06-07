@@ -23,7 +23,7 @@ export const AboutScreen = ({ navigation }: any) => {
         <Text style={[tw`text-lg font-bold tracking-tight flex-1 text-center`, { color: textPrimary }]}>About Vertex</Text>
         <View style={tw`w-12`} />
       </View>
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`p-6 pb-12 items-center gap-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`p-6 pb-12 items-center gap-6`}>
         <View style={[tw`w-24 h-24 rounded-3xl items-center justify-center mb-2`, { backgroundColor: accent + '14' }]}>
            <MaterialIcons name="fitness-center" size={48} color={accent} />
         </View>

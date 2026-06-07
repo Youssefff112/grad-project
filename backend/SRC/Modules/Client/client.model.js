@@ -28,7 +28,10 @@ ClientProfile.init({
   sequelize,
   modelName: 'ClientProfile',
   tableName: 'client_profiles',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['selectedCoachId'], name: 'client_profiles_selected_coach_id_idx' },
+  ],
 });
 
 import('../User/user.model.js').then(({ User }) => {

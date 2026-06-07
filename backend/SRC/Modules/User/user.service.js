@@ -1,6 +1,7 @@
 // src/Modules/User/user.service.js
 import { User } from './user.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+import { DietPlan } from '../Diet/diet.model.js';
 
 export const userService = {
   async getProfile(userId) {
@@ -30,6 +31,15 @@ export const userService = {
     }
 
     await User.update(updates, { where: { id: userId } });
+
+    // Sync water goal to active diet plan if present
+    if (updates.profile?.waterGoalMl != null) {
+      await DietPlan.update(
+        { hydrationGoal: updates.profile.waterGoalMl },
+        { where: { userId, isActive: true } }
+      );
+    }
+
     return await User.findByPk(userId);
   },
 

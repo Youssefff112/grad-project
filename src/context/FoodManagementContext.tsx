@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Built-in Food Dataset ────────────────────────────────────────────────────
@@ -383,27 +383,35 @@ export const FoodManagementProvider: React.FC<{ children: React.ReactNode }> = (
     [recentSearches, persistSearches]
   );
 
+  const contextValue = useMemo(
+    () => ({
+      foods,
+      customMeals,
+      recentSearches,
+      addFood,
+      updateFood,
+      deleteFood,
+      searchFoods,
+      getFoodById,
+      saveMealPlan,
+      updateMealPlan,
+      deleteMealPlan,
+      getMealsByType,
+      getMealById,
+      calculateFoodMacros,
+      addRecentSearch,
+      isLoading,
+    }),
+    [
+      foods, customMeals, recentSearches, isLoading,
+      addFood, updateFood, deleteFood, searchFoods, getFoodById,
+      saveMealPlan, updateMealPlan, deleteMealPlan, getMealsByType,
+      getMealById, calculateFoodMacros, addRecentSearch,
+    ],
+  );
+
   return (
-    <FoodManagementContext.Provider
-      value={{
-        foods,
-        customMeals,
-        recentSearches,
-        addFood,
-        updateFood,
-        deleteFood,
-        searchFoods,
-        getFoodById,
-        saveMealPlan,
-        updateMealPlan,
-        deleteMealPlan,
-        getMealsByType,
-        getMealById,
-        calculateFoodMacros,
-        addRecentSearch,
-        isLoading,
-      }}
-    >
+    <FoodManagementContext.Provider value={contextValue}>
       {children}
     </FoodManagementContext.Provider>
   );

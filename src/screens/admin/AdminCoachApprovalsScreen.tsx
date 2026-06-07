@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { AdminBottomNav } from '../../components/admin/AdminBottomNav';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import * as adminService from '../../services/adminService';
 
 type TabType = 'pending' | 'approved';
@@ -188,7 +189,7 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
+        <ScrollView keyboardShouldPersistTaps="handled"
           style={tw`flex-1`}
           contentContainerStyle={tw`px-5 pt-4 pb-28`}
           refreshControl={
@@ -227,9 +228,7 @@ export const AdminCoachApprovalsScreen = ({ navigation }: any) => {
               >
                 {/* Coach header */}
                 <View style={tw`flex-row items-center gap-3 mb-3`}>
-                  <View style={[tw`w-12 h-12 rounded-full items-center justify-center flex-shrink-0`, { backgroundColor: accent + '18' }]}>
-                    <MaterialIcons name="person" size={26} color={accent} />
-                  </View>
+                  <ProfileAvatar profilePicture={(app.User as any)?.profile?.profilePicture} size={48} />
                   <View style={tw`flex-1`}>
                     <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>{name}</Text>
                     <Text style={[tw`text-xs`, { color: subtextColor }]}>{email}</Text>

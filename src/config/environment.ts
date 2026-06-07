@@ -15,7 +15,11 @@
 import Constants from 'expo-constants';
 
 const getHostFromExpo = (): string | null => {
-  const hostUri = Constants.expoConfig?.hostUri ?? (Constants as any).manifest?.debuggerHost;
+  const hostUri =
+    Constants.expoConfig?.hostUri
+    ?? Constants.expoGoConfig?.hostUri
+    ?? Constants.manifest2?.extra?.expoGo?.debuggerHost
+    ?? null;
   if (hostUri) return hostUri.split(':')[0];
   return null;
 };
@@ -55,6 +59,14 @@ const BACKEND_URL = getBackendUrl();
 const AI_BACKEND_URL = getAIBackendUrl();
 const API_PREFIX = process.env.EXPO_PUBLIC_API_PREFIX || '/api/v1';
 const ENV = process.env.EXPO_PUBLIC_ENV || 'development';
+const isProduction = ENV === 'production';
+
+if (isProduction && BACKEND_URL.startsWith('http://')) {
+  console.error(
+    '[Vertex] SECURITY: Production builds must use HTTPS for EXPO_PUBLIC_BACKEND_URL. ' +
+    'Cleartext HTTP exposes auth tokens on the network.',
+  );
+}
 
 export const environment = {
   BACKEND_URL,
@@ -63,7 +75,9 @@ export const environment = {
   API_BASE_URL: `${BACKEND_URL}${API_PREFIX}`,
   ENV,
   isDevelopment: ENV === 'development',
-  isProduction: ENV === 'production',
+  isProduction,
+  /** True when API traffic should use TLS (production or explicit https URL). */
+  requiresHttps: isProduction || BACKEND_URL.startsWith('https://'),
 };
 
 if (__DEV__) {

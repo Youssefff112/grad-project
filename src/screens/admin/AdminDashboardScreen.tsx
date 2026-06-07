@@ -97,7 +97,7 @@ export const AdminDashboardScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-28`} showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-28`} showsVerticalScrollIndicator={false}>
         {loading ? (
           <View style={tw`items-center justify-center py-20`}>
             <ActivityIndicator size="large" color={accent} />

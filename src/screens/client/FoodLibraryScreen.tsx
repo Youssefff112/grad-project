@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ScrollView,
+  SectionList,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -162,7 +163,7 @@ export const FoodLibraryScreen = ({ navigation }: any) => {
 
       {/* Content */}
       {isEmpty ? (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
           <View style={[tw`w-16 h-16 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
             <MaterialIcons name="restaurant" size={32} color={accent} />
           </View>
@@ -183,7 +184,7 @@ export const FoodLibraryScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </ScrollView>
       ) : isFiltered ? (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
           <MaterialIcons name="search-off" size={40} color={textSecondary} />
           <Text style={[tw`text-base font-bold text-center`, { color: textPrimary }]}>
             No foods found
@@ -193,52 +194,29 @@ export const FoodLibraryScreen = ({ navigation }: any) => {
           </Text>
         </ScrollView>
       ) : (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-8`}>
-          {/* Custom Foods Section */}
-          {userFoods.length > 0 && (
-            <>
-              <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-2 mt-2`, { color: textSecondary }]}>
-                My Foods ({userFoods.length})
-              </Text>
-              {userFoods.map((food) => (
-                <FoodCard
-                  key={food.id}
-                  food={food}
-                  onPress={() => {
-                    // Could show detail screen later
-                  }}
-                  onEdit={() => {
-                    // Navigate to edit screen
-                    navigation.navigate('AddFood', { food });
-                  }}
-                  onDelete={() => handleDeleteFood(food.id, food.name)}
-                  showActions={true}
-                />
-              ))}
-            </>
+        <SectionList
+          style={tw`flex-1`}
+          contentContainerStyle={tw`px-4 py-4 gap-1 pb-8`}
+          sections={[
+            ...(userFoods.length > 0 ? [{ title: `My Foods (${userFoods.length})`, data: userFoods }] : []),
+            ...(apiFoods.length > 0 ? [{ title: `From USDA (${apiFoods.length})`, data: apiFoods }] : []),
+          ]}
+          keyExtractor={(item) => item.id}
+          renderSectionHeader={({ section: { title } }) => (
+            <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-2 mt-2`, { color: textSecondary }]}>
+              {title}
+            </Text>
           )}
-
-          {/* API Foods Section */}
-          {apiFoods.length > 0 && (
-            <>
-              <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-2`, { color: textSecondary }]}>
-                From USDA ({apiFoods.length})
-              </Text>
-              {apiFoods.map((food) => (
-                <FoodCard
-                  key={food.id}
-                  food={food}
-                  onPress={() => {
-                    // Could show detail screen later
-                  }}
-                  onDelete={() => handleDeleteFood(food.id, food.name)}
-                  showActions={true}
-                />
-              ))}
-            </>
+          renderItem={({ item: food, section }) => (
+            <FoodCard
+              food={food}
+              onPress={() => {}}
+              onEdit={section.title.startsWith('My Foods') ? () => navigation.navigate('AddFood', { food }) : undefined}
+              onDelete={() => handleDeleteFood(food.id, food.name)}
+              showActions={true}
+            />
           )}
-
-          {/* Search USDA Button */}
+          ListFooterComponent={
           <View style={tw`mt-6 mb-4`}>
             <TouchableOpacity
               onPress={() => navigation.navigate('FoodSearch')}
@@ -251,7 +229,8 @@ export const FoodLibraryScreen = ({ navigation }: any) => {
               <Text style={[tw`font-bold`, { color: accent }]}>Search USDA Database</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+          }
+        />
       )}
     </SafeAreaView>
   );

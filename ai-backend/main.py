@@ -214,7 +214,13 @@ def generate_nutrition_plan(client_id: int, db: Session = Depends(get_db)):
         except Exception:
             profile_ext = {}
 
-    if profile_ext and profile_ext.get("nutrition"):
+    if profile_ext:
+        nutrition = dict(profile_ext.get("nutrition") or {})
+        health = profile_ext.get("health") or {}
+        if not nutrition.get("allergies"):
+            nutrition["allergies"] = health.get("allergies") or []
+        if not nutrition.get("diet_style") and client.dietary_preferences:
+            nutrition["diet_style"] = client.dietary_preferences
         client_dict = {
             "weight_kg": client.weight_kg,
             "height_cm": client.height_cm,
@@ -224,7 +230,7 @@ def generate_nutrition_plan(client_id: int, db: Session = Depends(get_db)):
             "activity_level": client.activity_level,
             "dietary_preferences": client.dietary_preferences or "",
             "primary_goals": profile_ext.get("goals", {}).get("primary_goals", [client.goal]),
-            "nutrition": profile_ext.get("nutrition", {}),
+            "nutrition": nutrition,
         }
         plan_data = generate_nutrition_plan_full(client_dict)
     else:

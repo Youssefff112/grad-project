@@ -26,7 +26,7 @@ export const ExerciseDetailScreen = ({ navigation, route }: any) => {
         <View style={tw`flex size-12 items-center justify-center`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-8`}>
         {/* Exercise Header Card */}
         <View style={[tw`mx-4 mt-6 p-6 rounded-2xl`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
           <View style={tw`flex-row items-center gap-3 mb-4`}>

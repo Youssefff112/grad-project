@@ -25,7 +25,7 @@ export const CoachApplicationRejectedScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-6 pb-10`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-6 pb-10`}>
         <View style={tw`items-center pt-10 pb-6`}>
           <View style={[tw`w-20 h-20 rounded-2xl items-center justify-center mb-4`, { backgroundColor: '#ef444418' }]}>
             <MaterialIcons name="cancel" size={44} color="#ef4444" />

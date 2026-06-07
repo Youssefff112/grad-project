@@ -271,6 +271,18 @@ export const dietService = {
           { where: { userId, isActive: true } }
         );
 
+        const allergies = Array.isArray(profile.allergies)
+          ? profile.allergies.map((a) => String(a).trim()).filter(Boolean)
+          : [];
+
+        const enrichedWeeklyMealPlan = this._enrichWeeklyMealPlanWithIngredients(
+          aiBundle.weeklyMealPlan,
+          dietaryPreference,
+          aiBundle.dailyCalorieTarget || 2000,
+          aiBundle.macronutrients || { protein: 150, carbs: 200, fats: 60 },
+          allergies,
+        );
+
         const dietPlan = await DietPlan.create({
           userId,
           planName: planName || null,
@@ -278,7 +290,7 @@ export const dietService = {
           dietaryPreference,
           dailyCalorieTarget: aiBundle.dailyCalorieTarget || 2000,
           macronutrients: aiBundle.macronutrients || { protein: 150, carbs: 200, fats: 60 },
-          weeklyMealPlan: aiBundle.weeklyMealPlan,
+          weeklyMealPlan: enrichedWeeklyMealPlan,
           assignedByCoachId: coachId || null,
           assignedAt: coachId ? new Date() : null,
           weekStartDate: this._getStartOfWeek(),
@@ -308,10 +320,15 @@ export const dietService = {
     const macros = this._calculateMacros(dailyCalorieTarget, goal);
 
     // Generate weekly meal plan
+    const allergies = Array.isArray(profile.allergies)
+      ? profile.allergies.map((a) => String(a).trim()).filter(Boolean)
+      : [];
+
     const weeklyMealPlan = this._generateWeeklyMealPlan(
       dailyCalorieTarget,
       macros,
-      dietaryPreference
+      dietaryPreference,
+      allergies
     );
 
     const dietPlan = await DietPlan.create({
@@ -393,14 +410,81 @@ export const dietService = {
   },
 
   // Generate sample weekly meal plan
-  _generateWeeklyMealPlan(dailyCalories, macros, dietaryPreference) {
+  _matchesAllergy(text, allergies) {
+    const hay = String(text).toLowerCase();
+    return (allergies || []).some((a) => {
+      const needle = String(a).toLowerCase().trim();
+      return needle.length > 0 && hay.includes(needle);
+    });
+  },
+
+  _filterAllergens(ingredients, allergies) {
+    if (!allergies?.length) return ingredients;
+    return ingredients.filter((ing) => !this._matchesAllergy(ing, allergies));
+  },
+
+  _mealHasMeasuredIngredients(ingredients) {
+    if (!Array.isArray(ingredients) || ingredients.length === 0) return false;
+    return ingredients.some((ing) =>
+      /\d+\s*(g|ml|oz|lb|kg|l|cup|cups|tbsp|tsp|egg|slice|scoop)/i.test(String(ing))
+    );
+  },
+
+  _enrichWeeklyMealPlanWithIngredients(weeklyMealPlan, dietaryPreference, dailyCalories, macros, allergies = []) {
+    const pref = (dietaryPreference || 'none').toLowerCase();
+    const isVegan = pref === 'vegan';
+    const isVegetarian = pref === 'vegetarian' || isVegan;
+    const calorieDistribution = { breakfast: 0.25, lunch: 0.35, dinner: 0.30, snack: 0.10 };
+    const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+    return (weeklyMealPlan || []).map((dayPlan, dayIndex) => ({
+      ...dayPlan,
+      meals: (dayPlan.meals || []).map((meal, typeIdx) => {
+        if (this._mealHasMeasuredIngredients(meal.ingredients)) {
+          return meal;
+        }
+
+        const type = meal.type || mealTypes[Math.min(typeIdx, mealTypes.length - 1)] || 'snack';
+        const dist = calorieDistribution[type] || 0.25;
+        const targetCal = Math.round((dailyCalories || 2000) * dist);
+        const targetProt = Math.round((macros?.protein || 150) * dist);
+        const targetCarb = Math.round((macros?.carbs || 200) * dist);
+        const composed = this._composeMeal(
+          targetCal,
+          targetProt,
+          type,
+          isVegan,
+          isVegetarian,
+          dayIndex + typeIdx * 3,
+        );
+        const safeIngredients = this._filterAllergens(composed.ingredients, allergies);
+
+        return {
+          ...meal,
+          name: meal.name && !/^meal\s+\d+$/i.test(String(meal.name)) ? meal.name : composed.name,
+          description: meal.description || `Serving: ${composed.servingSize}`,
+          servingSize: composed.servingSize,
+          ingredients: safeIngredients.length ? safeIngredients : composed.ingredients,
+          nutrition: {
+            calories: meal.nutrition?.calories ?? Math.round(composed.totalCal) ?? targetCal,
+            protein: meal.nutrition?.protein ?? Math.round(composed.totalProt) ?? targetProt,
+            carbs: meal.nutrition?.carbs ?? Math.round(composed.totalCarbs) ?? targetCarb,
+            fats: meal.nutrition?.fats ?? meal.nutrition?.fat ?? Math.round(composed.totalFat) ?? 0,
+          },
+          preparationTime: meal.preparationTime || (type === 'snack' ? 3 : type === 'breakfast' ? 10 : 25),
+        };
+      }),
+    }));
+  },
+
+  _generateWeeklyMealPlan(dailyCalories, macros, dietaryPreference, allergies = []) {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const weeklyPlan = [];
 
     for (let i = 0; i < days.length; i++) {
       weeklyPlan.push({
         day: days[i],
-        meals: this._generateDailyMeals(dailyCalories, macros, dietaryPreference, i)
+        meals: this._generateDailyMeals(dailyCalories, macros, dietaryPreference, i, allergies)
       });
     }
 
@@ -781,7 +865,7 @@ export const dietService = {
     };
   },
 
-  _generateDailyMeals(dailyCalories, macros, dietaryPreference, dayIndex = 0) {
+  _generateDailyMeals(dailyCalories, macros, dietaryPreference, dayIndex = 0, allergies = []) {
     const calorieDistribution = { breakfast: 0.25, lunch: 0.35, dinner: 0.30, snack: 0.10 };
     const pref = (dietaryPreference || 'none').toLowerCase();
     const isVegan = pref === 'vegan';
@@ -794,13 +878,14 @@ export const dietService = {
 
       // Use a different rotation offset per meal type so each slot varies independently
       const composed = this._composeMeal(targetCal, targetProt, type, isVegan, isVegetarian, dayIndex + typeIdx * 3);
+      const safeIngredients = this._filterAllergens(composed.ingredients, allergies);
 
       return {
         type,
         name: composed.name,
         description: `Serving: ${composed.servingSize}`,
         servingSize: composed.servingSize,
-        ingredients: composed.ingredients,
+        ingredients: safeIngredients.length ? safeIngredients : composed.ingredients,
         nutrition: {
           calories: Math.round(composed.totalCal) || targetCal,
           protein:  Math.round(composed.totalProt) || targetProt,

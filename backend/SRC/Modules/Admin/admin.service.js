@@ -64,7 +64,35 @@ export const adminService = {
   },
 
   async updateUser(userId, updates) {
-    await User.update(updates, { where: { id: userId } });
+    const ALLOWED = ['firstName', 'lastName', 'email', 'role', 'userType', 'isActive'];
+    const BLOCKED = [
+      'password',
+      'refreshToken',
+      'passwordResetToken',
+      'passwordResetExpires',
+      'id',
+    ];
+
+    for (const blocked of BLOCKED) {
+      if (updates[blocked] !== undefined) {
+        throw new AppError(`Field "${blocked}" cannot be updated via this endpoint`, 403);
+      }
+    }
+
+    const sanitized = {};
+    for (const key of ALLOWED) {
+      if (updates[key] !== undefined) sanitized[key] = updates[key];
+    }
+
+    if (sanitized.role === 'admin') {
+      throw new AppError('Cannot assign admin role via this endpoint', 403);
+    }
+
+    if (Object.keys(sanitized).length === 0) {
+      throw new AppError('No valid fields to update', 400);
+    }
+
+    await User.update(sanitized, { where: { id: userId } });
     const user = await User.findByPk(userId);
 
     if (!user) {

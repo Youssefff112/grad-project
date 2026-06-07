@@ -354,7 +354,7 @@ export const CalibrationScreen = ({ navigation, route }: any) => {
 
         {/* Instruction cards */}
         {showInstructions && (
-          <ScrollView
+          <ScrollView keyboardShouldPersistTaps="handled"
             style={{ flex: 1 }}
             contentContainerStyle={tw`px-4 pt-3 pb-2 gap-2`}
             showsVerticalScrollIndicator

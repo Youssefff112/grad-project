@@ -11,7 +11,10 @@ export const validate = (schema) => {
 
     const { error, value } = schema.validate(validationTarget, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
+      context: {
+        userType: req.user?.userType,
+      },
     });
 
     if (error) {

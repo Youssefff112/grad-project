@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import { useFoodManagement, Food } from '../../context/FoodManagementContext';
+import { FoodPickerModal } from '../../components/FoodPickerModal';
 import * as coachService from '../../services/coachService';
 
 interface Meal {
@@ -95,13 +97,16 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
   /** API expects client User.id (same as CoachClientDetail `planClientId`). */
   const apiClientId = Number(clientUserId ?? clientId);
   const { isDark, accent } = useTheme();
+  const { foods: catalogFoods } = useFoodManagement();
 
   const [planName, setPlanName] = useState('');
   const [calorieTarget, setCalorieTarget] = useState('2000');
+  const [hydrationGoal, setHydrationGoal] = useState('2000');
   const [selectedDay, setSelectedDay] = useState('Mon');
   const [selectedMealType, setSelectedMealType] = useState('Breakfast');
   const [dayPlans, setDayPlans] = useState<Record<string, MealGroup[]>>({});
   const [showFoodPicker, setShowFoodPicker] = useState(false);
+  const [showCustomFoodForm, setShowCustomFoodForm] = useState(false);
   const [customFoodName, setCustomFoodName] = useState('');
   const [customCalories, setCustomCalories] = useState('');
   const [customProtein, setCustomProtein] = useState('');
@@ -122,13 +127,12 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     if (existingPlan) {
-      const defaultName = existingPlan.goal || 'Diet';
-      setPlanName(existingPlan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
-      if (existingPlan.dailyCalorieTarget) {
-        setCalorieTarget(String(existingPlan.dailyCalorieTarget));
+      if (existingPlan.planName) setPlanName(existingPlan.planName);
+      if (existingPlan.dailyCalorieTarget) setCalorieTarget(String(existingPlan.dailyCalorieTarget));
+      if (existingPlan.hydrationGoal) setHydrationGoal(String(existingPlan.hydrationGoal));
+      if (existingPlan.weeklyMealPlan) {
+        setDayPlans(mapMealPlanToUI(existingPlan.weeklyMealPlan));
       }
-      const mapped = mapMealPlanToUI(existingPlan.weeklyMealPlan || []);
-      setDayPlans(mapped);
     }
   }, []);
 
@@ -186,11 +190,24 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
       return { ...prev, [selectedDay]: [...dayData, newGroup] };
     });
     setShowFoodPicker(false);
+    setShowCustomFoodForm(false);
     setCustomFoodName('');
     setCustomCalories('');
     setCustomProtein('');
     setCustomCarbs('');
     setCustomFat('');
+  };
+
+  const addFoodFromCatalog = (food: Food, quantity: number) => {
+    const label = quantity === 1 ? food.name : `${food.name} (×${quantity})`;
+    addFoodToDay({
+      name: label,
+      calories: Math.round(food.calories * quantity),
+      protein: Math.round(food.protein * quantity),
+      carbs: Math.round(food.carbs * quantity),
+      fat: Math.round(food.fats * quantity),
+    });
+    setShowFoodPicker(false);
   };
 
   const handleAddCustomFood = () => {
@@ -224,6 +241,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         const defaultName = plan.goal || 'Diet';
         setPlanName(plan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
         if (plan.dailyCalorieTarget) setCalorieTarget(String(plan.dailyCalorieTarget));
+        if (plan.hydrationGoal) setHydrationGoal(String(plan.hydrationGoal));
         setDayPlans(mapMealPlanToUI(plan.weeklyMealPlan || []));
         Alert.alert('Plan Generated', 'The AI diet plan has been loaded. Review and edit it before saving.');
       }
@@ -298,11 +316,13 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
       }));
 
       const caloriesNum = parseInt(calorieTarget, 10) || 2000;
+      const hydrationNum = parseInt(hydrationGoal, 10) || 2000;
 
       if (editingPlanId) {
         await coachService.updateClientDietPlan(editingPlanId, {
           weeklyMealPlan,
           dailyCalorieTarget: caloriesNum,
+          hydrationGoal: hydrationNum,
           planName,
         });
         Alert.alert('Plan Updated', `Diet plan "${planName}" has been updated.`, [
@@ -312,6 +332,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         await coachService.assignDietToClient(apiClientId, {
           planName,
           dailyCalorieTarget: caloriesNum,
+          hydrationGoal: hydrationNum,
           weeklyMealPlan,
         });
         Alert.alert('Plan Assigned', `Meal plan "${planName}" has been assigned to ${clientName}.`, [
@@ -351,7 +372,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
         {/* AI Generate banner */}
         {Number.isFinite(apiClientId) && apiClientId > 0 && (
           <TouchableOpacity
@@ -377,28 +398,80 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         {/* Plan Details */}
         <View style={[tw`p-4 rounded-2xl mb-4`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
           <TextInput
-            style={[tw`text-lg font-bold mb-1`, { color: textPrimary }]}
+            style={[tw`text-xl font-black mb-4`, { color: textPrimary }]}
             placeholder="Plan name..."
             placeholderTextColor={subtextColor}
             value={planName}
             onChangeText={setPlanName}
           />
-          <View style={tw`flex-row items-center gap-2`}>
-            <MaterialIcons name="local-fire-department" size={16} color={accent} />
-            <TextInput
-              style={[tw`text-sm font-semibold`, { color: accent }]}
-              placeholder="Daily calorie target"
-              placeholderTextColor={subtextColor}
-              value={calorieTarget}
-              onChangeText={setCalorieTarget}
-              keyboardType="number-pad"
-            />
-            <Text style={[tw`text-xs`, { color: subtextColor }]}>kcal/day target</Text>
+
+          <View style={tw`flex-row gap-3`}>
+            {/* Calories Goal */}
+            <View style={[tw`flex-1 p-3 rounded-xl border`, { backgroundColor: isDark ? '#1e293b' : '#f8f7f5', borderColor }]}>
+              <View style={tw`flex-row items-center mb-2 gap-1`}>
+                <MaterialIcons name="local-fire-department" size={14} color={accent} />
+                <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: subtextColor }]}>Calories</Text>
+              </View>
+              <View style={tw`flex-row items-center`}>
+                <TouchableOpacity
+                  onPress={() => setCalorieTarget(prev => String(Math.max(0, parseInt(prev || '0') - 100)))}
+                  style={[tw`p-1 rounded-md`, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                >
+                  <MaterialIcons name="remove" size={16} color={textPrimary} />
+                </TouchableOpacity>
+                <TextInput
+                  style={[tw`flex-1 text-center font-black text-lg`, { color: accent }]}
+                  placeholder="2000"
+                  placeholderTextColor={subtextColor}
+                  value={calorieTarget}
+                  onChangeText={setCalorieTarget}
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity
+                  onPress={() => setCalorieTarget(prev => String(parseInt(prev || '0') + 100))}
+                  style={[tw`p-1 rounded-md`, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                >
+                  <MaterialIcons name="add" size={16} color={textPrimary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[tw`text-[10px] text-center mt-1`, { color: subtextColor }]}>kcal/day</Text>
+            </View>
+
+            {/* Hydration Goal */}
+            <View style={[tw`flex-1 p-3 rounded-xl border`, { backgroundColor: isDark ? '#1e293b' : '#f8f7f5', borderColor }]}>
+              <View style={tw`flex-row items-center mb-2 gap-1`}>
+                <MaterialIcons name="water-drop" size={14} color="#38bdf8" />
+                <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: subtextColor }]}>Water</Text>
+              </View>
+              <View style={tw`flex-row items-center`}>
+                <TouchableOpacity
+                  onPress={() => setHydrationGoal(prev => String(Math.max(0, parseInt(prev || '0') - 250)))}
+                  style={[tw`p-1 rounded-md`, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                >
+                  <MaterialIcons name="remove" size={16} color={textPrimary} />
+                </TouchableOpacity>
+                <TextInput
+                  style={[tw`flex-1 text-center font-black text-lg`, { color: '#38bdf8' }]}
+                  placeholder="2000"
+                  placeholderTextColor={subtextColor}
+                  value={hydrationGoal}
+                  onChangeText={setHydrationGoal}
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity
+                  onPress={() => setHydrationGoal(prev => String(parseInt(prev || '0') + 250))}
+                  style={[tw`p-1 rounded-md`, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                >
+                  <MaterialIcons name="add" size={16} color={textPrimary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[tw`text-[10px] text-center mt-1`, { color: subtextColor }]}>ml/day</Text>
+            </View>
           </View>
         </View>
 
         {/* Day selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-4`} contentContainerStyle={tw`px-4 gap-2`}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-4`} contentContainerStyle={tw`px-4 gap-2`}>
           {DAY_LABELS.map(day => {
             const cals = getDayCalories(day);
             const isActive = selectedDay === day;
@@ -428,7 +501,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
         </View>
 
         {/* Meal type selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-2`} contentContainerStyle={tw`px-4 gap-2`}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-2`} contentContainerStyle={tw`px-4 gap-2`}>
           {MEAL_TYPES.map(type => (
             <TouchableOpacity
               key={type}
@@ -577,18 +650,31 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           );
         })()}
 
+        <Text style={[tw`text-xs mb-2 px-1`, { color: subtextColor }]}>
+          Foods are chosen from the same library clients see in Food Library ({catalogFoods.length} items).
+        </Text>
+
         <TouchableOpacity
-          onPress={() => setShowFoodPicker(!showFoodPicker)}
+          onPress={() => setShowFoodPicker(true)}
           style={[tw`flex-row items-center justify-center gap-2 p-3 rounded-xl`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
         >
-          <MaterialIcons name="add" size={20} color={accent} />
-          <Text style={[tw`text-sm font-bold`, { color: accent }]}>Add Food Item</Text>
+          <MaterialIcons name="restaurant" size={20} color={accent} />
+          <Text style={[tw`text-sm font-bold`, { color: accent }]}>Add from Food Library</Text>
         </TouchableOpacity>
 
-        {showFoodPicker && (
-          <View style={[tw`mt-3 p-4 rounded-2xl gap-3`, { borderWidth: 1, borderColor, backgroundColor: cardBg }]}>
+        <TouchableOpacity
+          onPress={() => setShowCustomFoodForm((v) => !v)}
+          style={tw`mt-2 py-2 items-center`}
+        >
+          <Text style={[tw`text-xs font-semibold`, { color: subtextColor }]}>
+            {showCustomFoodForm ? 'Hide custom entry' : 'Or add a custom food manually'}
+          </Text>
+        </TouchableOpacity>
+
+        {showCustomFoodForm && (
+          <View style={[tw`mt-1 p-4 rounded-2xl gap-3`, { borderWidth: 1, borderColor, backgroundColor: cardBg }]}>
             <Text style={[tw`text-xs`, { color: subtextColor }]}>
-              Add a food manually (macros optional). Use Generate with AI above for a full plan from the server.
+              Custom entries are for one-off items not in the shared library. Prefer the food library when possible so clients recognize the same foods.
             </Text>
             <TextInput
               value={customFoodName}
@@ -672,6 +758,15 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
           </View>
         </View>
       </Modal>
+
+      <FoodPickerModal
+        visible={showFoodPicker}
+        foods={catalogFoods}
+        onSelect={addFoodFromCatalog}
+        onClose={() => setShowFoodPicker(false)}
+        isDark={isDark}
+        accent={accent}
+      />
     </SafeAreaView>
   );
 };

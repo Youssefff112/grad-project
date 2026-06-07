@@ -7,7 +7,9 @@ import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useUser } from '../context/UserContext';
+import { ProfileAvatar } from '../components/ProfileAvatar';
 import { TraineeBottomNav } from '../components/TraineeBottomNav';
+import { normalizeProfilePicturePath } from '../utils/imageUrl';
 import { CoachBottomNav } from '../components/coach/CoachBottomNav';
 import {
   getConversations,
@@ -88,10 +90,7 @@ export const MessagesScreen = ({ navigation }: any) => {
             const unreadCount = Math.max(0, Math.floor(Number(conv.unreadCount)) || 0);
             // Extract profile picture from the other party (profile is a JSONB object)
             const otherProfile = (otherParty as any)?.profile;
-            const otherUserAvatar: string | null =
-              typeof otherProfile?.profilePicture === 'string' && otherProfile.profilePicture
-                ? otherProfile.profilePicture
-                : null;
+            const otherUserAvatar = normalizeProfilePicturePath(otherProfile?.profilePicture);
 
             return {
               id: conv.id,
@@ -200,6 +199,7 @@ export const MessagesScreen = ({ navigation }: any) => {
         conversationId: msg.conversationId,
         conversationName: recipientName,
         receiverId: selectedRecipient.id,
+        otherUserAvatar: (selectedRecipient as any).profilePicture,
       });
     } catch (e: any) {
       Alert.alert('Failed to send', e?.message || 'Something went wrong. Please try again.');
@@ -210,7 +210,14 @@ export const MessagesScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        nestedScrollEnabled
+        style={tw`flex-1`}
+        contentContainerStyle={tw`pb-24`}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={tw`px-5 pt-5 pb-4`}>
           <View style={tw`flex-row items-center justify-between`}>
@@ -297,39 +304,24 @@ export const MessagesScreen = ({ navigation }: any) => {
                     borderColor: dividerColor },
                 ]}
               >
-                {/* Avatar */}
-                <View
-                  style={[
-                    tw`w-14 h-14 rounded-full items-center justify-center flex-shrink-0`,
-                    { backgroundColor: accent + '18', borderWidth: 2, borderColor: accent + '28' },
-                  ]}
-                >
-                  <MaterialIcons name={conversation.avatar as any} size={24} color={accent} />
-                </View>
-
-                {/* Content */}
+                <ProfileAvatar
+                  profilePicture={conversation.otherUserAvatar}
+                  size={56}
+                  style={{ borderWidth: 2, borderColor: accent + '28' }}
+                />
                 <View style={tw`flex-1`}>
                   <View style={tw`flex-row items-center justify-between mb-1`}>
                     <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>{conversation.name}</Text>
                     <View style={tw`items-end`}>
                       <Text style={[tw`text-xs`, { color: textMuted }]}>{conversation.time}</Text>
                       {conversation.unread > 0 && (
-                        <Text
-                          style={[
-                            tw`text-[10px] font-bold mt-0.5`,
-                            { color: '#ef4444' },
-                          ]}
-                        >
+                        <Text style={[tw`text-[10px] font-bold mt-0.5`, { color: '#ef4444' }]}>
                           {conversation.unread > 99 ? '99+ unread' : `${conversation.unread} unread`}
                         </Text>
                       )}
                     </View>
                   </View>
-                  <Text
-                    style={[tw`text-sm`, { color: textSecondary }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
+                  <Text style={[tw`text-sm`, { color: textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
                     {conversation.lastMessage}
                   </Text>
                 </View>
@@ -426,7 +418,7 @@ export const MessagesScreen = ({ navigation }: any) => {
                     <Text style={[tw`text-sm`, { color: textMuted }]}>No clients found</Text>
                   </View>
                 ) : (
-                  <ScrollView showsVerticalScrollIndicator={false}>
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     {coachClients.map((client, i) => (
                       <TouchableOpacity
                         key={client.id}

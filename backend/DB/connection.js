@@ -1,6 +1,8 @@
 // src/DB/connection.js
 import dotenv from 'dotenv';
 import { Sequelize } from 'sequelize';
+import { validateRequiredEnv } from '../SRC/Utils/validateEnv.utils.js';
+import { runMigrations } from './migrate.js';
 
 // Ensure env vars are loaded before Sequelize is initialized
 dotenv.config();
@@ -12,9 +14,7 @@ export const sequelize = new Sequelize(process.env.DATABASE_URL, {
 
 export const connectDB = async () => {
   try {
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL is not set. Add it to your .env file.');
-    }
+    validateRequiredEnv();
 
     // Load models to ensure they are registered before sync
     await import('../SRC/Modules/User/user.model.js');
@@ -32,10 +32,19 @@ export const connectDB = async () => {
     await import('../SRC/Modules/Messaging/messaging.model.js');
 
     await sequelize.authenticate();
-    // alter.drop:false adds missing columns/indexes but never drops
-    // existing constraints — prevents "Unknown constraint" errors on
-    // tables whose FK names differ between Sequelize and the live DB.
-    await sequelize.sync({ alter: { drop: false } });
+    await runMigrations(sequelize);
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const allowDevSync = process.env.DB_SYNC_ALTER !== 'false';
+
+    if (isProduction) {
+      console.log('📦 Production mode — skipping sequelize.sync (migrations only)');
+    } else if (allowDevSync) {
+      // Dev only: add missing columns without dropping constraints.
+      await sequelize.sync({ alter: { drop: false } });
+    } else {
+      console.log('📦 DB_SYNC_ALTER=false — skipping sequelize.sync');
+    }
 
     try {
       const { CoachProfile } = await import('../SRC/Modules/Coach/coach.model.js');

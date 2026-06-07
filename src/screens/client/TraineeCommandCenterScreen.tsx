@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, ImageBackground, TouchableOpacity, TextInput, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -18,17 +19,25 @@ import * as workoutService from '../../services/workoutService';
 import * as dietService from '../../services/dietService';
 import { getClientProfile, getClientSubscriptionStatus } from '../../services/clientService';
 import { getCoaches } from '../../services/coachService';
-import { WATER_ML_PER_GLASS } from '../../utils/waterConversions';
-import { buildImageUrl } from '../../utils/imageUrl';
+import { WATER_ML_PER_GLASS, capWaterToGoal, formatGlassProgress, maxGlassesForGoal } from '../../utils/waterConversions';
+import { localYmd } from '../../utils/localDate';
+import { completedExerciseNamesForDate, isExerciseCompleted } from '../../utils/exerciseMatching';
+import { validateBodyFat, validateWeightKg } from '../../utils/validation';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import type { WorkoutPlan, WorkoutDay } from '../../services/workoutService';
+import {
+  PENDING_WEEKLY_WEIGH_IN_INTRO_KEY,
+  WEEKLY_WEIGH_IN_INTRO_SEEN_KEY,
+  WEEKLY_WEIGH_IN_INTRO_TITLE,
+  WEEKLY_WEIGH_IN_INTRO_MESSAGE,
+  shouldShowWeeklyWeighInForm,
+} from '../../utils/weeklyWeighIn';
 
 const prettyLabel = (s?: string) =>
   (s || '')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim();
-
-const WATER_TARGET_GLASSES = 8;
 
 const getWorkoutImage = (focus?: string): string => {
   const f = (focus || '').toLowerCase().replace(/[\s_]+/g, '_');
@@ -64,9 +73,31 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const [caloriesConsumed, setCaloriesConsumed] = useState(0);
   const [calorieTarget, setCalorieTarget] = useState(2000);
   const [waterGlasses, setWaterGlasses] = useState(0);
+  const [waterLoggedMl, setWaterLoggedMl] = useState(0);
   const [hasActiveDietPlan, setHasActiveDietPlan] = useState(false);
   const { isDark, accent, colors } = useTheme();
-  const { fullName, lastPlanReviewDate, subscriptionPlan, canUseAIAssistant, weight, setWeight, bodyFatPercentage, setBodyFatPercentage, coachId, coachName, setCoach, clearCoach, setSubscriptionPlan, updateLastPlanReview, userId, profilePicture } = useUser();
+  const {
+    fullName,
+    lastPlanReviewDate,
+    subscriptionPlan,
+    canUseAIAssistant,
+    weight,
+    setWeight,
+    bodyFatPercentage,
+    setBodyFatPercentage,
+    coachId,
+    coachName,
+    setCoach,
+    clearCoach,
+    setSubscriptionPlan,
+    updateLastPlanReview,
+    initializeWeeklyWeighInCycle,
+    syncProfileFromServer,
+    userId,
+    profilePicture,
+    waterGoalMl,
+  } = useUser();
+  const weighInIntroShownRef = useRef(false);
   const { totalUnread } = useNotifications();
   const firstName = fullName?.split(' ')[0] || 'Trainee';
 
@@ -78,9 +109,14 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       setActivePlan(null);
     }
     try {
-      const exercises = await workoutService.getCompletedExercises();
-      setCompletedExercises(exercises);
-    } catch {}
+      const { logs } = await workoutService.getWorkoutHistory(1, 100);
+      setCompletedExercises(completedExerciseNamesForDate(logs || [], localYmd()));
+    } catch {
+      try {
+        const exercises = await workoutService.getCompletedExercises();
+        setCompletedExercises(exercises);
+      } catch {}
+    }
   }, []);
 
   const syncCoachInfo = useCallback(async () => {
@@ -122,7 +158,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
   const loadDailyProgress = useCallback(async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = localYmd();
 
       const planResult = await dietService.getActiveDietPlan().catch(() => ({ plan: null }));
       const plan = planResult.plan ?? null;
@@ -133,6 +169,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         setCaloriesConsumed(0);
         setCalorieTarget(0); // No plan — no target, avoids hardcoded 2000 fallback
         setWaterGlasses(0);
+        setWaterLoggedMl(0);
         return;
       }
 
@@ -171,16 +208,22 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
             setCaloriesConsumed(0);
           }
           if (log.waterMl != null && log.waterMl > 0) {
-            setWaterGlasses(Math.round(log.waterMl / WATER_ML_PER_GLASS));
+            const goalMl = waterGoalMl > 0 ? waterGoalMl : 2000;
+            const capped = capWaterToGoal(log.waterMl, goalMl);
+            setWaterLoggedMl(capped);
+            setWaterGlasses(Math.round(capped / WATER_ML_PER_GLASS));
           } else {
+            setWaterLoggedMl(0);
             setWaterGlasses(0);
           }
         } else {
           setCaloriesConsumed(0);
+          setWaterLoggedMl(0);
           setWaterGlasses(0);
         }
       } catch {
         setCaloriesConsumed(0);
+        setWaterLoggedMl(0);
         setWaterGlasses(0);
       }
     } catch {}
@@ -192,7 +235,40 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
       loadActivePlan();
       syncCoachInfo();
       syncClientSubscription();
-    }, [loadDailyProgress, loadActivePlan, syncCoachInfo, syncClientSubscription]),
+
+      if (!lastPlanReviewDate) {
+        initializeWeeklyWeighInCycle();
+      }
+
+      if (weighInIntroShownRef.current) return;
+      weighInIntroShownRef.current = true;
+
+      (async () => {
+        try {
+          const [pending, seen] = await Promise.all([
+            AsyncStorage.getItem(PENDING_WEEKLY_WEIGH_IN_INTRO_KEY),
+            AsyncStorage.getItem(WEEKLY_WEIGH_IN_INTRO_SEEN_KEY),
+          ]);
+
+          if (pending === '1' && seen !== '1') {
+            await AsyncStorage.setItem(WEEKLY_WEIGH_IN_INTRO_SEEN_KEY, '1');
+            await AsyncStorage.removeItem(PENDING_WEEKLY_WEIGH_IN_INTRO_KEY);
+            if (!lastPlanReviewDate) initializeWeeklyWeighInCycle();
+            Alert.alert(WEEKLY_WEIGH_IN_INTRO_TITLE, WEEKLY_WEIGH_IN_INTRO_MESSAGE, [{ text: 'Got it' }]);
+          }
+        } catch {
+          // non-blocking
+        }
+      })();
+    }, [
+      loadDailyProgress,
+      loadActivePlan,
+      syncCoachInfo,
+      syncClientSubscription,
+      initializeWeeklyWeighInCycle,
+      lastPlanReviewDate,
+      waterGoalMl,
+    ]),
   );
 
   const todayWorkoutDay = useMemo((): WorkoutDay | null => {
@@ -208,11 +284,9 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
   const nextWorkoutTarget = useMemo(() => {
     const exercises = todayWorkoutDay?.exercises ?? [];
     if (!exercises.length) return null;
-    const undone = exercises.find(
-      (ex) => !completedExercises.includes(ex.name.toLowerCase()),
-    );
-    if (undone) return { exercise: undone, isRedo: false };
-    return { exercise: exercises[0], isRedo: true };
+    const undone = exercises.find((ex) => !isExerciseCompleted(ex.name, completedExercises));
+    if (undone) return { exercise: undone, allComplete: false };
+    return { exercise: exercises[0], allComplete: true };
   }, [todayWorkoutDay, completedExercises]);
 
   const openNextWorkoutSession = useCallback(() => {
@@ -231,13 +305,58 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
     });
   }, [todayWorkoutDay, nextWorkoutTarget, activePlan?.id, navigation]);
 
-  const shouldShowPlanReview = useMemo(() => {
-    if (!lastPlanReviewDate) return true;
-    const lastReview = new Date(lastPlanReviewDate);
-    const today = new Date();
-    const daysDiff = Math.floor((today.getTime() - lastReview.getTime()) / (1000 * 60 * 60 * 24));
-    return daysDiff >= 7;
-  }, [lastPlanReviewDate]);
+  const shouldShowPlanReview = useMemo(
+    () => shouldShowWeeklyWeighInForm(lastPlanReviewDate),
+    [lastPlanReviewDate],
+  );
+
+  const handleWeeklyWeighIn = useCallback(async () => {
+    const hasWeight = weightInput.trim().length > 0;
+    const hasBodyFat = bodyFatInput.trim().length > 0;
+    const weightErr = hasWeight ? validateWeightKg(weightInput) : null;
+    const fatErr = hasBodyFat ? validateBodyFat(bodyFatInput) : null;
+
+    if (!hasWeight && !hasBodyFat) {
+      Alert.alert('Weekly weigh-in', 'Enter your weight and/or body fat % to continue.');
+      return;
+    }
+    if (weightErr || fatErr) {
+      Alert.alert('Invalid entry', weightErr || fatErr || 'Please check your values.');
+      return;
+    }
+
+    const newWeight = hasWeight ? parseFloat(weightInput) : undefined;
+    const newBodyFat = hasBodyFat ? parseFloat(bodyFatInput) : undefined;
+    const weightValid = newWeight != null && isFinite(newWeight);
+    const fatValid = newBodyFat != null && isFinite(newBodyFat);
+
+    if (weightValid) setWeight(newWeight!);
+    if (fatValid) setBodyFatPercentage(newBodyFat!);
+
+    updateLastPlanReview();
+
+    try {
+      await progressService.addMeasurement({
+        weight: weightValid ? newWeight : undefined,
+        bodyFat: fatValid ? newBodyFat : undefined,
+        measuredAt: new Date().toISOString(),
+      });
+      await syncProfileFromServer();
+    } catch {
+      // local state + profile queue already updated via setWeight / updateLastPlanReview
+    }
+
+    setWeightInput('');
+    setBodyFatInput('');
+    Alert.alert('Saved', 'Your weekly weigh-in was recorded.');
+  }, [
+    weightInput,
+    bodyFatInput,
+    setWeight,
+    setBodyFatPercentage,
+    updateLastPlanReview,
+    syncProfileFromServer,
+  ]);
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: colors.bg }]}>
@@ -249,30 +368,22 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`flex w-12 items-center justify-center`}>
-          <TouchableOpacity style={tw`relative p-2 ml-[-8px]`} onPress={() => navigation.navigate('NotificationsSettings')}>
-            <MaterialIcons name="notifications" size={30} color={colors.text} />
-            {!!totalUnread && (
-              <View style={[tw`absolute top-1 right-0 rounded-full items-center justify-center h-5 w-5`, { backgroundColor: colors.error }]}>
-                <Text style={tw`text-white text-[10px] font-black`}>
-                  {totalUnread > 99 ? '99+' : totalUnread}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
         
         <View style={tw`flex w-12 items-center justify-center`}>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={tw`p-1 mr-[-8px]`}>
-            {buildImageUrl(profilePicture) ? (
-              <Image source={{ uri: buildImageUrl(profilePicture) }} style={[tw`rounded-full`, { width: 40, height: 40 }]} />
-            ) : (
-              <MaterialIcons name="account-circle" size={40} color={colors.text} />
-            )}
+            <ProfileAvatar profilePicture={profilePicture} size={40} accent={accent} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-28 pt-4`}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        nestedScrollEnabled
+        style={tw`flex-1`}
+        contentContainerStyle={tw`pb-28 pt-4`}
+      >
         
         {/* Greeting Section */}
         <View style={tw`px-6 pb-6`}>
@@ -326,27 +437,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                     />
                   </View>
                   <TouchableOpacity
-                    onPress={async () => {
-                      const newWeight = weightInput.trim() ? parseFloat(weightInput) : undefined;
-                      const newBodyFat = bodyFatInput.trim() ? parseFloat(bodyFatInput) : undefined;
-                      const weightValid = newWeight != null && isFinite(newWeight) && newWeight > 0;
-                      const fatValid = newBodyFat != null && isFinite(newBodyFat) && newBodyFat > 0;
-
-                      if (!weightValid && !fatValid) return;
-
-                      if (weightValid) setWeight(newWeight!);
-                      if (fatValid) setBodyFatPercentage(newBodyFat!);
-
-                      updateLastPlanReview();
-                      progressService.addMeasurement({
-                        weight: weightValid ? newWeight : undefined,
-                        bodyFat: fatValid ? newBodyFat : undefined,
-                        measuredAt: new Date().toISOString(),
-                      }).catch(() => {});
-
-                      setWeightInput('');
-                      setBodyFatInput('');
-                    }}
+                    onPress={handleWeeklyWeighIn}
                     style={[tw`h-14 w-14 rounded-2xl items-center justify-center`, { backgroundColor: accent }]}
                   >
                     <MaterialIcons name="check" size={24} color="white" />
@@ -442,8 +533,14 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
 
             {/* Water Card */}
             {(() => {
-              const pct = Math.min(waterGlasses / WATER_TARGET_GLASSES, 1);
-              const waterL = ((waterGlasses * WATER_ML_PER_GLASS) / 1000).toFixed(1);
+              const waterGoalMlEffective = waterGoalMl > 0 ? waterGoalMl : 2000;
+              const waterTargetGlasses = maxGlassesForGoal(waterGoalMlEffective);
+              const rawWaterMl = waterLoggedMl > 0 ? waterLoggedMl : waterGlasses * WATER_ML_PER_GLASS;
+              const waterDisplayMl = capWaterToGoal(rawWaterMl, waterGoalMlEffective);
+              const waterGlassCount = Math.round(waterDisplayMl / WATER_ML_PER_GLASS);
+              const pct = waterGoalMlEffective > 0 ? waterDisplayMl / waterGoalMlEffective : 0;
+              const waterL = (waterDisplayMl / 1000).toFixed(1);
+              const isWaterComplete = pct >= 1;
               return (
                 <View style={tw`flex-1`}>
                   <TouchableOpacity onPress={() => navigation.navigate('Meals')} activeOpacity={0.8}>
@@ -456,11 +553,13 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                       </View>
                       
                       <View style={tw`items-center`}>
-                        <Text style={[tw`text-3xl font-black tracking-tighter text-center`, { color: colors.text }]}>
+                        <Text style={[tw`text-3xl font-black tracking-tighter text-center`, { color: isWaterComplete ? colors.success : colors.text }]}>
                           {waterL}L
                         </Text>
                         <Text style={[tw`text-xs font-medium mt-1 text-center`, { color: colors.textMuted }]}>
-                          {waterGlasses} of {WATER_TARGET_GLASSES} glasses
+                          {isWaterComplete
+                            ? '🎯 Goal met!'
+                            : formatGlassProgress(waterGlassCount, waterTargetGlasses)}
                         </Text>
                       </View>
 
@@ -543,8 +642,10 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                     />
                     <View style={tw`p-6`}>
                       <View style={tw`flex-row items-center gap-3 mb-3`}>
-                        <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: accent }]}>
-                          <Text style={tw`text-white text-[10px] font-black uppercase tracking-widest`}>Up Next</Text>
+                        <View style={[tw`px-3 py-1 rounded-full`, { backgroundColor: nextWorkoutTarget?.allComplete ? colors.success : accent }]}>
+                          <Text style={tw`text-white text-[10px] font-black uppercase tracking-widest`}>
+                            {nextWorkoutTarget?.allComplete ? 'Complete' : 'Up Next'}
+                          </Text>
                         </View>
                         <Text style={tw`text-white/80 text-xs font-bold uppercase tracking-wider`}>
                           {prettyLabel(todayWorkoutDay.day)} · {todayWorkoutDay.duration || 60} min
@@ -555,8 +656,8 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                       </Text>
                       {nextWorkoutTarget && (
                         <Text style={tw`text-white/70 text-sm font-bold mb-4`}>
-                          {nextWorkoutTarget.isRedo
-                            ? `All done — redo ${nextWorkoutTarget.exercise.name}`
+                          {nextWorkoutTarget.allComplete
+                            ? 'All exercises complete for today'
                             : `Next: ${nextWorkoutTarget.exercise.name}`}
                         </Text>
                       )}
@@ -564,8 +665,8 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                       <Button 
                         title={
                           nextWorkoutTarget
-                            ? nextWorkoutTarget.isRedo
-                              ? `Redo ${nextWorkoutTarget.exercise.name}`
+                            ? nextWorkoutTarget.allComplete
+                              ? 'Train again'
                               : `Start ${nextWorkoutTarget.exercise.name}`
                             : 'Start Session'
                         }
@@ -580,7 +681,7 @@ export const TraineeCommandCenterScreen = ({ navigation }: any) => {
                 {(todayWorkoutDay.exercises || []).length > 0 && (
                   <View style={tw`mt-2 gap-3`}>
                     {(todayWorkoutDay.exercises || []).slice(0, 3).map((exercise, i) => {
-                      const exDone = completedExercises.includes(exercise.name.toLowerCase());
+                      const exDone = isExerciseCompleted(exercise.name, completedExercises);
                       return (
                         <TouchableOpacity
                           key={i}

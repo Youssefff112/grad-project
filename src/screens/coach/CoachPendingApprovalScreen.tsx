@@ -65,7 +65,7 @@ export const CoachPendingApprovalScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: isDark ? '#0a0a12' : '#f8f7f5' }]}>
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         style={tw`flex-1`}
         contentContainerStyle={tw`px-6 pb-10`}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accent} />}

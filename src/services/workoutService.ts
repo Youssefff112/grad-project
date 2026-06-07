@@ -8,7 +8,35 @@
  * this frontend call will automatically use the AI-generated plans.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet, apiPost, apiDelete } from './api';
+
+async function workoutPlanCacheKey(): Promise<string | null> {
+  const userId = await AsyncStorage.getItem('user_id');
+  return userId ? `persist_workout_plan_${userId}` : null;
+}
+
+async function saveWorkoutPlanLocally(plan: WorkoutPlan | null) {
+  const key = await workoutPlanCacheKey();
+  if (!key) return;
+  if (plan) {
+    await AsyncStorage.setItem(key, JSON.stringify(plan));
+  } else {
+    await AsyncStorage.removeItem(key);
+  }
+}
+
+async function loadWorkoutPlanLocally(): Promise<WorkoutPlan | null> {
+  const key = await workoutPlanCacheKey();
+  if (!key) return null;
+  const raw = await AsyncStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as WorkoutPlan;
+  } catch {
+    return null;
+  }
+}
 
 export interface WorkoutExercise {
   name: string;
@@ -131,7 +159,9 @@ export const generateWorkoutPlan = async (
     location: location ?? undefined,
     equipment: equipment && equipment.length > 0 ? equipment : undefined,
   }, { timeout: 120000 });
-  return { plan: response.data?.plan };
+  const plan = response.data?.plan ?? null;
+  if (plan) await saveWorkoutPlanLocally(plan);
+  return { plan };
 };
 
 /**
@@ -139,12 +169,21 @@ export const generateWorkoutPlan = async (
  * Returns ``{ plan: null }`` if the user has no active plan.
  */
 export const getActiveWorkoutPlan = async (): Promise<{ plan: WorkoutPlan | null }> => {
-  const response: any = await apiGet('/workout/active');
-  return { plan: response.data?.plan ?? null };
+  try {
+    const response: any = await apiGet('/workout/active');
+    const plan = response.data?.plan ?? null;
+    await saveWorkoutPlanLocally(plan);
+    return { plan };
+  } catch (err) {
+    const cached = await loadWorkoutPlanLocally();
+    if (cached) return { plan: cached };
+    throw err;
+  }
 };
 
 export const deleteActiveWorkoutPlan = async (): Promise<void> => {
   await apiDelete('/workout/active');
+  await saveWorkoutPlanLocally(null);
 };
 
 /**

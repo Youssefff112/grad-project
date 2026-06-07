@@ -15,6 +15,7 @@ import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { Button } from '../../components/Button';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import { getCoaches, Coach } from '../../services/coachService';
 import { selectCoach, removeCoach, getClientProfile, getClientSubscriptionStatus } from '../../services/clientService';
 import { canClientSelectPersonalCoach } from '../../utils/planUtils';
@@ -168,7 +169,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
         </Text>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 pb-6`}>
         {/* Current Coach Section */}
         {currentCoachUserId ? (
           <View style={tw`mb-8`}>
@@ -182,11 +183,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
               ]}
             >
               <View style={tw`flex-row items-center gap-4 mb-4`}>
-                <View
-                  style={[tw`w-14 h-14 rounded-full items-center justify-center`, { backgroundColor: accent }]}
-                >
-                  <MaterialIcons name="person" size={28} color="white" />
-                </View>
+                <ProfileAvatar profilePicture={assignedCoach?.profilePicture} size={56} accent={accent} />
                 <View style={tw`flex-1`}>
                   <Text style={[tw`font-bold text-lg`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                     {displayedCoachName}
@@ -297,14 +294,7 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
                     ]}
                   >
                     <View style={tw`flex-row items-start gap-4 mb-3`}>
-                      <View
-                        style={[
-                          tw`w-16 h-16 rounded-full items-center justify-center`,
-                          { backgroundColor: accent + '20' },
-                        ]}
-                      >
-                        <MaterialIcons name="person" size={32} color={accent} />
-                      </View>
+                      <ProfileAvatar profilePicture={coach.profilePicture} size={64} accent={accent} />
                       <View style={tw`flex-1`}>
                         <View style={tw`flex-row items-center justify-between`}>
                           <Text
@@ -424,20 +414,13 @@ export const CoachAssignmentScreen = ({ navigation }: any) => {
             <View style={tw`w-10`} />
           </View>
 
-          <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-5`}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-5`}>
             {selectedCoach && (() => {
               const name = formatCoachName(selectedCoach);
               return (
                 <>
                   <View style={tw`items-center`}>
-                    <View
-                      style={[
-                        tw`w-24 h-24 rounded-full items-center justify-center mb-4`,
-                        { backgroundColor: accent + '20' },
-                      ]}
-                    >
-                      <MaterialIcons name="person" size={48} color={accent} />
-                    </View>
+                    <ProfileAvatar profilePicture={selectedCoach.profilePicture} size={96} accent={accent} style={tw`mb-4`} />
                     <Text
                       style={[
                         tw`text-2xl font-bold text-center`,

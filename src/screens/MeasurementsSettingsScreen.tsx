@@ -41,7 +41,7 @@ export const MeasurementsSettingsScreen = ({ navigation }: any) => {
         <View style={tw`w-12`} />
       </View>
 
-      <ScrollView style={tw`flex-1 px-4 pt-6`} contentContainerStyle={tw`pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1 px-4 pt-6`} contentContainerStyle={tw`pb-8`}>
         {/* Info Banner */}
         <View style={[tw`p-4 rounded-2xl mb-8 flex-row items-center gap-3`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}>
           <MaterialIcons name="straighten" size={24} color={accent} />

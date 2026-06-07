@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from './UserContext';
 
@@ -89,7 +89,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [userId],
   );
 
-  const totalUnread = Array.from(conversations.values()).reduce((s, n) => s + n, 0);
+  const totalUnread = useMemo(
+    () => Array.from(conversations.values()).reduce((s, n) => s + n, 0),
+    [conversations],
+  );
 
   const markAsRead = useCallback(
     (conversationId: string) => {
@@ -150,6 +153,27 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [persist],
   );
 
+  const contextValue = useMemo(
+    () => ({
+      conversations,
+      totalUnread,
+      markAsRead,
+      markAsUnread,
+      addNotification,
+      clearAllNotifications,
+      syncUnreadFromServer,
+    }),
+    [
+      conversations,
+      totalUnread,
+      markAsRead,
+      markAsUnread,
+      addNotification,
+      clearAllNotifications,
+      syncUnreadFromServer,
+    ],
+  );
+
   // --- Real-time socket: one connection per logged-in user ---
   useEffect(() => {
     if (!userId || !isAuthenticated) return;
@@ -195,17 +219,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [userId, isAuthenticated, addNotification]);
 
   return (
-    <NotificationContext.Provider
-      value={{
-        conversations,
-        totalUnread,
-        markAsRead,
-        markAsUnread,
-        addNotification,
-        clearAllNotifications,
-        syncUnreadFromServer,
-      }}
-    >
+    <NotificationContext.Provider value={contextValue}>
       {children}
     </NotificationContext.Provider>
   );

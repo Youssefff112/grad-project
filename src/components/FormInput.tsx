@@ -20,6 +20,7 @@ interface FormInputProps extends Omit<TextInputProps, 'editable'> {
   isPassword?: boolean;
   required?: boolean;
   disabled?: boolean;
+  onIconPress?: () => void;
 }
 
 export const FormInput: React.FC<FormInputProps> = ({
@@ -35,6 +36,7 @@ export const FormInput: React.FC<FormInputProps> = ({
   onChangeText,
   onFocus,
   onBlur,
+  onIconPress,
   ...props
 }) => {
   const { isDark, accent, colors } = useTheme();
@@ -142,7 +144,15 @@ export const FormInput: React.FC<FormInputProps> = ({
             />
           </TouchableOpacity>
         ) : icon ? (
-          <View style={tw`absolute right-4 top-4`}>{icon}</View>
+          <View style={tw`absolute right-4 top-4`}>
+            {onIconPress ? (
+              <TouchableOpacity onPress={onIconPress} disabled={disabled}>
+                {icon}
+              </TouchableOpacity>
+            ) : (
+              icon
+            )}
+          </View>
         ) : null}
       </Animated.View>
 

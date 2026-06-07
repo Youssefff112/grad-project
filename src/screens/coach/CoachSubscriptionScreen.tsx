@@ -50,14 +50,20 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
       const { subscription } = await subscriptionService.createSubscription({
         role: 'coach',
         planName: 'ProCoach',
-        price: 49.99,
+        price: 19.99,
         autoRenew: true,
       });
+      const isDev = __DEV__;
       await subscriptionService.recordPayment(subscription.id, {
-        amount: 49.99,
-        provider: 'manual',
-        status: 'paid',
+        amount: 19.99,
+        provider: isDev ? 'demo' : 'card',
+        status: isDev ? 'paid' : 'pending',
       });
+      if (!isDev) {
+        Alert.alert('Payment pending', 'Your coach plan will activate after payment is confirmed.');
+        setIsLoading(false);
+        return;
+      }
       setSubscriptionPlan('ProCoach');
       navigation.navigate('CoachProfileEdit');
     } catch {
@@ -81,7 +87,7 @@ export const CoachSubscriptionScreen = ({ navigation }: any) => {
         <View style={tw`w-10`} />
       </View>
 
-      <ScrollView style={tw`flex-1 px-6`} contentContainerStyle={tw`pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1 px-6`} contentContainerStyle={tw`pb-8`}>
         {/* Hero */}
         <View style={tw`items-center pt-8 pb-6`}>
           <View style={[tw`w-20 h-20 rounded-2xl items-center justify-center mb-4`, { backgroundColor: accent + '18' }]}>

@@ -44,6 +44,49 @@ export interface RegisterResponse {
   };
 }
 
+export interface NotificationSettingsPayload {
+  workoutReminders?: boolean;
+  mealReminders?: boolean;
+  coachMessages?: boolean;
+  weeklyReport?: boolean;
+  formAlerts?: boolean;
+  restTimer?: boolean;
+  hydrationReminders?: boolean;
+}
+
+export interface PrivacyPreferencesPayload {
+  analytics?: boolean;
+  dataSharing?: boolean;
+}
+
+export interface UserProfilePayload {
+  age?: number;
+  gender?: string;
+  height?: number;
+  currentWeight?: number;
+  goal?: string;
+  experienceLevel?: string;
+  dietaryPreferences?: string[];
+  allergies?: string[];
+  notificationSettings?: NotificationSettingsPayload;
+  privacyPreferences?: PrivacyPreferencesPayload;
+  bodyFat?: number;
+  lastPlanReviewDate?: string;
+  canUseComputerVision?: boolean;
+  canUseAIAssistant?: boolean;
+  profilePicture?: string;
+  waterGoalMl?: number;
+  medicalConditions?: string[];
+  otherMedicalNotes?: string;
+}
+
+export interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  profile?: UserProfilePayload;
+}
+
 export interface User {
   id: string;
   firstName: string;
@@ -52,22 +95,7 @@ export interface User {
   role: string;
   isActive: boolean;
   coachProfile?: { isApproved: boolean; applicationStatus: 'pending' | 'approved' | 'rejected' };
-  profile?: {
-    age?: number;
-    gender?: string;
-    height?: number;
-    currentWeight?: number;
-    goal?: string;
-    experienceLevel?: string;
-    dietaryPreferences?: string[];
-    allergies?: string[];
-    notificationSettings?: any;
-    bodyFat?: number;
-    lastPlanReviewDate?: string;
-    canUseComputerVision?: boolean;
-    canUseAIAssistant?: boolean;
-    profilePicture?: string;
-  };
+  profile?: UserProfilePayload;
 }
 
 export interface ProfileResponse {
@@ -159,14 +187,14 @@ export const logout = async (): Promise<void> => {
 /**
  * Update user profile
  */
-export const updateProfile = async (updates: Partial<User>): Promise<ProfileResponse> => {
+export const updateProfile = async (updates: UpdateProfileRequest): Promise<ProfileResponse> => {
   return apiPatch<ProfileResponse>(API_ROUTES.users.profile, updates);
 };
 
 /**
  * Complete onboarding
  */
-export const completeOnboarding = async (profile: any): Promise<ProfileResponse> => {
+export const completeOnboarding = async (profile: UserProfilePayload): Promise<ProfileResponse> => {
   return apiPost<ProfileResponse>(API_ROUTES.users.onboarding, { profile });
 };
 

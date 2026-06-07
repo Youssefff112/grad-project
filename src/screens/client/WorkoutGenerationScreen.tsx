@@ -347,7 +347,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         </Text>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6`}>
         {/* Mode Info Banner */}
         <View
           style={[
@@ -732,7 +732,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
               </>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 <TouchableOpacity
                   onPress={() => setLocationStep(1)}
                   style={tw`flex-row items-center gap-2 mb-4`}
@@ -857,7 +857,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
             <View style={{ width: 44 }} />
           </View>
 
-          <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-6 gap-4`}>
             {generatedWorkout && (
               <>
                 {/* Header */}
@@ -1109,7 +1109,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                     />
                   </View>
                 </View>
-                <ScrollView
+                <ScrollView keyboardShouldPersistTaps="handled"
                   contentContainerStyle={tw`px-4 pb-6 gap-2`}
                   showsVerticalScrollIndicator={false}
                 >

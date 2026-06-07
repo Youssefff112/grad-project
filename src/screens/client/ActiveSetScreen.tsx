@@ -363,8 +363,9 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
     // ── Save session to history (awaited so it's always written before navigating)
     const todayWeekday = new Date()
       .toLocaleDateString('en-US', { weekday: 'long' })
-      .toLowerCase() as workoutService.LogWorkoutRequest['day'];
-    const planDay = (workoutDay as workoutService.LogWorkoutRequest['day']) || todayWeekday;
+      .toLowerCase() as workoutService.WeekdayName;
+    const planDay: workoutService.WeekdayName =
+      (workoutDay as workoutService.WeekdayName | undefined) ?? todayWeekday;
     const actualReps = isHold ? holdSeconds : totalRepsRef.current;
 
     setSaving(true);

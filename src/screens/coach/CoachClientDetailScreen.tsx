@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import * as coachService from '../../services/coachService';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 import type { ClientActivitySnapshot, AdherenceSummary, DetailedDietLog } from '../../services/coachService';
 import type { WorkoutSession } from '../../services/workoutService';
 import {
@@ -51,7 +52,7 @@ function shortWeekdayFromYmd(ymd: string): string {
 }
 
 export const CoachClientDetailScreen = ({ navigation, route }: any) => {
-  const { clientId, userId: clientUserId, clientName = 'Client' } = route.params ?? {};
+  const { clientId, userId: clientUserId, clientName = 'Client', clientProfilePicture } = route.params ?? {};
   // Use the actual User.id for API calls that query by userId (plans, etc.)
   // Fall back to clientId if userId wasn't passed (older nav paths)
   const planClientId = clientUserId || clientId;
@@ -263,7 +264,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
         {/* Weekly overview */}
         <View style={tw`px-4 py-3`}>
           <Text style={[tw`text-xs font-bold mb-2`, { color: subtextColor }]}>WEEKLY SCHEDULE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`gap-2`}>
+          <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`gap-2`}>
             {(workoutPlan.weeklySchedule || []).map((day: any, i: number) => (
               <View
                 key={i}
@@ -378,7 +379,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
         {(dietPlan.weeklyMealPlan || []).length > 0 && (
           <View style={tw`px-4 pb-3`}>
             <Text style={[tw`text-xs font-bold mb-2`, { color: subtextColor }]}>DAYS WITH MEALS</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`gap-2`}>
+            <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`gap-2`}>
               {(dietPlan.weeklyMealPlan || []).map((day: any, i: number) => {
                 const hasMeals = (day.meals || []).length > 0;
                 return (
@@ -675,8 +676,12 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
 
       {/* Client hero */}
       <View style={[tw`px-4 py-5 flex-row items-center gap-4`, { borderBottomWidth: 1, borderColor }]}>
-        <View style={[tw`w-16 h-16 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
-          <MaterialIcons name="person" size={32} color={accent} />
+        <View style={[tw`w-16 h-16 rounded-full items-center justify-center`, { backgroundColor: accent + '20', overflow: 'hidden' }]}>
+          {clientProfilePicture ? (
+            <ProfileAvatar profilePicture={clientProfilePicture} size={64} />
+          ) : (
+            <MaterialIcons name="person" size={32} color={accent} />
+          )}
         </View>
         <View style={tw`flex-1`}>
           <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>{clientName}</Text>
@@ -710,7 +715,7 @@ export const CoachClientDetailScreen = ({ navigation, route }: any) => {
           <ActivityIndicator size="large" color={accent} />
         </View>
       ) : (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
 
           {/* ── Overview Tab ─────────────────────────────────────── */}
           {activeTab === 'overview' && (

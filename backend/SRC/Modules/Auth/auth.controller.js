@@ -93,18 +93,12 @@ export const authController = {
   async forgotPassword(req, res, next) {
     try {
       const { email } = req.body;
-      const resetToken = await authService.forgotPassword(email);
-
-      const responseData = {};
-      if (process.env.NODE_ENV !== 'production' || process.env.EMAIL_ENABLED === 'false') {
-        responseData.resetToken = resetToken;
-      }
+      await authService.forgotPassword(email);
 
       successResponse(
         res,
         200,
-        'Password reset email sent. Please check your inbox.',
-        Object.keys(responseData).length ? responseData : null
+        'If an account exists for that email, a password reset link has been sent.',
       );
     } catch (error) {
       next(error);

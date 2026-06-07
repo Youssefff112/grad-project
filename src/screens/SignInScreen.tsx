@@ -23,6 +23,7 @@ import { getClientSubscriptionStatus } from '../services/clientService';
 import { PLAN_FEATURES } from '../constants/plans';
 import { resolveCoachGate } from '../utils/coachGate';
 import { environment } from '../config/environment';
+import { validateEmail, validatePassword } from '../utils/validation';
 
 export const SignInScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
@@ -36,24 +37,33 @@ export const SignInScreen = ({ navigation }: any) => {
 
   const validateForm = (): Record<string, string> => {
     const newErrors: Record<string, string> = {};
-
-    if (!email.trim()) {
-      newErrors.email = 'Please enter your email address';
-    } else if (!email.includes('@')) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (!password.trim()) {
-      newErrors.password = 'Please enter your password';
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
+    const emailErr = validateEmail(email);
+    if (emailErr) newErrors.email = emailErr;
+    const passErr = validatePassword(password);
+    if (passErr) newErrors.password = passErr;
     return newErrors;
   };
 
   // Ensures a demo quick-login user has an active subscription for their plan tier in the DB.
   // Called after successful login/auto-register so AI features work immediately.
+  const _bootstrapDemoAccount = async (mockUser: MockUser) => {
+    if (mockUser.role === 'client') {
+      await authService.updateProfile({
+        profile: {
+          goal: 'maintenance',
+          experienceLevel: 'beginner',
+          age: 28,
+          height: 175,
+          currentWeight: 75,
+          gender: 'male',
+          waterGoalMl: 2000,
+        },
+      }).catch(() => {});
+    }
+    await _ensureDemoQuickLoginSubscription(mockUser);
+    await syncProfileFromServer().catch(() => {});
+  };
+
   const _ensureDemoQuickLoginSubscription = async (mockUser: MockUser) => {
     const subRole: 'client' | 'coach' = mockUser.role === 'coach' ? 'coach' : 'client';
     const planName = mockUser.role === 'coach' ? 'ProCoach' : mockUser.subscriptionPlan;
@@ -197,7 +207,8 @@ export const SignInScreen = ({ navigation }: any) => {
         </View>
 
         <View style={tw`flex-col gap-5`}>
-          {/* Demo quick-login chips — credentials align with backend seed */}
+          {/* Demo quick-login — development builds only */}
+          {__DEV__ && environment.isDevelopment && (
           <View>
             <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-3`, { color: subtextColor }]}>
               Demo: Quick Login
@@ -257,7 +268,8 @@ export const SignInScreen = ({ navigation }: any) => {
                       await setCoachApplicationStatus(null);
                     }
 
-                    // Set immediate defaults then navigate right away
+                    hydrateFromAuthUser(u);
+
                     if (u.role === 'admin') {
                       navigation.navigate('AdminDashboard');
                     } else if (u.role === 'coach' && coachGate) {
@@ -268,24 +280,20 @@ export const SignInScreen = ({ navigation }: any) => {
                         setSubscriptionPlan('Free');
                         navigation.navigate('CoachApplicationRejected');
                       } else {
+                        await _bootstrapDemoAccount(user);
                         setSubscriptionPlan('ProCoach');
                         navigation.navigate('CoachCommandCenter');
                       }
                     } else {
-                      setSubscriptionPlan(user.subscriptionPlan as any);
+                      await _bootstrapDemoAccount(user);
+                      try {
+                        const { subscription } = await getClientSubscriptionStatus();
+                        if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
+                        else setSubscriptionPlan(user.subscriptionPlan as any);
+                      } catch {
+                        setSubscriptionPlan(user.subscriptionPlan as any);
+                      }
                       navigation.navigate('TraineeCommandCenter');
-                    }
-
-                    // Background: ensure demo subscription & refine plan (non-blocking)
-                    if (u.role === 'client' || u.role === 'coach') {
-                      _ensureDemoQuickLoginSubscription(user).catch(() => {});
-                    }
-                    if (u.role === 'client') {
-                      getClientSubscriptionStatus()
-                        .then(({ subscription }) => {
-                          if (subscription?.planName) setSubscriptionPlan(subscription.planName as any);
-                        })
-                        .catch(() => {});
                     }
                   }
                 } catch (err: any) {
@@ -344,7 +352,7 @@ export const SignInScreen = ({ navigation }: any) => {
                     <Text style={[tw`text-[10px] font-semibold uppercase tracking-wider mb-2`, { color: subtextColor }]}>
                       Clients
                     </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
+                    <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
                       <View style={tw`flex-row gap-2`}>{clientUsers.map(renderChip)}</View>
                     </ScrollView>
                   </View>
@@ -353,7 +361,7 @@ export const SignInScreen = ({ navigation }: any) => {
                     <Text style={[tw`text-[10px] font-semibold uppercase tracking-wider mb-2`, { color: subtextColor }]}>
                       Staff (Coach & Admin)
                     </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
+                    <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-6 px-6`}>
                       <View style={tw`flex-row gap-2`}>{staffUsers.map(renderChip)}</View>
                     </ScrollView>
                   </View>
@@ -361,6 +369,7 @@ export const SignInScreen = ({ navigation }: any) => {
               );
             })()}
           </View>
+          )}
 
           <FormInput
             label="Email Address"

@@ -21,7 +21,7 @@ export class User extends Model {
   generateRefreshToken() {
     return jwt.sign(
       { userId: this.id },
-      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
     );
   }

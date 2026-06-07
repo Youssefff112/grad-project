@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter to only accept images
+// File filter — MIME/extension gate; magic-byte validation runs after upload.
 const fileFilter = (req, file, cb) => {
   const allowedMimes = [
     'image/jpeg',
@@ -36,11 +36,17 @@ const fileFilter = (req, file, cb) => {
     'image/webp',
     'image/heic',
     'image/heif',
-    'application/octet-stream', // common for React Native FormData on iOS
   ];
   const ext = path.extname(file.originalname || '').toLowerCase();
   const allowedExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
-  if (allowedMimes.includes(file.mimetype) || allowedExt.includes(ext)) {
+  const hasAllowedExt = allowedExt.includes(ext);
+
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else if (file.mimetype === 'application/octet-stream' && hasAllowedExt) {
+    // React Native iOS may send octet-stream — only when extension is known; content verified post-upload.
+    cb(null, true);
+  } else if (hasAllowedExt) {
     cb(null, true);
   } else {
     cb(new Error('Invalid file type. Only JPEG, PNG, GIF, WebP and HEIC are allowed.'), false);

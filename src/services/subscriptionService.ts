@@ -45,7 +45,7 @@ export interface RecordPaymentRequest {
   amount: number;
   currency?: string;
   provider?: string;
-  status?: 'paid' | 'failed';
+  status?: 'paid' | 'failed' | 'pending';
   reference?: string;
   paidAt?: string;
   meta?: Record<string, any>;

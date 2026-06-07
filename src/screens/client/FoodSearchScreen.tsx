@@ -159,7 +159,7 @@ export const FoodSearchScreen = ({ navigation }: any) => {
       </Text>
 
       {/* Content */}
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-8`}>
         {showRecent && recentSearches.length > 0 ? (
           <>
             <Text style={[tw`text-xs font-bold uppercase tracking-wider mb-2`, { color: textSecondary }]}>

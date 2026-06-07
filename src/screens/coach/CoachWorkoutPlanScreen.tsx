@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
+import { useExerciseManagement } from '../../context/ExerciseManagementContext';
+import { ExercisePickerModal } from '../../components/ExercisePickerModal';
 import * as coachService from '../../services/coachService';
 
-interface Exercise {
+interface PlanExercise {
   id: string;
   name: string;
   sets: number;
@@ -15,29 +17,12 @@ interface Exercise {
   notes?: string;
 }
 
-const EXERCISE_SUGGESTIONS = [
-  { id: '1', name: 'Barbell Back Squat', category: 'Legs' },
-  { id: '2', name: 'Bench Press', category: 'Chest' },
-  { id: '3', name: 'Deadlift', category: 'Back' },
-  { id: '4', name: 'Pull-Ups', category: 'Back' },
-  { id: '5', name: 'Overhead Press', category: 'Shoulders' },
-  { id: '6', name: 'Romanian Deadlift', category: 'Legs' },
-  { id: '7', name: 'Dumbbell Row', category: 'Back' },
-  { id: '8', name: 'Leg Press', category: 'Legs' },
-  { id: '9', name: 'Dumbbell Curl', category: 'Arms' },
-  { id: '10', name: 'Tricep Pushdown', category: 'Arms' },
-  { id: '11', name: 'Lateral Raise', category: 'Shoulders' },
-  { id: '12', name: 'Lunges', category: 'Legs' },
-  { id: '13', name: 'Cable Fly', category: 'Chest' },
-  { id: '14', name: 'Lat Pulldown', category: 'Back' },
-];
-
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_FULL_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
 // Map full-name days from backend → short labels used in the UI
-function mapScheduleToUI(weeklySchedule: any[]): Record<string, Exercise[]> {
-  const result: Record<string, Exercise[]> = {};
+function mapScheduleToUI(weeklySchedule: any[]): Record<string, PlanExercise[]> {
+  const result: Record<string, PlanExercise[]> = {};
   weeklySchedule.forEach((dayEntry: any) => {
     const idx = DAY_FULL_NAMES.indexOf((dayEntry.day || '').toLowerCase());
     if (idx === -1) return;
@@ -58,10 +43,11 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
   const { clientId, userId: clientUserId, clientName, existingPlan, autoGenerate } = route?.params ?? {};
   const apiClientId = Number(clientUserId ?? clientId);
   const { isDark, accent } = useTheme();
+  const { exercises: catalogExercises } = useExerciseManagement();
 
   const [planName, setPlanName] = useState('');
   const [selectedDay, setSelectedDay] = useState('Mon');
-  const [dayExercises, setDayExercises] = useState<Record<string, Exercise[]>>({});
+  const [dayExercises, setDayExercises] = useState<Record<string, PlanExercise[]>>({});
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -88,11 +74,20 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const textPrimary = isDark ? '#f1f5f9' : '#1e293b';
 
-  const getDayExercises = (day: string): Exercise[] => dayExercises[day] || [];
+  const getDayExercises = (day: string): PlanExercise[] => dayExercises[day] || [];
 
-  const addExercise = (ex: { id: string; name: string; category: string }) => {
-    const newEx: Exercise = { id: ex.id + Date.now(), name: ex.name, sets: 3, reps: '10', rest: '60s' };
-    setDayExercises(prev => ({ ...prev, [selectedDay]: [...(prev[selectedDay] || []), newEx] }));
+  const addExerciseFromCatalog = (exerciseId: string, sets: number, reps: string, restSeconds: number) => {
+    const catalogEx = catalogExercises.find((e) => e.id === exerciseId);
+    if (!catalogEx) return;
+    const newEx: PlanExercise = {
+      id: `${selectedDay}-${exerciseId}-${Date.now()}`,
+      name: catalogEx.name,
+      sets,
+      reps,
+      rest: `${restSeconds}s`,
+      notes: catalogEx.muscleGroups.join(', '),
+    };
+    setDayExercises((prev) => ({ ...prev, [selectedDay]: [...(prev[selectedDay] || []), newEx] }));
     setShowExercisePicker(false);
   };
 
@@ -100,7 +95,7 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
     setDayExercises(prev => ({ ...prev, [day]: (prev[day] || []).filter(e => e.id !== exId) }));
   };
 
-  const updateExercise = (day: string, exId: string, field: keyof Exercise, value: any) => {
+  const updateExercise = (day: string, exId: string, field: keyof PlanExercise, value: string | number) => {
     setDayExercises(prev => ({
       ...prev,
       [day]: (prev[day] || []).map(e => e.id === exId ? { ...e, [field]: value } : e),
@@ -199,7 +194,7 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 pb-8`}>
         {/* AI Generate banner */}
         {Number.isFinite(apiClientId) && apiClientId > 0 && (
           <TouchableOpacity
@@ -234,7 +229,7 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
         </View>
 
         {/* Day selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-4`} contentContainerStyle={tw`px-4 gap-2`}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`-mx-4 mb-4`} contentContainerStyle={tw`px-4 gap-2`}>
           {DAY_LABELS.map(day => {
             const count = getDayExercises(day).length;
             const isActive = selectedDay === day;
@@ -298,35 +293,27 @@ export const CoachWorkoutPlanScreen = ({ navigation, route }: any) => {
           </View>
         ))}
 
+        <Text style={[tw`text-xs mb-2 px-1`, { color: subtextColor }]}>
+          Exercises are chosen from the same library clients see in Exercise Library.
+        </Text>
+
         <TouchableOpacity
-          onPress={() => setShowExercisePicker(!showExercisePicker)}
+          onPress={() => setShowExercisePicker(true)}
           style={[tw`flex-row items-center justify-center gap-2 p-3 rounded-xl mb-4`, { backgroundColor: accent + '14', borderWidth: 1, borderColor: accent + '28' }]}
         >
           <MaterialIcons name="add" size={20} color={accent} />
-          <Text style={[tw`text-sm font-bold`, { color: accent }]}>Add Exercise</Text>
+          <Text style={[tw`text-sm font-bold`, { color: accent }]}>Add from Exercise Library</Text>
         </TouchableOpacity>
-
-        {showExercisePicker && (
-          <View style={[tw`rounded-2xl overflow-hidden mb-4`, { borderWidth: 1, borderColor }]}>
-            {EXERCISE_SUGGESTIONS.map(ex => (
-              <TouchableOpacity
-                key={ex.id}
-                onPress={() => addExercise(ex)}
-                style={[tw`flex-row items-center p-4`, { backgroundColor: cardBg, borderBottomWidth: 1, borderColor }]}
-              >
-                <View style={[tw`w-8 h-8 rounded-lg items-center justify-center mr-3`, { backgroundColor: accent + '14' }]}>
-                  <MaterialIcons name="fitness-center" size={16} color={accent} />
-                </View>
-                <View style={tw`flex-1`}>
-                  <Text style={[tw`text-sm font-bold`, { color: textPrimary }]}>{ex.name}</Text>
-                  <Text style={[tw`text-xs`, { color: subtextColor }]}>{ex.category}</Text>
-                </View>
-                <MaterialIcons name="add-circle" size={22} color={accent} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
       </ScrollView>
+
+      <ExercisePickerModal
+        visible={showExercisePicker}
+        exercises={catalogExercises}
+        onSelect={addExerciseFromCatalog}
+        onClose={() => setShowExercisePicker(false)}
+        isDark={isDark}
+        accent={accent}
+      />
     </SafeAreaView>
   );
 };

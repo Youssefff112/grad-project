@@ -70,9 +70,10 @@ export const coachController = {
 
   async getClients(req, res, next) {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 20;
-      const result = await coachService.getClients(req.user.id, page, limit);
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 20;
+      const includeActivity = Boolean(req.query.includeActivity);
+      const result = await coachService.getClients(req.user.id, page, limit, { includeActivity });
       successResponse(res, 200, 'Coach clients retrieved', { clients: result.clients }, result.pagination);
     } catch (error) {
       next(error);
@@ -97,6 +98,7 @@ export const coachController = {
         throw new AppError('clientId is required', 400);
       }
       const resolvedUserId = await resolveUserId(parseInt(rawId));
+      await coachService.ensureCoachOwnsClient(req.user.id, resolvedUserId);
       const plan = await workoutService.generateWorkoutPlanForUser(resolvedUserId, req.user.id);
       successResponse(res, 201, 'Workout plan assigned', { plan });
     } catch (error) {
@@ -107,13 +109,41 @@ export const coachController = {
   async assignDietPlan(req, res, next) {
     try {
       await coachService.requireApprovedCoach(req.user.id);
-      const { clientId, userId: rawUserId } = req.body;
+      const { clientId, userId: rawUserId, weeklyMealPlan, dailyCalorieTarget, hydrationGoal, planName, macronutrients } = req.body;
       const rawId = clientId || rawUserId;
       if (!rawId) {
         throw new AppError('clientId is required', 400);
       }
       const resolvedUserId = await resolveUserId(parseInt(rawId));
-      const plan = await dietService.generateDietPlanForUser(resolvedUserId, req.user.id);
+      await coachService.ensureCoachOwnsClient(req.user.id, resolvedUserId);
+      
+      // Deactivate existing active plans
+      await DietPlan.update(
+        { isActive: false },
+        { where: { userId: resolvedUserId, isActive: true } }
+      );
+
+      const plan = await DietPlan.create({
+        userId: resolvedUserId,
+        planName: planName || 'Custom Diet Plan',
+        dailyCalorieTarget: dailyCalorieTarget || 2000,
+        hydrationGoal: hydrationGoal || null,
+        weeklyMealPlan: weeklyMealPlan || [],
+        macronutrients: macronutrients || { protein: 150, carbs: 200, fats: 60 },
+        assignedByCoachId: req.user.id,
+        assignedAt: new Date(),
+        isActive: true,
+        pendingCoachReview: false,
+      });
+      
+      if (hydrationGoal) {
+        const user = await User.findByPk(resolvedUserId);
+        if (user) {
+          user.profile = { ...user.profile, waterGoalMl: hydrationGoal };
+          await user.save();
+        }
+      }
+
       successResponse(res, 201, 'Diet plan assigned', { plan });
     } catch (error) {
       next(error);
@@ -126,6 +156,7 @@ export const coachController = {
     try {
       await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(parseInt(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const plan = await workoutService.getActiveWorkoutPlan(userId);
       successResponse(res, 200, 'Client workout plan retrieved', { plan });
     } catch (error) {
@@ -137,6 +168,7 @@ export const coachController = {
     try {
       await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(parseInt(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const plan = await dietService.getActiveDietPlan(userId);
       successResponse(res, 200, 'Client diet plan retrieved', { plan });
     } catch (error) {
@@ -197,7 +229,7 @@ export const coachController = {
     try {
       await coachService.requireApprovedCoach(req.user.id);
       const { planId } = req.params;
-      const { weeklyMealPlan, dailyCalorieTarget, macronutrients, planName } = req.body;
+      const { weeklyMealPlan, dailyCalorieTarget, hydrationGoal, macronutrients, planName } = req.body;
 
       const plan = await DietPlan.findByPk(parseInt(planId));
       if (!plan) {
@@ -209,10 +241,19 @@ export const coachController = {
 
       if (weeklyMealPlan !== undefined) plan.weeklyMealPlan = weeklyMealPlan;
       if (dailyCalorieTarget !== undefined) plan.dailyCalorieTarget = dailyCalorieTarget;
+      if (hydrationGoal !== undefined) plan.hydrationGoal = hydrationGoal;
       if (macronutrients !== undefined) plan.macronutrients = macronutrients;
       if (planName !== undefined) plan.planName = planName;
       plan.assignedAt = new Date();
       await plan.save();
+      
+      if (hydrationGoal !== undefined && plan.isActive) {
+        const user = await User.findByPk(plan.userId);
+        if (user) {
+          user.profile = { ...user.profile, waterGoalMl: hydrationGoal };
+          await user.save();
+        }
+      }
 
       successResponse(res, 200, 'Diet plan updated', { plan });
     } catch (error) {
@@ -447,7 +488,9 @@ export const coachController = {
   // Coach reads a specific client's body measurements
   async getClientMeasurements(req, res, next) {
     try {
+      await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(Number(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const { measurements } = await progressService.getMeasurements(userId);
       successResponse(res, 200, 'Client measurements retrieved', { measurements });
     } catch (error) {
@@ -460,6 +503,7 @@ export const coachController = {
     try {
       await coachService.requireApprovedCoach(req.user.id);
       const userId = await resolveUserId(Number(req.params.clientId));
+      await coachService.ensureCoachOwnsClient(req.user.id, userId);
       const days = parseInt(req.query.days, 10) || 14;
       const snapshot = await coachService.getClientActivitySnapshot(req.user.id, userId, days);
       successResponse(res, 200, 'Client activity retrieved', snapshot);

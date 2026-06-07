@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../tw';
 import { useTheme } from '../context/ThemeContext';
+import { useUser } from '../context/UserContext';
 import { Switch } from '../components/Switch';
 
 export const PrivacySecurityScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const [dataSharing, setDataSharing] = useState(false);
-  const [analytics, setAnalytics] = useState(true);
+  const { privacyPreferences, setPrivacyPreferences } = useUser();
 
   const bg = isDark ? '#0a0a12' : '#f8f7f5';
   const cardBg = isDark ? '#111128' : '#ffffff';
@@ -26,12 +26,12 @@ export const PrivacySecurityScreen = ({ navigation }: any) => {
         <Text style={[tw`text-lg font-bold tracking-tight flex-1 text-center`, { color: textPrimary }]}>Privacy & Security</Text>
         <View style={tw`w-12`} />
       </View>
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`p-4 pb-12 gap-6`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`p-4 pb-12 gap-6`}>
         <View style={[tw`p-5 rounded-2xl gap-3`, { backgroundColor: cardBg, borderWidth: 1, borderColor }]}>
           <MaterialIcons name="security" size={32} color={accent} />
-          <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>End-to-End Encryption</Text>
+          <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>How we protect your data</Text>
           <Text style={[tw`text-sm leading-5`, { color: textSecondary }]}>
-            Your personal data, health metrics, and workout logs are encrypted on your device. We use state-of-the-art security to ensure nobody else can access your information.
+            Sign-in tokens are stored in your device secure keychain. Health and profile data is sent to our servers over encrypted connections in production. Preferences sync to your account when signed in.
           </Text>
         </View>
 
@@ -43,14 +43,24 @@ export const PrivacySecurityScreen = ({ navigation }: any) => {
                 <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>Analytics Tracking</Text>
                 <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>Help us improve the app by sharing anonymous usage data.</Text>
               </View>
-              <Switch value={analytics} onValueChange={setAnalytics} />
+              <Switch
+                value={privacyPreferences.analytics}
+                onValueChange={(value) => {
+                  setPrivacyPreferences({ ...privacyPreferences, analytics: value });
+                }}
+              />
             </View>
             <View style={tw`flex-row items-center justify-between p-4`}>
               <View style={tw`flex-1 mr-4`}>
                 <Text style={[tw`font-bold text-base`, { color: textPrimary }]}>Personalized Ads</Text>
                 <Text style={[tw`text-xs mt-1`, { color: textSecondary }]}>Allow us to use your data to show you relevant offers.</Text>
               </View>
-              <Switch value={dataSharing} onValueChange={setDataSharing} />
+              <Switch
+                value={privacyPreferences.dataSharing}
+                onValueChange={(value) => {
+                  setPrivacyPreferences({ ...privacyPreferences, dataSharing: value });
+                }}
+              />
             </View>
           </View>
         </View>

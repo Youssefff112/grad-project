@@ -269,7 +269,13 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
       </View>
 
       {activeTab === 'live' ? (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-32`}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          nestedScrollEnabled
+          style={tw`flex-1`}
+          contentContainerStyle={tw`pb-32`}
+        >
 
           {/* Generate Workout shortcut */}
           <View style={tw`px-4 pt-4 pb-2`}>
@@ -441,7 +447,13 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
         </ScrollView>
       ) : (
         /* ── History Tab ── */
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 pt-4 gap-3 pb-32`}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          nestedScrollEnabled
+          style={tw`flex-1`}
+          contentContainerStyle={tw`px-4 pt-4 gap-3 pb-32`}
+        >
           {historyLoading ? (
             <View style={tw`flex-1 items-center justify-center py-12`}>
               <ActivityIndicator color={accent} />
@@ -548,7 +560,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
                 />
               </View>
             </View>
-            <ScrollView style={tw`px-4`} contentContainerStyle={tw`gap-2 pb-6`}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={tw`px-4`} contentContainerStyle={tw`gap-2 pb-6`}>
               {swapCandidates.slice(0, 40).map((candidate, i) => (
                 <TouchableOpacity
                   key={i}

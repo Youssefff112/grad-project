@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, Image, ActivityIndicator, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, ActivityIndicator, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import tw from '../../tw';
 import { useTheme } from '../../context/ThemeContext';
 import { Coach } from '../../services/coachService';
 import { coachDisplayName } from '../../utils/coachDisplayName';
 import { formatCoachRating } from '../../utils/coachRating';
-import { buildImageUrl } from '../../utils/imageUrl';
+import { ProfileAvatar } from '../ProfileAvatar';
 
 export interface CoachCardProps {
   coach: Coach & { displayName?: string };
@@ -75,11 +75,7 @@ export const CoachCard: React.FC<CoachCardProps> = ({
               { backgroundColor: accent + '1a' },
             ]}
           >
-            {coach.profilePicture ? (
-              <Image source={{ uri: buildImageUrl(coach.profilePicture) }} style={tw`w-full h-full`} />
-            ) : (
-              <MaterialIcons name="person" size={32} color={accent} />
-            )}
+            <ProfileAvatar profilePicture={coach.profilePicture} size={64} accent={accent} />
           </View>
 
           <View style={tw`flex-1`}>

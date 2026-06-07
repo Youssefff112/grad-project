@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -126,7 +127,7 @@ export const ExerciseLibraryScreen = ({ navigation }: any) => {
       </View>
 
       {/* Filter Buttons */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mt-3 px-4`}>
+      <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={tw`mt-3 px-4`}>
         {/* Difficulty Filter */}
         <View style={tw`flex-row gap-2 mr-4`}>
           {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((level) => (
@@ -184,7 +185,7 @@ export const ExerciseLibraryScreen = ({ navigation }: any) => {
 
       {/* Content */}
       {isEmpty ? (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
           <View style={[tw`w-16 h-16 rounded-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
             <MaterialIcons name="fitness-center" size={32} color={accent} />
           </View>
@@ -205,7 +206,7 @@ export const ExerciseLibraryScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </ScrollView>
       ) : isFiltered ? (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`flex-1 items-center justify-center px-5 gap-4`}>
           <MaterialIcons name="search-off" size={40} color={textSecondary} />
           <Text style={[tw`text-base font-bold text-center`, { color: textPrimary }]}>
             No exercises found
@@ -215,23 +216,27 @@ export const ExerciseLibraryScreen = ({ navigation }: any) => {
           </Text>
         </ScrollView>
       ) : (
-        <ScrollView style={tw`flex-1`} contentContainerStyle={tw`px-4 py-4 gap-1 pb-8`}>
-          <View style={tw`flex-row items-center justify-between mb-2`}>
-            <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: textSecondary }]}>
-              Exercises ({filteredExercises.length})
-            </Text>
-          </View>
-
-          {filteredExercises.map((exercise) => (
+        <FlatList
+          data={filteredExercises}
+          keyExtractor={(item) => item.id}
+          style={tw`flex-1`}
+          contentContainerStyle={tw`px-4 py-4 gap-1 pb-8`}
+          ListHeaderComponent={
+            <View style={tw`flex-row items-center justify-between mb-2`}>
+              <Text style={[tw`text-xs font-bold uppercase tracking-wider`, { color: textSecondary }]}>
+                Exercises ({filteredExercises.length})
+              </Text>
+            </View>
+          }
+          renderItem={({ item: exercise }) => (
             <ExerciseCard
-              key={exercise.id}
               exercise={exercise}
               onEdit={() => navigation.navigate('AddExercise', { exercise })}
               onDelete={() => handleDeleteExercise(exercise.id, exercise.name)}
               showActions={true}
             />
-          ))}
-        </ScrollView>
+          )}
+        />
       )}
     </SafeAreaView>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Pressable } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Pressable, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Circle } from 'react-native-svg';
@@ -14,10 +14,16 @@ import { TraineeBottomNav } from '../../components/TraineeBottomNav';
 import {
   WATER_ML_PER_GLASS,
   formatLitres,
+  formatGlassLabel,
+  capWaterToGoal,
+  maxGlassesForGoal,
   mlFromLitres,
   mlFromMetricCups,
   mlFromUsCups,
 } from '../../utils/waterConversions';
+import { localYmd } from '../../utils/localDate';
+import { resolveMealIngredientLines } from '../../utils/mealIngredients';
+import { cacheMealLog, getCachedMealLog } from '../../services/offlineService';
 
 // When there is no active plan there is no meaningful calorie target.
 // We use 0 so the ring and "Remaining" never show a fake 2000-kcal default.
@@ -52,7 +58,7 @@ const MEAL_ICON_MAP: Record<string, keyof typeof import('@expo/vector-icons').Ma
 
 export const MealsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
-  const { fullName, userId } = useUser();
+  const { fullName, userId, waterGoalMl, setWaterGoalMl } = useUser();
   const { totalUnread } = useNotifications();
   const { customMeals } = useFoodManagement();
 
@@ -71,6 +77,7 @@ export const MealsScreen = ({ navigation }: any) => {
   /** Exact ml when user uses the calculator; otherwise derived from glasses × 250 */
   const [waterMlOverride, setWaterMlOverride] = useState<number | null>(null);
   const [showWaterCalc, setShowWaterCalc] = useState(false);
+  const [waterModalTab, setWaterModalTab] = useState<'log' | 'goal'>('log');
   const [calcLitres, setCalcLitres] = useState('');
   const [calcMetricCups, setCalcMetricCups] = useState('');
   const [calcUsCups, setCalcUsCups] = useState('');
@@ -83,7 +90,7 @@ export const MealsScreen = ({ navigation }: any) => {
   const saveStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /** Today's calendar date string YYYY-MM-DD — stable for the lifetime of this render cycle */
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => localYmd(), []);
 
   /** Calendar date string for the currently selected week-day index */
   const selectedDateStr = useMemo(() => {
@@ -92,7 +99,7 @@ export const MealsScreen = ({ navigation }: any) => {
     const diff = selectedDayIndex - todayDow;
     const target = new Date(d);
     target.setDate(d.getDate() + diff);
-    return target.toISOString().split('T')[0];
+    return localYmd(target);
   }, [selectedDayIndex]);
 
   // Build display meals: prefer active backend plan → custom meals → empty
@@ -112,7 +119,7 @@ export const MealsScreen = ({ navigation }: any) => {
           meal: m.name,
           time: (m as any).clockTime || MEAL_TIME_MAP[(m.type || '').toLowerCase()] || '12:00',
           icon: MEAL_ICON_MAP[(m.type || '').toLowerCase()] || 'restaurant',
-          items: m.ingredients,
+          items: resolveMealIngredientLines(m),
           calories: m.nutrition.calories,
           protein: m.nutrition.protein,
           carbs: m.nutrition.carbs,
@@ -237,16 +244,37 @@ export const MealsScreen = ({ navigation }: any) => {
 
           // Water intake is independent of which meal plan is active — always restore it.
           if (selectedDateStr === todayStr && log.waterMl != null && log.waterMl > 0) {
-            setWaterMlOverride(log.waterMl);
-            setWaterGlasses(Math.min(24, Math.round(log.waterMl / WATER_ML_PER_GLASS)));
+            const goalMl = waterGoalMl || 2000;
+            const capped = capWaterToGoal(log.waterMl, goalMl);
+            setWaterMlOverride(capped);
+            setWaterGlasses(Math.min(maxGlassesForGoal(goalMl), Math.round(capped / WATER_ML_PER_GLASS)));
           }
           return;
         }
-        // No log found for today — start with all meals unchecked
-        if (!cancelled) setCheckedMeals(base);
+        const cached = await getCachedMealLog(selectedDateStr, userId, activePlan.id);
+        if (cancelled) return;
+        if (cached?.checkedMeals) {
+          setCheckedMeals({ ...base, ...cached.checkedMeals });
+          if (selectedDateStr === todayStr) {
+            const goalMl = waterGoalMl || 2000;
+            const ml = cached.waterMl ?? (cached.waterGlasses || 0) * WATER_ML_PER_GLASS;
+            if (ml > 0) {
+              const capped = capWaterToGoal(ml, goalMl);
+              setWaterMlOverride(capped);
+              setWaterGlasses(Math.min(maxGlassesForGoal(goalMl), Math.round(capped / WATER_ML_PER_GLASS)));
+            }
+          }
+        } else if (!cancelled) {
+          setCheckedMeals(base);
+        }
       } catch {
-        // Network error — start with all meals unchecked
-        if (!cancelled) setCheckedMeals(base);
+        const cached = await getCachedMealLog(selectedDateStr, userId, activePlan.id).catch(() => null);
+        if (cancelled) return;
+        if (cached?.checkedMeals) {
+          setCheckedMeals({ ...base, ...cached.checkedMeals });
+        } else if (!cancelled) {
+          setCheckedMeals(base);
+        }
       }
     };
 
@@ -263,7 +291,8 @@ export const MealsScreen = ({ navigation }: any) => {
   useEffect(() => {
     if (selectedDayIndex !== todayIndex) return;
 
-    const waterMlEffective = waterMlOverride ?? waterGlasses * WATER_ML_PER_GLASS;
+    const goalMl = waterGoalMl || 2000;
+    const waterMlEffective = capWaterToGoal(waterMlOverride ?? waterGlasses * WATER_ML_PER_GLASS, goalMl);
 
     // Ensure every meal ID is present (unchecked meals explicitly false) so the
     // backend denominator is always the full assigned meal count, not just the
@@ -288,28 +317,45 @@ export const MealsScreen = ({ navigation }: any) => {
         );
         const allChecked = mealsToDisplay.length > 0 && mealsToDisplay.every((m) => fullMealMap[m.id]);
         const anyChecked = mealsToDisplay.some((m) => fullMealMap[m.id]);
-        await dietService.logDietDay({
+        const payload = {
           date: todayStr,
           mealsCompleted: fullMealMap,
           caloriesConsumed: consumed.calories,
           macrosConsumed: { protein: consumed.protein, carbs: consumed.carbs, fats: consumed.fats },
-          status: allChecked ? 'full' : anyChecked ? 'partial' : 'missed',
+          status: (allChecked ? 'full' : anyChecked ? 'partial' : 'missed') as 'full' | 'partial' | 'missed',
           waterMl: waterMlEffective,
           ...(activePlan ? { dietPlanId: activePlan.id } : {}),
-        });
+        };
+        await dietService.logDietDay(payload);
+        await cacheMealLog(
+          todayStr,
+          { checkedMeals: fullMealMap, waterGlasses, waterMl: waterMlEffective, date: todayStr },
+          userId,
+          activePlan?.id,
+        );
         setSaveStatus('saved');
         if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
         saveStatusTimer.current = setTimeout(() => setSaveStatus('idle'), 2500);
       } catch {
+        await cacheMealLog(
+          todayStr,
+          {
+            checkedMeals: fullMealMap,
+            waterGlasses,
+            waterMl: waterMlEffective,
+            date: todayStr,
+          },
+          userId,
+          activePlan?.id,
+        ).catch(() => {});
         setSaveStatus('idle');
-        // silent – data cached locally
       }
     }, 2000);
     return () => {
       if (logTimer.current) clearTimeout(logTimer.current);
       if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
     };
-  }, [checkedMeals, waterGlasses, waterMlOverride, activePlan?.id, selectedDayIndex]);
+  }, [checkedMeals, waterGlasses, waterMlOverride, activePlan?.id, selectedDayIndex, waterGoalMl]);
 
   const toggleMeal = (id: string) => {
     setCheckedMeals((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -331,26 +377,28 @@ export const MealsScreen = ({ navigation }: any) => {
 
   const checkedCount = Object.values(checkedMeals).filter(Boolean).length;
 
-  const waterDisplayMl = waterMlOverride ?? waterGlasses * WATER_ML_PER_GLASS;
-  const waterGoalMl = 8 * WATER_ML_PER_GLASS;
-  const waterBarPct = Math.min(waterDisplayMl / waterGoalMl, 1);
+  const currentWaterGoalMl = waterGoalMl || 2000;
+  const maxWaterGlasses = maxGlassesForGoal(currentWaterGoalMl);
+  const waterDisplayMl = capWaterToGoal(waterMlOverride ?? waterGlasses * WATER_ML_PER_GLASS, currentWaterGoalMl);
+  const waterGlassCount = Math.round(waterDisplayMl / WATER_ML_PER_GLASS);
+  const waterBarPct = currentWaterGoalMl > 0 ? waterDisplayMl / currentWaterGoalMl : 0;
   const openWaterCalculator = () => {
     const ml = waterDisplayMl;
     setCalcLitres((ml / 1000).toFixed(2));
-    setCalcMetricCups('');
-    setCalcUsCups('');
+    setWaterModalTab('log');
     setShowWaterCalc(true);
   };
   const applyWaterCalculator = () => {
-    const L = parseFloat(String(calcLitres).replace(',', '.')) || 0;
-    const mc = parseFloat(String(calcMetricCups).replace(',', '.')) || 0;
-    const uc = parseFloat(String(calcUsCups).replace(',', '.')) || 0;
-    const total = Math.min(
-      15000,
-      Math.max(0, mlFromLitres(L) + mlFromMetricCups(mc) + mlFromUsCups(uc))
-    );
-    setWaterMlOverride(total);
-    setWaterGlasses(Math.min(24, Math.max(0, Math.round(total / WATER_ML_PER_GLASS))));
+    if (waterModalTab === 'log') {
+      const L = parseFloat(String(calcLitres).replace(',', '.')) || 0;
+      const total = capWaterToGoal(mlFromLitres(L), currentWaterGoalMl);
+      setWaterMlOverride(total);
+      setWaterGlasses(Math.min(maxWaterGlasses, Math.max(0, Math.round(total / WATER_ML_PER_GLASS))));
+    } else {
+      const targetL = parseFloat(String(calcLitres).replace(',', '.')) || 2;
+      const totalMl = Math.min(15000, Math.max(500, Math.round(targetL * 1000)));
+      setWaterGoalMl(totalMl);
+    }
     setShowWaterCalc(false);
   };
   const ringSize = 160;
@@ -374,6 +422,9 @@ export const MealsScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
       <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        nestedScrollEnabled
         style={tw`flex-1`}
         contentContainerStyle={tw`pb-24`}
         showsVerticalScrollIndicator={false}
@@ -467,7 +518,7 @@ export const MealsScreen = ({ navigation }: any) => {
         {/* Week day selector — only shown when an active plan exists */}
         {activePlan && !planLoading && (
           <View style={tw`mt-4`}>
-            <ScrollView
+            <ScrollView keyboardShouldPersistTaps="handled"
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={tw`px-5 gap-2`}
@@ -718,7 +769,7 @@ export const MealsScreen = ({ navigation }: any) => {
 
                 {/* Food Items */}
                 <View style={[tw`mt-3 pt-3`, { borderTopWidth: 1, borderColor: dividerColor }]}>
-                  {meal.items.map((item, i) => (
+                  {(meal.items || []).map((item, i) => (
                     <View key={i} style={tw`flex-row items-center gap-2.5 py-1`}>
                       <View
                         style={[
@@ -780,45 +831,36 @@ export const MealsScreen = ({ navigation }: any) => {
 
         {/* Water Tracker */}
         <View style={tw`px-5 mt-4`}>
-          <View
-            style={[
-              tw`rounded-2xl p-5`,
-              { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder },
-            ]}
-          >
-            <View style={tw`flex-row items-center justify-between mb-4`}>
-              <View style={tw`flex-row items-center gap-3`}>
-                <View
-                  style={[
-                    tw`w-11 h-11 rounded-xl items-center justify-center`,
-                    { backgroundColor: '#38bdf8' + '18' },
-                  ]}
-                >
-                  <MaterialIcons name="water-drop" size={22} color="#38bdf8" />
-                </View>
-                <View>
-                  <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>
-                    Water Intake
-                  </Text>
-                  <Text style={[tw`text-xs`, { color: textMuted }]}>
-                    Goal ~{formatLitres(waterGoalMl)} L (8 × {WATER_ML_PER_GLASS} ml)
-                  </Text>
-                </View>
+          <View style={[tw`p-5 rounded-3xl`, { backgroundColor: cardBg, borderWidth: 1, borderColor: cardBorder }]}>
+            <View style={tw`flex-row justify-between items-start mb-6`}>
+              <View>
+                <Text style={[tw`text-base font-bold`, { color: textPrimary }]}>
+                  Water Intake
+                </Text>
+                <Text style={[tw`text-xs mt-0.5`, { color: textMuted }]}>
+                  Goal ~{formatLitres(currentWaterGoalMl)} L ({formatGlassLabel(Math.round(currentWaterGoalMl / WATER_ML_PER_GLASS))})
+                </Text>
               </View>
-              <Text style={[tw`text-2xl font-black`, { color: '#38bdf8' }]}>
-                {formatLitres(waterDisplayMl)}L
-              </Text>
             </View>
 
-            <TouchableOpacity
-              onPress={openWaterCalculator}
-              style={[tw`self-start mb-3 px-3 py-1.5 rounded-lg flex-row items-center gap-1`, { backgroundColor: '#38bdf8' + '18' }]}
-            >
-              <MaterialIcons name="calculate" size={16} color="#38bdf8" />
-              <Text style={[tw`text-xs font-bold`, { color: '#38bdf8' }]}>Cup / litre calculator</Text>
-            </TouchableOpacity>
+            <View style={tw`flex-row items-end justify-between mb-8`}>
+              <View style={tw`flex-row items-baseline`}>
+                <Text style={[tw`text-4xl font-black`, { color: textPrimary }]}>
+                  {formatLitres(waterDisplayMl)}L
+                </Text>
+              </View>
+              <View style={tw`flex-row items-center gap-2`}>
+                <TouchableOpacity
+                  onPress={openWaterCalculator}
+                  style={[tw`px-3 py-1.5 rounded-full flex-row items-center`, { backgroundColor: 'rgba(56,189,248,0.1)' }]}
+                >
+                  <MaterialIcons name="edit" size={14} color="#38bdf8" />
+                  <Text style={[tw`text-xs font-bold ml-1`, { color: '#38bdf8' }]}>Goal / Log</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-            {/* Water Progress Bar */}
+            {/* Visual Tracker */}
             <View
               style={[
                 tw`h-3 rounded-full overflow-hidden mb-4`,
@@ -836,8 +878,8 @@ export const MealsScreen = ({ navigation }: any) => {
             </View>
 
             {/* Glass Icons Row */}
-            <View style={tw`flex-row items-center justify-center gap-1.5 mb-4`}>
-              {Array.from({ length: 8 }).map((_, i) => {
+            <View style={tw`flex-row items-center justify-center gap-1.5 mb-4 flex-wrap`}>
+              {Array.from({ length: maxWaterGlasses }).map((_, i) => {
                 const filled = waterDisplayMl >= (i + 1) * WATER_ML_PER_GLASS;
                 return (
                 <View
@@ -876,13 +918,13 @@ export const MealsScreen = ({ navigation }: any) => {
               </TouchableOpacity>
 
               <Text style={[tw`text-lg font-bold`, { color: textPrimary }]}>
-                {(waterDisplayMl / WATER_ML_PER_GLASS).toFixed(1)} glasses
+                {formatGlassLabel(waterGlassCount)}
               </Text>
 
               <TouchableOpacity
                 onPress={() => {
                   setWaterMlOverride(null);
-                  setWaterGlasses((prev) => Math.min(prev + 1, 24));
+                  setWaterGlasses((prev) => Math.min(prev + 1, maxWaterGlasses));
                 }}
                 style={[
                   tw`w-12 h-12 rounded-full items-center justify-center`,
@@ -900,61 +942,119 @@ export const MealsScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <Modal visible={showWaterCalc} transparent animationType="fade" onRequestClose={() => setShowWaterCalc(false)}>
-        <View style={tw`flex-1 justify-end`}>
+        <KeyboardAvoidingView 
+          style={tw`flex-1 justify-end`} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <Pressable style={[tw`flex-1`, { backgroundColor: 'rgba(0,0,0,0.5)' }]} onPress={() => setShowWaterCalc(false)} />
           <View
             style={[
-              tw`rounded-t-3xl px-5 pt-4 pb-8`,
+              tw`rounded-t-3xl px-5 pt-6 pb-10`,
               { backgroundColor: cardBg, borderTopWidth: 1, borderColor: cardBorder },
             ]}
           >
-            <Text style={[tw`text-lg font-bold mb-1`, { color: textPrimary }]}>Water calculator</Text>
-            <Text style={[tw`text-xs mb-4`, { color: textMuted }]}>
-              Enter any combination. Metric cups = 250 ml each. US cups ≈ 236.6 ml (nutrition labels).
-            </Text>
-            <Text style={[tw`text-xs font-bold mb-1`, { color: textSecondary }]}>Litres</Text>
-            <TextInput
-              value={calcLitres}
-              onChangeText={setCalcLitres}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={textMuted}
-              style={[tw`rounded-xl px-4 py-3 mb-3`, { borderWidth: 1, borderColor: cardBorder, color: textPrimary }]}
-            />
-            <Text style={[tw`text-xs font-bold mb-1`, { color: textSecondary }]}>Metric cups (250 ml)</Text>
-            <TextInput
-              value={calcMetricCups}
-              onChangeText={setCalcMetricCups}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={textMuted}
-              style={[tw`rounded-xl px-4 py-3 mb-3`, { borderWidth: 1, borderColor: cardBorder, color: textPrimary }]}
-            />
-            <Text style={[tw`text-xs font-bold mb-1`, { color: textSecondary }]}>US cups (~236.6 ml)</Text>
-            <TextInput
-              value={calcUsCups}
-              onChangeText={setCalcUsCups}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={textMuted}
-              style={[tw`rounded-xl px-4 py-3 mb-4`, { borderWidth: 1, borderColor: cardBorder, color: textPrimary }]}
-            />
-            <View style={tw`flex-row gap-3`}>
-              <TouchableOpacity
-                onPress={() => setShowWaterCalc(false)}
-                style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }]}
-              >
-                <Text style={[tw`font-bold`, { color: textSecondary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={applyWaterCalculator}
-                style={[tw`flex-1 py-3 rounded-xl items-center`, { backgroundColor: '#38bdf8' }]}
-              >
-                <Text style={tw`font-bold text-white`}>Apply</Text>
+            <View style={tw`flex-row items-center justify-between mb-5`}>
+              <Text style={[tw`text-xl font-black`, { color: textPrimary }]}>Hydration</Text>
+              <TouchableOpacity onPress={() => setShowWaterCalc(false)} style={tw`p-2`}>
+                <MaterialIcons name="close" size={24} color={textMuted} />
               </TouchableOpacity>
             </View>
+
+            {/* Tabs */}
+            <View style={[tw`flex-row rounded-xl p-1 mb-6`, { backgroundColor: dividerColor }]}>
+              <TouchableOpacity
+                style={[
+                  tw`flex-1 py-2 rounded-lg items-center`,
+                  waterModalTab === 'log' ? { backgroundColor: cardBg, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 } : {}
+                ]}
+                onPress={() => {
+                  setWaterModalTab('log');
+                  setCalcLitres((waterDisplayMl / 1000).toFixed(2));
+                }}
+              >
+                <Text style={[tw`font-bold`, { color: waterModalTab === 'log' ? textPrimary : textMuted }]}>Log Intake</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  tw`flex-1 py-2 rounded-lg items-center`,
+                  waterModalTab === 'goal' ? { backgroundColor: cardBg, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 } : {}
+                ]}
+                onPress={() => {
+                  setWaterModalTab('goal');
+                  setCalcLitres((currentWaterGoalMl / 1000).toFixed(2));
+                }}
+              >
+                <Text style={[tw`font-bold`, { color: waterModalTab === 'goal' ? textPrimary : textMuted }]}>Set Goal</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={tw`mb-8`}>
+              <Text style={[tw`text-sm font-bold mb-2`, { color: textSecondary }]}>
+                {waterModalTab === 'log' ? 'Amount to log' : 'Daily target'} (Litres)
+              </Text>
+              <View style={[tw`flex-row items-center rounded-2xl px-2 py-2`, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                <TouchableOpacity
+                  onPress={() => setCalcLitres(prev => Math.max(0, (parseFloat(prev || '0') - 0.25)).toFixed(2))}
+                  style={[tw`p-3 rounded-xl shadow-sm mr-3`, { backgroundColor: cardBg }]}
+                >
+                  <MaterialIcons name="remove" size={24} color="#38bdf8" />
+                </TouchableOpacity>
+                <MaterialIcons name="water-drop" size={24} color="#38bdf8" />
+                <TextInput
+                  value={calcLitres}
+                  onChangeText={setCalcLitres}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={textMuted}
+                  style={[tw`flex-1 text-3xl font-black text-center`, { color: textPrimary }]}
+                  autoFocus
+                />
+                <Text style={[tw`text-xl font-bold ml-1 mr-3`, { color: textMuted }]}>L</Text>
+                <TouchableOpacity
+                  onPress={() => setCalcLitres(prev => (parseFloat(prev || '0') + 0.25).toFixed(2))}
+                  style={[tw`p-3 rounded-xl shadow-sm`, { backgroundColor: cardBg }]}
+                >
+                  <MaterialIcons name="add" size={24} color="#38bdf8" />
+                </TouchableOpacity>
+              </View>
+
+              {waterModalTab === 'log' && (
+                <View style={tw`flex-row justify-center gap-3 mt-4`}>
+                  <TouchableOpacity
+                  onPress={() => {
+                    const goalL = currentWaterGoalMl / 1000;
+                    setCalcLitres((prev) => Math.min(goalL, parseFloat(prev || '0') + 0.25).toFixed(2));
+                  }}
+                  style={[tw`px-4 py-2 rounded-full flex-row items-center`, { backgroundColor: '#38bdf820' }]}
+                >
+                  <MaterialIcons name="local-drink" size={16} color="#38bdf8" style={tw`mr-1`} />
+                  <Text style={tw`text-[#38bdf8] font-bold text-xs`}>+ 1 Glass (0.25L)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    const goalL = currentWaterGoalMl / 1000;
+                    setCalcLitres((prev) => Math.min(goalL, parseFloat(prev || '0') + 0.5).toFixed(2));
+                  }}
+                    style={[tw`px-4 py-2 rounded-full flex-row items-center`, { backgroundColor: '#38bdf820' }]}
+                  >
+                    <MaterialIcons name="local-drink" size={16} color="#38bdf8" style={tw`mr-1`} />
+                    <Text style={tw`text-[#38bdf8] font-bold text-xs`}>+ 1 Bottle (0.5L)</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={applyWaterCalculator}
+              style={[tw`py-4 rounded-2xl items-center flex-row justify-center`, { backgroundColor: '#38bdf8' }]}
+            >
+              <MaterialIcons name={waterModalTab === 'log' ? 'check' : 'flag'} size={20} color="#fff" style={tw`mr-2`} />
+              <Text style={tw`font-bold text-white text-base`}>
+                {waterModalTab === 'log' ? 'Save Intake' : 'Update Goal'}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Bottom Navigation */}

@@ -16,6 +16,49 @@ export const aiClient = axios.create({
 
 // ─── Profile Mapping ──────────────────────────────────────────────────────────
 
+function normalizeDietStyle(raw) {
+  if (!raw) return 'omnivore';
+  if (Array.isArray(raw)) return String(raw[0] || 'omnivore').toLowerCase();
+  return String(raw).toLowerCase();
+}
+
+function buildMedicalNotes(profile) {
+  const parts = [];
+  if (Array.isArray(profile.medicalConditions) && profile.medicalConditions.length) {
+    parts.push(...profile.medicalConditions.map(String));
+  }
+  if (profile.otherMedicalNotes && String(profile.otherMedicalNotes).trim()) {
+    parts.push(String(profile.otherMedicalNotes).trim());
+  }
+  if (profile.medicalNotes && String(profile.medicalNotes).trim()) {
+    parts.push(String(profile.medicalNotes).trim());
+  }
+  return parts.join('; ');
+}
+
+function buildProfileExtended(profile) {
+  const allergies = Array.isArray(profile.allergies)
+    ? profile.allergies.map((a) => String(a).trim()).filter(Boolean)
+    : [];
+  const medicalConditions = Array.isArray(profile.medicalConditions)
+    ? profile.medicalConditions.map((c) => String(c).trim()).filter(Boolean)
+    : [];
+  if (profile.otherMedicalNotes && String(profile.otherMedicalNotes).trim()) {
+    medicalConditions.push(String(profile.otherMedicalNotes).trim());
+  }
+
+  return {
+    health: {
+      medical_conditions: medicalConditions,
+      allergies,
+    },
+    nutrition: {
+      diet_style: normalizeDietStyle(profile.dietaryPreference || profile.dietaryPreferences),
+      allergies,
+    },
+  };
+}
+
 function mapUserToAiProfile(user) {
   const profile = user.profile || {};
   const goalMap = {
@@ -42,8 +85,9 @@ function mapUserToAiProfile(user) {
     fitness_level: profile.experienceLevel || 'beginner',
     activity_level: profile.activityLevel || 'moderate',
     equipment: equipmentMap[user.userType] || 'full_gym',
-    dietary_preferences: profile.dietaryPreference || profile.dietaryPreferences || '',
-    medical_notes: profile.medicalNotes || '',
+    dietary_preferences: normalizeDietStyle(profile.dietaryPreference || profile.dietaryPreferences),
+    medical_notes: buildMedicalNotes(profile),
+    profile_extended: buildProfileExtended(profile),
   };
 }
 
@@ -62,10 +106,16 @@ export async function getOrCreateAiClientId(user) {
   }
 
   const payload = mapUserToAiProfile(user);
+  const { profile_extended, ...legacyPayload } = payload;
 
   try {
-    const res = await aiClient.post('/clients', payload);
+    const res = await aiClient.post('/clients', legacyPayload);
     const aiId = res.data.id;
+
+    await aiClient.put(`/clients/${aiId}`, {
+      medical_notes: legacyPayload.medical_notes,
+      profile_extended,
+    }).catch(() => {});
 
     // Persist the AI client ID in the user's profile JSON
     await User.update(
@@ -201,7 +251,7 @@ function _estimateCalories(exerciseCount) {
  * Returns an object compatible with DietPlan schema.
  */
 export async function generateAiDietPlan(user) {
-  const aiId = await getOrCreateAiClientId(user);
+  const aiId = await syncUserProfileToAi(user);
   const res = await aiClient.post(`/clients/${aiId}/nutrition-plan`);
   const plan = res.data;
 
@@ -252,8 +302,9 @@ function _mapPythonAiMeal(meal, index, totalMeals) {
     ? suggestions[0]
     : `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Meal`;
 
-  // Build a proper ingredient list with measurements where possible
-  const ingredients = suggestions || [name];
+  const ingredients = suggestions
+    ? suggestions.flatMap((s) => String(s).split('+').map((part) => part.trim()).filter(Boolean))
+    : [name];
 
   return {
     type: mealType,

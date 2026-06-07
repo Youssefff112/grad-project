@@ -5,6 +5,9 @@ import { CoachProfile } from '../Coach/coach.model.js';
 import { subscriptionService } from '../Subscription/subscription.service.js';
 import { AppError } from '../../Utils/appError.utils.js';
 
+const CLIENT_PROFILE_FIELDS = ['goals', 'preferences', 'medicalNotes'];
+const BLOCKED_PROFILE_FIELDS = ['selectedCoachId', 'userId', 'id'];
+
 export const clientService = {
   async getProfile(userId) {
     let profile = await ClientProfile.findOne({
@@ -25,13 +28,27 @@ export const clientService = {
   },
 
   async updateProfile(userId, updates) {
+    for (const blocked of BLOCKED_PROFILE_FIELDS) {
+      if (updates[blocked] !== undefined) {
+        throw new AppError(
+          `Field "${blocked}" cannot be updated here. Use POST /client/coach to select a coach.`,
+          403
+        );
+      }
+    }
+
+    const sanitized = {};
+    for (const key of CLIENT_PROFILE_FIELDS) {
+      if (updates[key] !== undefined) sanitized[key] = updates[key];
+    }
+
     let profile = await ClientProfile.findOne({ where: { userId } });
     if (!profile) {
-      profile = await ClientProfile.create({ userId, ...updates });
+      profile = await ClientProfile.create({ userId, ...sanitized });
       return profile;
     }
 
-    await ClientProfile.update(updates, { where: { userId } });
+    await ClientProfile.update(sanitized, { where: { userId } });
     return ClientProfile.findOne({
       where: { userId },
       include: [
@@ -91,7 +108,7 @@ export const clientService = {
   },
 
   async removeCoach(userId) {
-    let profile = await ClientProfile.findOne({ where: { userId } });
+    const profile = await ClientProfile.findOne({ where: { userId } });
     if (!profile) {
       throw new AppError('Client profile not found', 404);
     }
@@ -113,6 +130,5 @@ export const clientService = {
   async getSubscriptionStatus(userId) {
     const subscription = await subscriptionService.getActiveSubscription(userId, 'client');
     return subscription;
-  }
+  },
 };
-

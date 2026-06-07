@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import React, { useMemo, useEffect } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { stackScreenOptions } from './src/navigation/screenTransitions';
 
@@ -11,6 +11,29 @@ import { OfflineProvider } from './src/context/OfflineContext';
 import { FoodManagementProvider } from './src/context/FoodManagementContext';
 import { ExerciseManagementProvider } from './src/context/ExerciseManagementContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { DismissKeyboard } from './src/components/DismissKeyboard';
+import { onSessionExpired } from './src/services/sessionEvents';
+
+const navigationRef = createNavigationContainerRef();
+
+function SessionExpiryHandler() {
+  const { clearAuth } = useUser();
+
+  useEffect(() => {
+    return onSessionExpired(async () => {
+      try {
+        await clearAuth();
+      } catch {
+        // still navigate to sign-in
+      }
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'Splash' }] });
+      }
+    });
+  }, [clearAuth]);
+
+  return null;
+}
 
 // Shared / Auth screens
 import { SplashScreen } from './src/screens/SplashScreen';
@@ -50,6 +73,7 @@ import { WorkoutGenerationScreen } from './src/screens/client/WorkoutGenerationS
 import { MealGenerationScreen } from './src/screens/client/MealGenerationScreen';
 import { EditExperienceScreen } from './src/screens/client/EditExperienceScreen';
 import { EditDietScreen } from './src/screens/client/EditDietScreen';
+import { EditHealthScreen } from './src/screens/EditHealthScreen';
 import { AddFoodScreen } from './src/screens/client/AddFoodScreen';
 import { FoodLibraryScreen } from './src/screens/client/FoodLibraryScreen';
 import { FoodSearchScreen } from './src/screens/client/FoodSearchScreen';
@@ -74,7 +98,7 @@ import { CoachClientListScreen } from './src/screens/coach/CoachClientListScreen
 import { CoachClientDetailScreen } from './src/screens/coach/CoachClientDetailScreen';
 import { CoachMealPlanScreen } from './src/screens/coach/CoachMealPlanScreen';
 import { CoachWorkoutPlanScreen } from './src/screens/coach/CoachWorkoutPlanScreen';
-import { CoachScheduleScreen } from './src/screens/coach/CoachScheduleScreen';
+
 import { CoachEarningsScreen } from './src/screens/coach/CoachEarningsScreen';
 import { CoachReviewManagementScreen } from './src/screens/coach/CoachReviewManagementScreen';
 import { CoachProgramTemplatesScreen } from './src/screens/coach/CoachProgramTemplatesScreen';
@@ -93,7 +117,7 @@ function AppNavigator() {
 
   const initialRouteName = (() => {
     if (isLoading) return 'Splash';
-    if (!fullName) return 'Splash';
+    if (!isAuthenticated || !fullName) return 'Splash';
     if (isAuthenticated && role === 'coach' && coachApplicationStatus === 'pending') return 'CoachPendingApproval';
     if (isAuthenticated && role === 'coach' && coachApplicationStatus === 'rejected') return 'CoachApplicationRejected';
     if (role === 'admin') return 'AdminDashboard';
@@ -135,7 +159,7 @@ function AppNavigator() {
       <Stack.Screen name="CoachBrowsingScreen" component={CoachBrowsingScreen} />
       <Stack.Screen name="CoachCommandCenter" component={CoachCommandCenterScreen} />
       <Stack.Screen name="CoachClientList" component={CoachClientListScreen} />
-      <Stack.Screen name="CoachSchedule" component={CoachScheduleScreen} />
+
       <Stack.Screen name="CoachSettings" component={CoachSettingsScreen} />
       <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       <Stack.Screen name="AdminUsers" component={AdminUserManagementScreen} />
@@ -169,6 +193,7 @@ function AppNavigator() {
       <Stack.Screen name="MealGeneration" component={MealGenerationScreen} />
       <Stack.Screen name="EditExperience" component={EditExperienceScreen} />
       <Stack.Screen name="EditDiet" component={EditDietScreen} />
+      <Stack.Screen name="EditHealth" component={EditHealthScreen} />
       <Stack.Screen name="CoachProfileDetail" component={CoachProfileDetailScreen} />
       <Stack.Screen name="CoachAssignment" component={CoachAssignmentScreen} />
 
@@ -216,7 +241,8 @@ function AppNavigationContainer() {
   }, [isDark, accent, colors]);
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+      <SessionExpiryHandler />
       <AppNavigator />
     </NavigationContainer>
   );
@@ -232,7 +258,9 @@ export default function App() {
               <ExerciseManagementProvider>
                 <NotificationProvider>
                   <LoadingProvider>
-                    <AppNavigationContainer />
+                    <DismissKeyboard>
+                      <AppNavigationContainer />
+                    </DismissKeyboard>
                   </LoadingProvider>
                 </NotificationProvider>
               </ExerciseManagementProvider>

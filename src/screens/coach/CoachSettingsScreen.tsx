@@ -71,9 +71,6 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
       case 'reviews':
         navigation.navigate('CoachReviewManagement');
         break;
-      case 'schedule':
-        navigation.navigate('CoachSchedule');
-        break;
       case 'privacy':
         navigation.navigate('PrivacySecurity');
         break;
@@ -103,7 +100,6 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
         { id: 'subscription', icon: 'card-membership', label: 'Coach Subscription' },
         { id: 'program-templates', icon: 'library-books', label: 'Program Templates' },
         { id: 'reviews', icon: 'star-rate', label: 'Reviews & Ratings' },
-        { id: 'schedule', icon: 'calendar-today', label: 'Schedule & Availability' },
       ],
     },
     {
@@ -115,7 +111,6 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
           label: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
           isToggle: true,
         },
-        { id: 'notifications', icon: 'notifications', label: 'Notifications' },
       ],
     },
     {
@@ -152,7 +147,7 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
         <View style={tw`w-12`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
         {/* Avatar & Name */}
         <View style={tw`items-center pt-6 pb-5`}>
           <TouchableOpacity

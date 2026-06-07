@@ -70,7 +70,7 @@ export const CoachReviewManagementScreen = ({ navigation }: any) => {
           <ActivityIndicator size="large" color={accent} />
         </View>
       ) : (
-        <ScrollView
+        <ScrollView keyboardShouldPersistTaps="handled"
           style={tw`flex-1`}
           contentContainerStyle={tw`px-4 py-4 pb-8`}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accent} />}

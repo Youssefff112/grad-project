@@ -199,7 +199,7 @@ export const ProgressScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={[tw`flex-1`, { backgroundColor: bgColor }]}>
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         style={tw`flex-1`}
         contentContainerStyle={tw`pb-24`}
         showsVerticalScrollIndicator={false}

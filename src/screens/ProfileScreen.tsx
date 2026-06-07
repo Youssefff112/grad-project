@@ -12,12 +12,14 @@ import { CoachBottomNav } from '../components/coach/CoachBottomNav';
 import { Switch } from '../components/Switch';
 import * as workoutService from '../services/workoutService';
 import * as progressService from '../services/progressService';
+import { fetchDailyStreak } from '../services/streakService';
 import { canClientSelectPersonalCoach } from '../utils/planUtils';
-import { buildImageUrl } from '../utils/imageUrl';
+import { ProfileAvatar } from '../components/ProfileAvatar';
+import { validateWeightKg } from '../utils/validation';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { isDark, accent, toggleTheme } = useTheme();
-  const { fullName, email, logout, role, subscriptionPlan, weight: userWeight, setWeight, syncProfileFromServer, profilePicture } = useUser();
+  const { fullName, email, logout, role, subscriptionPlan, weight: userWeight, setWeight, syncProfileFromServer, profilePicture, waterGoalMl } = useUser();
   const { totalUnread } = useNotifications();
   const displayName = fullName || 'Trainee';
 
@@ -30,11 +32,12 @@ export const ProfileScreen = ({ navigation }: any) => {
   const [weightInput, setWeightInput] = useState('');
 
   const handleSaveWeight = async () => {
-    const newWeight = parseFloat(weightInput);
-    if (isNaN(newWeight) || newWeight <= 0) {
-      Alert.alert('Invalid Weight', 'Please enter a valid number.');
+    const weightErr = validateWeightKg(weightInput);
+    if (weightErr) {
+      Alert.alert('Invalid Weight', weightErr);
       return;
     }
+    const newWeight = parseFloat(weightInput);
     setIsWeightModalVisible(false);
     setLatestWeight(`${newWeight}kg`);
     if (setWeight) setWeight(newWeight);
@@ -70,25 +73,14 @@ export const ProfileScreen = ({ navigation }: any) => {
             );
             if (sorted[0].weight && userWeight == null) setLatestWeight(`${sorted[0].weight}kg`);
           }
-          // Compute simple streak from consecutive workout days
-          if (logs && logs.length > 0) {
-            const days = new Set(logs.map((s: any) => new Date(s.date || s.completedAt || s.createdAt).toDateString()));
-            let streak = 0;
-            const today = new Date();
-            for (let i = 0; i < 365; i++) {
-              const d = new Date(today);
-              d.setDate(d.getDate() - i);
-              if (days.has(d.toDateString())) streak++;
-              else if (i > 0) break;
-            }
-            setStreakDays(`${streak}d`);
-          }
+          const streak = await fetchDailyStreak(waterGoalMl);
+          setStreakDays(streak > 0 ? `${streak}d` : '0d');
         } catch {
           // keep current values
         }
       };
       loadStats();
-    }, [userWeight, syncProfileFromServer])
+    }, [userWeight, syncProfileFromServer, waterGoalMl])
   );
 
   const STATS = [
@@ -138,6 +130,9 @@ export const ProfileScreen = ({ navigation }: any) => {
       case 'goals':
         navigation.navigate('Goals', { fromSettings: true });
         break;
+      case 'health':
+        navigation.navigate('EditHealth');
+        break;
     }
   };
 
@@ -148,12 +143,12 @@ export const ProfileScreen = ({ navigation }: any) => {
         { id: 'experience', icon: 'fitness-center', label: 'Fitness Level' },
         { id: 'diet', icon: 'restaurant', label: 'Diet Preferences' },
         { id: 'goals', icon: 'track-changes', label: 'Goals' },
+        { id: 'health', icon: 'medical-services', label: 'Health & Allergies' },
       ] },
     {
       title: 'Preferences',
       items: [
         { id: 'dark-mode', icon: isDark ? 'light-mode' : 'dark-mode', label: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode', isToggle: true },
-        { id: 'notifications', icon: 'notifications', label: 'Notifications' },
         { id: 'units', icon: 'straighten', label: 'Units & Measurements' },
       ] },
     {
@@ -196,24 +191,21 @@ export const ProfileScreen = ({ navigation }: any) => {
         <View style={tw`w-12`} />
       </View>
 
-      <ScrollView style={tw`flex-1`} contentContainerStyle={tw`pb-24`}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        nestedScrollEnabled
+        style={tw`flex-1`}
+        contentContainerStyle={tw`pb-24`}
+      >
         {/* Avatar & Name */}
         <View style={tw`items-center pt-6 pb-5`}>
           <TouchableOpacity
             onPress={() => navigation.navigate('EditProfile')}
             activeOpacity={0.85}
-            style={[tw`w-24 h-24 rounded-full overflow-hidden mb-4`]}
+            style={tw`mb-4`}
           >
-            {buildImageUrl(profilePicture) ? (
-              <Image
-                source={{ uri: buildImageUrl(profilePicture) }}
-                style={tw`w-full h-full`}
-              />
-            ) : (
-              <View style={[tw`w-full h-full items-center justify-center`, { backgroundColor: accent + '20' }]}>
-                <MaterialIcons name="person" size={48} color={accent} />
-              </View>
-            )}
+            <ProfileAvatar profilePicture={profilePicture} size={96} accent={accent} isDark={isDark} />
           </TouchableOpacity>
           <Text style={[tw`text-2xl font-bold`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>{displayName}</Text>
           <Text style={[tw`text-sm mt-1`, { color: isDark ? '#94a3b8' : '#64748b' }]}>{email || 'Vertex Member'}</Text>

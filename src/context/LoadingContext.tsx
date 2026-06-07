@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import tw from '../tw';
 import { useTheme } from './ThemeContext';
@@ -24,8 +24,13 @@ export const LoadingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const showLoading = useCallback(() => setIsLoading(true), []);
   const hideLoading = useCallback(() => setIsLoading(false), []);
 
+  const contextValue = useMemo(
+    () => ({ isLoading, setIsLoading, showLoading, hideLoading }),
+    [isLoading, showLoading, hideLoading],
+  );
+
   return (
-    <LoadingContext.Provider value={{ isLoading, setIsLoading, showLoading, hideLoading }}>
+    <LoadingContext.Provider value={contextValue}>
       {children}
       {isLoading && <LoadingOverlay />}
     </LoadingContext.Provider>

@@ -80,6 +80,10 @@ Message.init({
   modelName: 'Message',
   tableName: 'messages',
   timestamps: true,
+  indexes: [
+    { fields: ['conversationId'], name: 'messages_conversation_id_idx' },
+    { fields: ['conversationId', 'read', 'senderId'], name: 'messages_unread_lookup_idx' },
+  ],
 });
 
 // Relationships

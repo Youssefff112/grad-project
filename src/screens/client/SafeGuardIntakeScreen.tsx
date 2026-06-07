@@ -76,7 +76,7 @@ export const SafeGuardIntakeScreen = ({ navigation }: any) => {
 
       <ProgressBar progress={50} containerStyle={tw`px-6 pt-4 pb-0`} label="Intake Progress" stepText="Step 3 of 6" />
 
-      <ScrollView style={tw`flex-1`}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={tw`flex-1`}>
         <View style={tw`px-6 pt-4`}>
           <Text style={[tw`tracking-tight text-2xl font-bold leading-tight`, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
             Medical History

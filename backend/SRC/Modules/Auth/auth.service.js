@@ -2,6 +2,7 @@
 import { User } from '../User/user.model.js';
 import { CoachProfile } from '../Coach/coach.model.js';
 import { ClientProfile } from '../Client/client.model.js';
+import { subscriptionService } from '../Subscription/subscription.service.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { sendWelcomeEmail, sendPasswordResetEmail } from '../../Utils/Emails/sendEmail.utils.js';
 import jwt from 'jsonwebtoken';
@@ -34,23 +35,26 @@ export const authService = {
   },
 
   async register(userData) {
-    const { email, password, confirmPassword, ...rest } = userData;
+    const { email, password, confirmPassword, firstName, lastName, userType } = userData;
 
-    if (rest.role === 'admin' && String(email).toLowerCase().trim() !== 'admin@vertex.com') {
-      throw new AppError('Admin accounts cannot be created through self-service registration', 400);
+    if (userData.role === 'admin') {
+      throw new AppError('Admin accounts cannot be created through self-service registration', 403);
     }
 
-    // Check if user already exists
+    const role = userData.role === 'coach' ? 'coach' : 'client';
+
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       throw new AppError('User with this email already exists', 400);
     }
 
-    // Create user
     const user = await User.create({
       email,
       password,
-      ...rest
+      firstName,
+      lastName,
+      userType,
+      role,
     });
 
     if (user.role === 'coach') {
@@ -62,6 +66,25 @@ export const authService = {
 
     if (user.role === 'client') {
       await ClientProfile.findOrCreate({ where: { userId: user.id }, defaults: { userId: user.id } });
+      user.profile = {
+        ...(user.profile || {}),
+        goal: 'maintenance',
+        experienceLevel: 'beginner',
+        age: 25,
+        height: 170,
+        currentWeight: 70,
+        gender: 'male',
+        waterGoalMl: 2000,
+      };
+      await user.save();
+      const existingSub = await subscriptionService.getActiveSubscription(user.id, 'client');
+      if (!existingSub) {
+        await subscriptionService.createSubscription(user.id, {
+          role: 'client',
+          planName: 'Free',
+          autoRenew: true,
+        }, 'client');
+      }
     }
 
     // Send welcome email (don't await to avoid blocking)
@@ -98,10 +121,7 @@ export const authService = {
 
   async refreshToken(refreshToken) {
     try {
-      const decoded = jwt.verify(
-        refreshToken,
-        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
-      );
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
       const user = await User.unscoped().findByPk(decoded.userId);
       if (!user || user.refreshToken !== refreshToken || !user.isActive) {
@@ -144,7 +164,7 @@ export const authService = {
       throw new AppError('Error sending email. Please try again later.', 500);
     }
 
-    return resetToken;
+    return null;
   },
 
   async resetPassword(token, password) {

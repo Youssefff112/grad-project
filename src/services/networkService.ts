@@ -18,7 +18,7 @@ const startPolling = () => {
     try {
       const networkState = await Network.getNetworkStateAsync();
       const state: NetworkState = {
-        isOnline: true, // Force true to avoid emulator wifi glitches
+        isOnline: networkState.isConnected === true && networkState.isInternetReachable !== false,
         isConnecting: false,
         type: networkState.type,
       };
