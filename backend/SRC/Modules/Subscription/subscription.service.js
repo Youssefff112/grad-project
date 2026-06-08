@@ -35,6 +35,13 @@ export const subscriptionService = {
 
     const isFreePlan = serverPrice === 0;
 
+    // Cancel any existing active or pending subscriptions for this user+role
+    // so the new plan becomes the sole active subscription.
+    await Subscription.update(
+      { status: 'cancelled' },
+      { where: { userId, role, status: ['active', 'pending'] } },
+    );
+
     const subscription = await Subscription.create({
       userId,
       role,
@@ -57,9 +64,12 @@ export const subscriptionService = {
       ...(role ? { role } : {}),
     };
 
+    // Order by createdAt DESC so the most recently created active subscription
+    // wins. This avoids the PostgreSQL NULLS FIRST default on endDate DESC
+    // that would otherwise surface the auto-created Free plan over a paid one.
     return Subscription.findOne({
       where,
-      order: [['endDate', 'DESC']],
+      order: [['createdAt', 'DESC']],
     });
   },
 
