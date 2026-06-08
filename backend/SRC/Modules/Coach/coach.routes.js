@@ -12,6 +12,7 @@ import {
   getClientsSchema,
   clientActivityQuerySchema,
   assignPlanSchema,
+  assignDietPlanSchema,
 } from './coach.validation.js';
 
 const router = Router();
@@ -39,7 +40,7 @@ router.delete('/certifications/:certificationId', authenticate, restrictTo('coac
 router.get('/clients', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), validate(getClientsSchema), coachController.getClients);
 router.get('/analytics', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), coachController.getAnalytics);
 router.post('/assign/workout', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), validate(assignPlanSchema), coachController.assignWorkoutPlan);
-router.post('/assign/diet', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), validate(assignPlanSchema), coachController.assignDietPlan);
+router.post('/assign/diet', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), validate(assignDietPlanSchema), coachController.assignDietPlan);
 
 // Per-client plan management (view, generate, edit)
 router.get('/clients/:clientId/workout-plan', authenticate, restrictTo('coach'), requireActiveSubscription('coach'), validate(clientIdParamSchema), coachController.getClientWorkoutPlan);

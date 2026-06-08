@@ -116,24 +116,13 @@ export const coachController = {
       }
       const resolvedUserId = await resolveUserId(parseInt(rawId));
       await coachService.ensureCoachOwnsClient(req.user.id, resolvedUserId);
-      
-      // Deactivate existing active plans
-      await DietPlan.update(
-        { isActive: false },
-        { where: { userId: resolvedUserId, isActive: true } }
-      );
 
-      const plan = await DietPlan.create({
-        userId: resolvedUserId,
-        planName: planName || 'Custom Diet Plan',
-        dailyCalorieTarget: dailyCalorieTarget || 2000,
-        hydrationGoal: hydrationGoal || null,
-        weeklyMealPlan: weeklyMealPlan || [],
-        macronutrients: macronutrients || { protein: 150, carbs: 200, fats: 60 },
-        assignedByCoachId: req.user.id,
-        assignedAt: new Date(),
-        isActive: true,
-        pendingCoachReview: false,
+      const plan = await dietService.createCoachAssignedPlan(resolvedUserId, req.user.id, {
+        planName,
+        dailyCalorieTarget,
+        hydrationGoal,
+        weeklyMealPlan,
+        macronutrients,
       });
       
       if (hydrationGoal) {

@@ -122,7 +122,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     draft: string;
   } | null>(null);
 
-  const editingPlanId: number | null = existingPlan?.id ?? null;
+  const [editingPlanId, setEditingPlanId] = useState<number | null>(existingPlan?.id ?? null);
   const saveLocked = !!existingPlan?.pendingCoachReview;
 
   useEffect(() => {
@@ -238,6 +238,7 @@ export const CoachMealPlanScreen = ({ navigation, route }: any) => {
     try {
       const { plan } = await coachService.generateDietForClient(apiClientId);
       if (plan) {
+        if (plan.id) setEditingPlanId(plan.id);
         const defaultName = plan.goal || 'Diet';
         setPlanName(plan.planName || (defaultName.endsWith('Plan') ? defaultName : `${defaultName} Plan`));
         if (plan.dailyCalorieTarget) setCalorieTarget(String(plan.dailyCalorieTarget));

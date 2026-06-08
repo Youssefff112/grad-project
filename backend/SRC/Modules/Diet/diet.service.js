@@ -45,6 +45,43 @@ export const dietService = {
     return this._generateDietPlanForUser(targetUserId, coachId, planName);
   },
 
+  /**
+   * Coach manually assigns a custom meal plan (from the meal plan builder).
+   * Sets all required DietPlan fields that the model enforces.
+   */
+  async createCoachAssignedPlan(userId, coachId, data = {}) {
+    const user = await User.findByPk(userId);
+    if (!user) throw new AppError('Client not found', 404);
+
+    const clientRow = await ClientProfile.findOne({ where: { userId } });
+    const profile = user.profile || {};
+    const mergedGoal = pickFitnessGoal(profile, clientRow, coachId);
+    const goal = this._normalizeGoal(mergedGoal);
+    const rawDietPref = profile.dietaryPreference || profile.dietaryPreferences;
+    const dietaryPreference = this._normalizeDietaryPreference(rawDietPref);
+
+    await DietPlan.update(
+      { isActive: false },
+      { where: { userId, isActive: true } }
+    );
+
+    return DietPlan.create({
+      userId,
+      planName: data.planName || 'Custom Diet Plan',
+      goal,
+      dietaryPreference,
+      dailyCalorieTarget: data.dailyCalorieTarget || 2000,
+      hydrationGoal: data.hydrationGoal ?? null,
+      weeklyMealPlan: data.weeklyMealPlan || [],
+      macronutrients: data.macronutrients || { protein: 150, carbs: 200, fats: 60 },
+      assignedByCoachId: coachId,
+      assignedAt: new Date(),
+      weekStartDate: this._getStartOfWeek(),
+      isActive: true,
+      pendingCoachReview: false,
+    });
+  },
+
   async getActiveDietPlan(userId) {
     // Return active plan first; fall back to pending-review plan
     const plan = await DietPlan.findOne({ where: { userId, isActive: true } });
