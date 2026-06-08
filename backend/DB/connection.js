@@ -32,11 +32,11 @@ export const connectDB = async () => {
     await import('../SRC/Modules/Messaging/messaging.model.js');
 
     await sequelize.authenticate();
-    await runMigrations(sequelize);
 
     const isProduction = process.env.NODE_ENV === 'production';
     const allowDevSync = process.env.DB_SYNC_ALTER !== 'false';
 
+    // Sync first so all tables exist before migrations run their index/column DDL.
     if (isProduction) {
       console.log('📦 Production mode — skipping sequelize.sync (migrations only)');
     } else if (allowDevSync) {
@@ -45,6 +45,9 @@ export const connectDB = async () => {
     } else {
       console.log('📦 DB_SYNC_ALTER=false — skipping sequelize.sync');
     }
+
+    // Run migrations after tables exist (indexes, extra columns, data fixes).
+    await runMigrations(sequelize);
 
     try {
       const { CoachProfile } = await import('../SRC/Modules/Coach/coach.model.js');
