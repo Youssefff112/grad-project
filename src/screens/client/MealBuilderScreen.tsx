@@ -17,35 +17,9 @@ import { useFoodManagement, CustomMeal } from '../../context/FoodManagementConte
 import { FoodPickerModal } from '../../components/FoodPickerModal';
 import { Button } from '../../components/Button';
 import { Food } from '../../context/FoodManagementContext';
+import { getServingGrams, formatFoodQty, estimateTotalGrams } from '../../utils/mealIngredients';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
-
-/** Extract how many grams one serving of this food represents, or null if not gram-based */
-const getServingGrams = (servingSize?: string): number | null => {
-  if (!servingSize) return null;
-  // "100g", "100g cooked", "100g (≈2 slices)"
-  const direct = servingSize.match(/^(\d+(?:\.\d+)?)g/);
-  if (direct) return parseFloat(direct[1]);
-  // "1 scoop (30g)"
-  const paren = servingSize.match(/\((\d+(?:\.\d+)?)g\)/);
-  if (paren) return parseFloat(paren[1]);
-  return null;
-};
-
-/**
- * Produce a human-readable measurement string.
- * gram-based foods: "150g", count-based: "2 × 1 large egg"
- */
-const formatQty = (quantity: number, servingSize?: string): string => {
-  const grams = getServingGrams(servingSize);
-  if (grams) {
-    const total = Math.round(quantity * grams);
-    return `${total}g`;
-  }
-  if (!servingSize) return `×${quantity.toFixed(1)}`;
-  if (quantity === Math.round(quantity)) return `${quantity} × ${servingSize}`;
-  return `${quantity.toFixed(1)} × ${servingSize}`;
-};
 
 export const MealBuilderScreen = ({ navigation, route }: any) => {
   const { isDark, accent } = useTheme();
@@ -288,7 +262,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
                       <View style={tw`flex-row items-center justify-between`}>
                         <View style={tw`flex-1`}>
                           <Text style={[tw`text-xs font-bold`, { color: accent }]}>
-                            {formatQty(item.quantity, food.servingSize)}
+                            {formatFoodQty(item.quantity, food.servingSize)}
                           </Text>
                           <Text style={[tw`text-xs mt-0.5`, { color: textSecondary }]}>
                             {Math.round(food.calories * item.quantity)} kcal · P:{Math.round(food.protein * item.quantity)}g · C:{Math.round(food.carbs * item.quantity)}g · F:{Math.round(food.fats * item.quantity)}g
@@ -309,7 +283,7 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
                                 <Text style={[tw`text-sm font-bold`, { color: accent }]}>−</Text>
                               </TouchableOpacity>
                               <Text style={[tw`text-xs font-bold w-10 text-center`, { color: textPrimary }]}>
-                                {formatQty(item.quantity, food.servingSize)}
+                                {formatFoodQty(item.quantity, food.servingSize)}
                               </Text>
                               <TouchableOpacity
                                 onPress={() => handleUpdateQuantity(index, item.quantity + step)}
@@ -333,40 +307,57 @@ export const MealBuilderScreen = ({ navigation, route }: any) => {
           </View>
 
           {/* Totals Section */}
-          {selectedFoods.length > 0 && (
-            <View style={[tw`rounded-2xl p-4 gap-2`, { backgroundColor: accent + '10', borderWidth: 1, borderColor: accent + '40' }]}>
-              <Text style={[tw`text-xs font-bold uppercase mb-1`, { color: textSecondary }]}>
-                Meal Totals
-              </Text>
+          {selectedFoods.length > 0 && (() => {
+            const itemsForWeight = selectedFoods.map((item) => {
+              const food = foods.find((f) => f.id === item.foodId);
+              return { quantity: item.quantity, servingSize: food?.servingSize };
+            });
+            const totalGrams = estimateTotalGrams(itemsForWeight);
+            return (
+              <View style={[tw`rounded-2xl p-4 gap-2`, { backgroundColor: accent + '10', borderWidth: 1, borderColor: accent + '40' }]}>
+                <View style={tw`flex-row items-center justify-between mb-1`}>
+                  <Text style={[tw`text-xs font-bold uppercase`, { color: textSecondary }]}>
+                    Meal Totals
+                  </Text>
+                  {totalGrams > 0 && (
+                    <View style={[tw`flex-row items-center gap-1 px-2 py-0.5 rounded-full`, { backgroundColor: accent + '20' }]}>
+                      <MaterialIcons name="scale" size={12} color={accent} />
+                      <Text style={[tw`text-xs font-bold`, { color: accent }]}>
+                        ~{totalGrams}g serving
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
-              <View style={tw`gap-1.5`}>
-                <View style={tw`flex-row justify-between`}>
-                  <Text style={[tw`text-sm`, { color: textPrimary }]}>Calories</Text>
-                  <Text style={[tw`text-sm font-bold`, { color: accent }]}>
-                    {Math.round(totals.calories)}
-                  </Text>
-                </View>
-                <View style={tw`flex-row justify-between`}>
-                  <Text style={[tw`text-sm`, { color: textPrimary }]}>Protein</Text>
-                  <Text style={[tw`text-sm font-bold`, { color: '#4ade80' }]}>
-                    {totals.protein.toFixed(1)}g
-                  </Text>
-                </View>
-                <View style={tw`flex-row justify-between`}>
-                  <Text style={[tw`text-sm`, { color: textPrimary }]}>Carbs</Text>
-                  <Text style={[tw`text-sm font-bold`, { color: '#facc15' }]}>
-                    {totals.carbs.toFixed(1)}g
-                  </Text>
-                </View>
-                <View style={tw`flex-row justify-between`}>
-                  <Text style={[tw`text-sm`, { color: textPrimary }]}>Fats</Text>
-                  <Text style={[tw`text-sm font-bold`, { color: '#f87171' }]}>
-                    {totals.fats.toFixed(1)}g
-                  </Text>
+                <View style={tw`gap-1.5`}>
+                  <View style={tw`flex-row justify-between`}>
+                    <Text style={[tw`text-sm`, { color: textPrimary }]}>Calories</Text>
+                    <Text style={[tw`text-sm font-bold`, { color: accent }]}>
+                      {Math.round(totals.calories)} kcal
+                    </Text>
+                  </View>
+                  <View style={tw`flex-row justify-between`}>
+                    <Text style={[tw`text-sm`, { color: textPrimary }]}>Protein</Text>
+                    <Text style={[tw`text-sm font-bold`, { color: '#4ade80' }]}>
+                      {totals.protein.toFixed(1)}g
+                    </Text>
+                  </View>
+                  <View style={tw`flex-row justify-between`}>
+                    <Text style={[tw`text-sm`, { color: textPrimary }]}>Carbs</Text>
+                    <Text style={[tw`text-sm font-bold`, { color: '#facc15' }]}>
+                      {totals.carbs.toFixed(1)}g
+                    </Text>
+                  </View>
+                  <View style={tw`flex-row justify-between`}>
+                    <Text style={[tw`text-sm`, { color: textPrimary }]}>Fats</Text>
+                    <Text style={[tw`text-sm font-bold`, { color: '#f87171' }]}>
+                      {totals.fats.toFixed(1)}g
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            );
+          })()}
         </ScrollView>
 
         {/* Footer Buttons */}

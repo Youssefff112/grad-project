@@ -22,7 +22,7 @@ import {
   mlFromUsCups,
 } from '../../utils/waterConversions';
 import { localYmd } from '../../utils/localDate';
-import { resolveMealIngredientLines } from '../../utils/mealIngredients';
+import { resolveMealIngredientLines, formatFoodQty } from '../../utils/mealIngredients';
 import { cacheMealLog, getCachedMealLog } from '../../services/offlineService';
 
 // When there is no active plan there is no meaningful calorie target.
@@ -60,7 +60,7 @@ export const MealsScreen = ({ navigation }: any) => {
   const { isDark, accent } = useTheme();
   const { fullName, userId, waterGoalMl, setWaterGoalMl } = useUser();
   const { totalUnread } = useNotifications();
-  const { customMeals } = useFoodManagement();
+  const { customMeals, foods: foodLibrary } = useFoodManagement();
 
   // Week day navigation (Mon–Sun).  0 = Monday … 6 = Sunday
   const todayIndex = (() => {
@@ -133,7 +133,13 @@ export const MealsScreen = ({ navigation }: any) => {
         meal: meal.name,
         time: MEAL_TIME_MAP[(meal.mealType || '').toLowerCase()] || '12:00',
         icon: MEAL_ICON_MAP[(meal.mealType || '').toLowerCase()] || 'restaurant',
-        items: meal.foods.map((f) => `Food #${f.foodId}`),
+        items: meal.foods
+          .map((f) => {
+            const food = foodLibrary.find((lib) => lib.id === f.foodId);
+            if (!food) return null;
+            return `${formatFoodQty(f.quantity, food.servingSize)} ${food.name}`;
+          })
+          .filter((s): s is string => s !== null),
         calories: meal.totalCalories,
         protein: meal.totalMacros.protein,
         carbs: meal.totalMacros.carbs,
@@ -162,13 +168,24 @@ export const MealsScreen = ({ navigation }: any) => {
           plan.weeklyMealPlan.find((d) => d.day.toLowerCase() === todayName) ||
           plan.weeklyMealPlan[todayDow] ||
           plan.weeklyMealPlan[0];
-        const mealCalorieSum = (dayPlan?.meals ?? []).reduce((s, m) => s + (m.nutrition?.calories ?? 0), 0);
-        const targetCalories = mealCalorieSum > 0 ? mealCalorieSum : plan.dailyCalorieTarget > 0 ? plan.dailyCalorieTarget : 0;
+        const mealNutritionSum = (dayPlan?.meals ?? []).reduce(
+          (s, m) => ({
+            calories: s.calories + (m.nutrition?.calories ?? 0),
+            protein: s.protein + (m.nutrition?.protein ?? 0),
+            carbs: s.carbs + (m.nutrition?.carbs ?? 0),
+            fats: s.fats + (m.nutrition?.fats ?? 0),
+          }),
+          { calories: 0, protein: 0, carbs: 0, fats: 0 },
+        );
+        const targetCalories = mealNutritionSum.calories > 0
+          ? mealNutritionSum.calories
+          : plan.dailyCalorieTarget > 0 ? plan.dailyCalorieTarget : 0;
+        // Prefer meal-level sums; fall back to plan-level macronutrient targets
         setDailyTarget({
           calories: targetCalories,
-          protein: plan.macronutrients.protein,
-          carbs: plan.macronutrients.carbs,
-          fats: plan.macronutrients.fats,
+          protein: mealNutritionSum.protein > 0 ? mealNutritionSum.protein : plan.macronutrients.protein,
+          carbs: mealNutritionSum.carbs > 0 ? mealNutritionSum.carbs : plan.macronutrients.carbs,
+          fats: mealNutritionSum.fats > 0 ? mealNutritionSum.fats : plan.macronutrients.fats,
         });
       } else {
         // No active plan — drop stale state and revert to zero defaults.
