@@ -36,6 +36,37 @@ function buildMedicalNotes(profile) {
   return parts.join('; ');
 }
 
+/** Map app onboarding goals (fatloss, hypertrophy, …) to AI backend enums. */
+export function normalizeGoalForAi(raw) {
+  if (!raw) return 'general_fitness';
+  const g = String(raw).toLowerCase().replace(/[\s-]/g, '_');
+  const aliases = {
+    fatloss: 'fat_loss',
+    fat_loss: 'fat_loss',
+    weight_loss: 'fat_loss',
+    lose_weight: 'fat_loss',
+    hypertrophy: 'muscle_gain',
+    muscle_gain: 'muscle_gain',
+    muscle: 'muscle_gain',
+    bulk: 'muscle_gain',
+    athletic: 'sports_performance',
+    sports_performance: 'sports_performance',
+    sports: 'sports_performance',
+    longevity: 'general_fitness',
+    maintenance: 'general_fitness',
+    general_fitness: 'general_fitness',
+    endurance: 'endurance',
+    strength: 'strength',
+  };
+  if (aliases[g]) return aliases[g];
+  if (g.includes('fat') || g.includes('weight') || g.includes('loss')) return 'fat_loss';
+  if (g.includes('muscle') || g.includes('hyper') || g.includes('bulk')) return 'muscle_gain';
+  if (g.includes('athlet') || g.includes('sport')) return 'sports_performance';
+  if (g.includes('endur') || g.includes('cardio') || g.includes('stamina')) return 'endurance';
+  if (g.includes('longev') || g.includes('health')) return 'general_fitness';
+  return 'general_fitness';
+}
+
 function buildProfileExtended(profile) {
   const allergies = Array.isArray(profile.allergies)
     ? profile.allergies.map((a) => String(a).trim()).filter(Boolean)
@@ -46,8 +77,12 @@ function buildProfileExtended(profile) {
   if (profile.otherMedicalNotes && String(profile.otherMedicalNotes).trim()) {
     medicalConditions.push(String(profile.otherMedicalNotes).trim());
   }
+  const aiGoal = normalizeGoalForAi(profile.goal);
 
   return {
+    goals: {
+      primary_goals: [aiGoal],
+    },
     health: {
       medical_conditions: medicalConditions,
       allergies,
@@ -61,15 +96,6 @@ function buildProfileExtended(profile) {
 
 function mapUserToAiProfile(user) {
   const profile = user.profile || {};
-  const goalMap = {
-    muscle_gain: 'muscle_gain',
-    weight_loss: 'fat_loss',
-    fat_loss: 'fat_loss',
-    endurance: 'endurance',
-    maintenance: 'general_fitness',
-    strength: 'strength',
-    sports: 'sports_performance',
-  };
   const equipmentMap = {
     onsite: 'full_gym',
     offline: profile.homeEquipment?.length ? 'dumbbells' : 'none',
@@ -81,7 +107,7 @@ function mapUserToAiProfile(user) {
     gender: profile.gender || 'male',
     weight_kg: profile.currentWeight || profile.weight || 70,
     height_cm: profile.height || 170,
-    goal: goalMap[profile.goal] || profile.goal || 'general_fitness',
+    goal: normalizeGoalForAi(profile.goal),
     fitness_level: profile.experienceLevel || 'beginner',
     activity_level: profile.activityLevel || 'moderate',
     equipment: equipmentMap[user.userType] || 'full_gym',
@@ -181,13 +207,32 @@ function resolveEquipmentForAi(location, equipment, user) {
  * @param {string|null} location   - 'home' | 'gym' | null (from frontend questionnaire)
  * @param {string[]}    equipment  - list of equipment IDs (from frontend questionnaire)
  */
-export async function generateAiWorkoutPlan(user, daysPerWeek = 4, location = null, equipment = null) {
+export async function generateAiWorkoutPlan(
+  user,
+  daysPerWeek = 4,
+  location = null,
+  equipment = null,
+  excludeExerciseNames = [],
+) {
   const aiId = await getOrCreateAiClientId(user);
 
   // Temporarily override equipment in the AI profile for this request
   const resolvedEquipment = resolveEquipmentForAi(location, equipment || [], user);
   const profile = mapUserToAiProfile(user);
   profile.equipment = resolvedEquipment;
+
+  const dislikes = (excludeExerciseNames || [])
+    .map((name) => String(name).trim())
+    .filter(Boolean);
+  if (dislikes.length > 0) {
+    profile.profile_extended = {
+      ...(profile.profile_extended || {}),
+      training: {
+        ...((profile.profile_extended || {}).training || {}),
+        exercises_dislike: dislikes,
+      },
+    };
+  }
 
   // Sync updated profile to AI backend before generating
   try {
@@ -196,7 +241,10 @@ export async function generateAiWorkoutPlan(user, daysPerWeek = 4, location = nu
     // non-fatal — the generate call may still succeed with existing profile
   }
 
-  const res = await aiClient.post(`/clients/${aiId}/exercise-plan?days_per_week=${daysPerWeek}`);
+  const rotation = dislikes.length > 0 ? Date.now() % 11 : 0;
+  const res = await aiClient.post(
+    `/clients/${aiId}/exercise-plan?days_per_week=${daysPerWeek}&rotation=${rotation}`,
+  );
   const aiPlans = res.data.plans || [];
   return mapAiPlansToWeeklySchedule(aiPlans, daysPerWeek);
 }

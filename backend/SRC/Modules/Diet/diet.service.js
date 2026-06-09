@@ -61,11 +61,16 @@ export const dietService = {
     const dietaryPreference = this._normalizeDietaryPreference(rawDietPref);
 
     await DietPlan.update(
-      { isActive: false },
-      { where: { userId, isActive: true } }
+      { isActive: false, pendingCoachReview: false },
+      {
+        where: {
+          userId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+      }
     );
 
-    return DietPlan.create({
+    const dietPlan = await DietPlan.create({
       userId,
       planName: data.planName || 'Custom Diet Plan',
       goal,
@@ -80,14 +85,27 @@ export const dietService = {
       isActive: true,
       pendingCoachReview: false,
     });
+
+    await DietPlan.update(
+      { isActive: false, pendingCoachReview: false },
+      { where: { userId, id: { [Op.ne]: dietPlan.id } } },
+    );
+
+    return dietPlan;
+  },
+
+  async getCurrentDietPlan(userId) {
+    return DietPlan.findOne({
+      where: {
+        userId,
+        [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+      },
+      order: [['createdAt', 'DESC']],
+    });
   },
 
   async getActiveDietPlan(userId) {
-    // Return active plan first; fall back to pending-review plan
-    const plan = await DietPlan.findOne({ where: { userId, isActive: true } });
-    if (plan) return plan;
-    const pending = await DietPlan.findOne({ where: { userId, pendingCoachReview: true }, order: [['createdAt', 'DESC']] });
-    return pending || null;
+    return this.getCurrentDietPlan(userId);
   },
 
   async getPendingCoachReviewDietPlans(userId) {
@@ -304,8 +322,13 @@ export const dietService = {
       const aiBundle = await generateAiDietPlan(user);
       if (aiBundle?.weeklyMealPlan?.length) {
         await DietPlan.update(
-          { isActive: false },
-          { where: { userId, isActive: true } }
+          { isActive: false, pendingCoachReview: false },
+          {
+            where: {
+              userId,
+              [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+            },
+          }
         );
 
         const allergies = Array.isArray(profile.allergies)
@@ -334,6 +357,10 @@ export const dietService = {
           isActive: !pendingReview,
           pendingCoachReview: pendingReview,
         });
+        await DietPlan.update(
+          { isActive: false, pendingCoachReview: false },
+          { where: { userId, id: { [Op.ne]: dietPlan.id } } },
+        );
         return dietPlan;
       }
     } catch (e) {
@@ -342,10 +369,14 @@ export const dietService = {
       user.profile = savedProfile;
     }
 
-    // Deactivate previous plans
     await DietPlan.update(
-      { isActive: false },
-      { where: { userId, isActive: true } }
+      { isActive: false, pendingCoachReview: false },
+      {
+        where: {
+          userId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+      }
     );
 
     // Calculate daily calorie target
@@ -383,6 +414,11 @@ export const dietService = {
       isActive: !pendingReview,
       pendingCoachReview: pendingReview,
     });
+
+    await DietPlan.update(
+      { isActive: false, pendingCoachReview: false },
+      { where: { userId, id: { [Op.ne]: dietPlan.id } } },
+    );
 
     return dietPlan;
   },

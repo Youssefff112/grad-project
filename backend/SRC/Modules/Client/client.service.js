@@ -3,6 +3,7 @@ import { ClientProfile } from './client.model.js';
 import { User } from '../User/user.model.js';
 import { CoachProfile } from '../Coach/coach.model.js';
 import { subscriptionService } from '../Subscription/subscription.service.js';
+import { notificationService } from '../Notification/notification.service.js';
 import { AppError } from '../../Utils/appError.utils.js';
 
 const CLIENT_PROFILE_FIELDS = ['goals', 'preferences', 'medicalNotes'];
@@ -92,8 +93,24 @@ export const clientService = {
       return profile;
     }
 
+    const previousCoachId = profile.selectedCoachId;
     profile.selectedCoachId = coachId;
     await profile.save();
+
+    // Ensure the coach can access client routes (ProCoach in dev/demo).
+    await subscriptionService.ensureCoachProSubscription(coachId);
+
+    if (Number(previousCoachId) !== Number(coachId)) {
+      const clientUser = await User.findByPk(userId, { attributes: ['firstName', 'lastName'] });
+      const clientDisplayName = clientUser
+        ? `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim()
+        : '';
+      void notificationService.notifyCoachClientAssigned(coachId, {
+        clientUserId: userId,
+        clientDisplayName,
+      });
+    }
+
     return ClientProfile.findOne({
       where: { userId },
       include: [

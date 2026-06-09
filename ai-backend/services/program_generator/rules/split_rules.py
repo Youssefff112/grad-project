@@ -1,6 +1,8 @@
 """Deterministic split selection based on client profile."""
 from typing import List
 
+from .goal_utils import normalize_goal_list
+
 SPLIT_MUSCLE_MAP = {
     "full_body": [
         ["legs", "chest", "back", "shoulders", "core"],
@@ -19,6 +21,20 @@ SPLIT_MUSCLE_MAP = {
         ["chest", "shoulders", "triceps"],
         ["back", "biceps"],
         ["legs", "shoulders", "core"],
+    ],
+    # Fat loss: alternate metabolic lower-body days with full-body compound days
+    "fat_loss_metabolic": [
+        ["legs", "glutes", "core"],
+        ["chest", "back", "shoulders", "core"],
+        ["legs", "glutes", "core"],
+        ["chest", "back", "shoulders", "core"],
+    ],
+    # Athletic / endurance: more full-body conditioning volume
+    "athletic_conditioning": [
+        ["legs", "core", "glutes"],
+        ["chest", "back", "shoulders"],
+        ["legs", "core"],
+        ["chest", "back", "shoulders", "core"],
     ],
 }
 
@@ -39,12 +55,27 @@ def select_split(
     Select workout split based on client profile.
     Returns: full_body, upper_lower, push_pull_legs, push_pull_legs_4
     """
+    normalized = normalize_goal_list(goals)
+
+    if "fat_loss" in normalized:
+        return "fat_loss_metabolic"
+    if "sports_performance" in normalized or "endurance" in normalized:
+        return "athletic_conditioning"
+    if "muscle_gain" in normalized:
+        if days_per_week <= 2:
+            return "full_body"
+        if days_per_week == 3:
+            return "full_body" if experience == "beginner" else "push_pull_legs"
+        if days_per_week >= 5:
+            return "push_pull_legs_4"
+        return "push_pull_legs" if experience != "beginner" else "upper_lower"
+
     if days_per_week <= 2:
         return "full_body"
     if days_per_week == 3:
         return "full_body" if experience == "beginner" else "upper_lower"
     if days_per_week == 4:
-        if "strength" in goals or experience == "advanced":
+        if "strength" in normalized or experience == "advanced":
             return "push_pull_legs"
         return "upper_lower"
     if days_per_week >= 5:
@@ -65,4 +96,6 @@ def get_muscle_plan(split: str, days_per_week: int) -> List[List[str]]:
         return base + [base[0]]
     if split == "push_pull_legs_4":
         return base
+    if split in ("fat_loss_metabolic", "athletic_conditioning"):
+        return base[:days_per_week] if len(base) >= days_per_week else base
     return base[:days_per_week] if len(base) >= days_per_week else base

@@ -10,6 +10,16 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiGet, apiPost, apiDelete } from './api';
+import { unwrapApiData } from '../utils/apiResponse';
+
+function parsePlanFromBody(body: unknown): WorkoutPlan | null {
+  const data = unwrapApiData<{ plan?: WorkoutPlan | null }>(body);
+  if (data && typeof data === 'object' && 'plan' in data) {
+    return data.plan ?? null;
+  }
+  const legacy = body as { data?: { plan?: WorkoutPlan | null } };
+  return legacy?.data?.plan ?? null;
+}
 
 async function workoutPlanCacheKey(): Promise<string | null> {
   const userId = await AsyncStorage.getItem('user_id');
@@ -150,17 +160,22 @@ export interface LogWorkoutRequest {
  * @param location   'home' | 'gym' — where the user will work out
  * @param equipment  list of available equipment IDs (e.g. ['dumbbells', 'resistance_bands'])
  */
+export const clearWorkoutPlanCache = async (): Promise<void> => {
+  await saveWorkoutPlanLocally(null);
+};
+
 export const generateWorkoutPlan = async (
   location?: 'home' | 'gym' | null,
   equipment?: string[],
 ): Promise<{ plan: WorkoutPlan }> => {
   // AI generation can take 60-120 s on a cold start — use a generous timeout.
-  const response: any = await apiPost('/workout/generate', {
+  const response = await apiPost('/workout/generate', {
     location: location ?? undefined,
     equipment: equipment && equipment.length > 0 ? equipment : undefined,
   }, { timeout: 120000 });
-  const plan = response.data?.plan ?? null;
-  if (plan) await saveWorkoutPlanLocally(plan);
+  const plan = parsePlanFromBody(response);
+  // Always replace local cache with the server-created plan (never keep a stale plan).
+  await saveWorkoutPlanLocally(plan);
   return { plan };
 };
 
@@ -168,15 +183,19 @@ export const generateWorkoutPlan = async (
  * Get the currently active workout plan for the current user.
  * Returns ``{ plan: null }`` if the user has no active plan.
  */
-export const getActiveWorkoutPlan = async (): Promise<{ plan: WorkoutPlan | null }> => {
+export const getActiveWorkoutPlan = async (options?: { allowCache?: boolean }): Promise<{ plan: WorkoutPlan | null }> => {
   try {
-    const response: any = await apiGet('/workout/active');
-    const plan = response.data?.plan ?? null;
+    const response = await apiGet('/workout/active');
+    const plan = parsePlanFromBody(response);
     await saveWorkoutPlanLocally(plan);
     return { plan };
   } catch (err) {
-    const cached = await loadWorkoutPlanLocally();
-    if (cached) return { plan: cached };
+    // Only fall back to cache when explicitly allowed — prevents showing a
+    // deleted/superseded plan after regeneration when the network blips.
+    if (options?.allowCache) {
+      const cached = await loadWorkoutPlanLocally();
+      if (cached) return { plan: cached };
+    }
     throw err;
   }
 };
@@ -245,13 +264,22 @@ export const getCompletedDays = async (): Promise<string[]> => {
  * status = 'completed') in the current Mon–Sun week.
  * Example: ['jumping jacks', 'burpees']
  */
-export const getCompletedExercises = async (): Promise<string[]> => {
-  const response: any = await apiGet('/workout/completed-exercises');
-  return response.data?.completedExercises ?? [];
+export const getCompletedExercises = async (
+  workoutPlanId?: number,
+  planDay?: string,
+): Promise<string[]> => {
+  const params = new URLSearchParams();
+  if (workoutPlanId) params.set('workoutPlanId', String(workoutPlanId));
+  if (planDay) params.set('planDay', planDay);
+  const qs = params.toString();
+  const response = await apiGet(`/workout/completed-exercises${qs ? `?${qs}` : ''}`);
+  const data = unwrapApiData<{ completedExercises?: string[] }>(response);
+  return data?.completedExercises ?? (response as { data?: { completedExercises?: string[] } })?.data?.completedExercises ?? [];
 };
 
 export default {
   generateWorkoutPlan,
+  clearWorkoutPlanCache,
   getActiveWorkoutPlan,
   startWorkoutSession,
   finishWorkoutSession,

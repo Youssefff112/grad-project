@@ -239,9 +239,24 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
         const workouts = planToWorkout(plan);
         const first = workouts[0];
         if (first) {
-          setGeneratedWorkout({ ...first, status: 'pending' });
+          setGeneratedWorkout({ ...first, status: plan.pendingCoachReview ? 'pending' : 'approved' });
           setShowPreview(true);
           setAvailableWorkouts(workouts);
+          // Sync list view immediately so the screen reflects the new plan without waiting for focus.
+          await loadActivePlan();
+          Alert.alert(
+            'Plan Generated',
+            plan.pendingCoachReview
+              ? 'Your new plan was sent to your coach for approval. Once approved, it will appear on the Workouts tab.'
+              : 'Your workout plan has been updated. Go back to the Workouts tab to see today\'s exercises.',
+            [
+              {
+                text: 'View Workouts',
+                onPress: () => navigation.navigate('VisionAnalysisLab', { refresh: Date.now() }),
+              },
+              { text: 'Stay Here' },
+            ],
+          );
         } else {
           throw new Error('Plan has no workout days');
         }
@@ -276,14 +291,14 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
     setSwapSearch('');
   };
 
-  const handleApproveWorkout = () => {
-    // Plan is already saved and active on the backend — just navigate away.
+  const handleApproveWorkout = async () => {
     setShowPreview(false);
     setGeneratedWorkout(null);
+    await loadActivePlan();
     Alert.alert('Workout Plan Saved!', 'Your workout plan has been added to your routine.', [
       {
         text: 'View Workouts',
-        onPress: () => navigation.navigate('VisionAnalysisLab'),
+        onPress: () => navigation.navigate('VisionAnalysisLab', { refresh: Date.now() }),
       },
       { text: 'Stay Here' },
     ]);
@@ -296,6 +311,7 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
     setGeneratedWorkout(null);
     // Reload so the "Awaiting Coach Review" banner appears immediately
     loadActivePlan();
+    navigation.navigate('VisionAnalysisLab', { refresh: Date.now() });
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -494,7 +510,15 @@ export const WorkoutGenerationScreen = ({ navigation }: any) => {
                       onPress: async () => {
                         try {
                           await workoutService.deleteActiveWorkoutPlan();
+                          await workoutService.clearWorkoutPlanCache();
                           setAvailableWorkouts([]);
+                          Alert.alert('Plan Deleted', 'Your workout plan has been removed.', [
+                            {
+                              text: 'OK',
+                              onPress: () =>
+                                navigation.navigate('VisionAnalysisLab', { refresh: Date.now() }),
+                            },
+                          ]);
                         } catch (e: any) {
                           Alert.alert('Error', e?.response?.data?.message || 'Failed to delete plan');
                         }

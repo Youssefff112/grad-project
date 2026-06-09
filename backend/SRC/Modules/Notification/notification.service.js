@@ -262,6 +262,63 @@ export const notificationService = {
     }
   },
 
+  /** A client chose this coach as their primary coach. */
+  async notifyCoachClientAssigned(coachUserId, { clientUserId, clientDisplayName } = {}) {
+    const cid = coachUserId != null ? Number(coachUserId) : NaN;
+    if (!Number.isFinite(cid) || cid <= 0) return;
+    try {
+      const name = (clientDisplayName || '').trim() || 'A client';
+      const message = `${name} assigned you as their coach. Open My Clients to view their profile.`;
+      await Notification.create({
+        userId: cid,
+        channel: 'in_app',
+        title: 'New client assigned',
+        message,
+        type: 'system',
+        icon: 'person_add',
+        read: false,
+        status: 'sent',
+      });
+      await this.sendExpoPushIfEnabled(
+        cid,
+        undefined,
+        'New client assigned',
+        message,
+        { type: 'client_assigned', clientUserId: String(clientUserId ?? '') },
+      );
+    } catch (e) {
+      console.warn('[notifyCoachClientAssigned]', e?.message || e);
+    }
+  },
+
+  /** Client generated an AI workout plan that needs coach approval (in-app + optional push). */
+  async notifyCoachPendingClientWorkoutPlan(coachUserId, { clientUserId, clientDisplayName, planId } = {}) {
+    const cid = coachUserId != null ? Number(coachUserId) : NaN;
+    if (!Number.isFinite(cid) || cid <= 0) return;
+    try {
+      const name = (clientDisplayName || '').trim() || 'A client';
+      await Notification.create({
+        userId: cid,
+        channel: 'in_app',
+        title: 'Workout plan pending review',
+        message: `${name} generated an AI workout plan and is waiting for your approval.`,
+        type: 'workout',
+        icon: 'fitness_center',
+        read: false,
+        status: 'sent',
+      });
+      await this.sendExpoPushIfEnabled(
+        cid,
+        undefined,
+        'Workout plan pending review',
+        `${name} submitted a workout plan. Open the client → Plans tab to approve.`,
+        { type: 'pending_workout_plan', planId: String(planId ?? ''), clientUserId: String(clientUserId ?? '') },
+      );
+    } catch (e) {
+      console.warn('[notifyCoachPendingClientWorkoutPlan]', e?.message || e);
+    }
+  },
+
   /** Client generated an AI meal plan that needs coach approval (in-app + optional push). */
   async notifyCoachPendingClientDietPlan(coachUserId, { clientUserId, clientDisplayName, planId }) {
     const cid = coachUserId != null ? Number(coachUserId) : NaN;

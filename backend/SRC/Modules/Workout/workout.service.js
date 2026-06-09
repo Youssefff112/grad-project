@@ -5,7 +5,7 @@ import { User } from '../User/user.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
 import { notificationService } from '../Notification/notification.service.js';
-import { generateAiWorkoutPlan } from '../../Utils/aiService.js';
+import { generateAiWorkoutPlan, normalizeGoalForAi } from '../../Utils/aiService.js';
 import { pickFitnessGoal } from '../../Utils/mergeClientGoal.utils.js';
 import { subscriptionService } from '../Subscription/subscription.service.js';
 import { clientShouldRequireCoachPlanApproval } from '../../Utils/planAccess.utils.js';
@@ -29,20 +29,40 @@ export const workoutService = {
       subscription,
       clientProfile?.selectedCoachId
     );
-    return this._generateWorkoutPlanForUser(userId, null, location, equipment, null, needsCoachReview);
+    const plan = await this._generateWorkoutPlanForUser(userId, null, location, equipment, null, needsCoachReview);
+    if (needsCoachReview && plan?.pendingCoachReview && clientProfile?.selectedCoachId) {
+      const coachUid = Number(clientProfile.selectedCoachId);
+      const user = await User.findByPk(userId, { attributes: ['firstName', 'lastName'] });
+      const clientDisplayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
+      void notificationService.notifyCoachPendingClientWorkoutPlan(coachUid, {
+        clientUserId: userId,
+        clientDisplayName,
+        planId: plan.id,
+      });
+    }
+    return plan;
   },
 
   async generateWorkoutPlanForUser(targetUserId, coachId, planName = null) {
     return this._generateWorkoutPlanForUser(targetUserId, coachId, null, null, planName);
   },
 
+  /**
+   * The plan the client (and coach) should treat as "current":
+   * newest row that is either active or awaiting coach approval.
+   */
+  async getCurrentWorkoutPlan(userId) {
+    return WorkoutPlan.findOne({
+      where: {
+        userId,
+        [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+      },
+      order: [['createdAt', 'DESC']],
+    });
+  },
+
   async getActiveWorkoutPlan(userId) {
-    // Return active plan first; fall back to most recent pending-review plan
-    const plan = await WorkoutPlan.findOne({ where: { userId, isActive: true } });
-    if (plan) return plan;
-    // Show pending-review plans so the client sees something while awaiting approval
-    const pending = await WorkoutPlan.findOne({ where: { userId, pendingCoachReview: true }, order: [['createdAt', 'DESC']] });
-    return pending || null;
+    return this.getCurrentWorkoutPlan(userId);
   },
 
   async getPendingCoachReviewPlans(userId) {
@@ -297,18 +317,43 @@ export const workoutService = {
       ? equipment
       : (profile.homeEquipment || []);
 
-    // Deactivate previous plans
+    // Collect exercise names from the current plan so regeneration can pick
+    // different movements instead of returning the same deterministic schedule.
+    const previousPlan = await this.getCurrentWorkoutPlan(userId);
+    const excludeExerciseNames = [];
+    if (previousPlan?.weeklySchedule) {
+      for (const day of previousPlan.weeklySchedule) {
+        for (const ex of day.exercises || []) {
+          if (ex?.name) excludeExerciseNames.push(String(ex.name).trim());
+        }
+      }
+    }
+
+    // Supersede every prior plan (active or awaiting coach review) so the new
+    // generation is always the one returned by getActiveWorkoutPlan.
     await WorkoutPlan.update(
-      { isActive: false },
-      { where: { userId, isActive: true } }
+      { isActive: false, pendingCoachReview: false },
+      {
+        where: {
+          userId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+      }
     );
 
     // Prefer Python AI service (see AI_SERVICE_URL); fall back to built-in rules if it is down or errors.
     const savedProfile = user.profile;
-    user.profile = { ...profile, goal: mergedGoal, experienceLevel: mergedExperience };
+    const aiGoal = normalizeGoalForAi(mergedGoal);
+    user.profile = { ...profile, goal: aiGoal, experienceLevel: mergedExperience };
     let weeklySchedule;
     try {
-      weeklySchedule = await generateAiWorkoutPlan(user, 4, effectiveLocation, effectiveEquipment);
+      weeklySchedule = await generateAiWorkoutPlan(
+        user,
+        4,
+        effectiveLocation,
+        effectiveEquipment,
+        excludeExerciseNames,
+      );
       if (!Array.isArray(weeklySchedule) || weeklySchedule.length === 0) {
         throw new Error('empty AI schedule');
       }
@@ -337,6 +382,12 @@ export const workoutService = {
       isActive: !pendingReview,
       pendingCoachReview: pendingReview,
     });
+
+    // Archive every older plan so only this row is "current" for client + coach UIs.
+    await WorkoutPlan.update(
+      { isActive: false, pendingCoachReview: false },
+      { where: { userId, id: { [Op.ne]: workoutPlan.id } } },
+    );
 
     return workoutPlan;
   },
@@ -543,7 +594,8 @@ export const workoutService = {
     const g = String(raw).toLowerCase().replace(/[\s-]/g, '_');
     if (g.includes('fat') || g.includes('weight') || g === 'fatloss' || g === 'lose_weight') return 'weight_loss';
     if (g.includes('muscle') || g.includes('bulk') || g === 'gain' || g === 'hypertrophy') return 'muscle_gain';
-    if (g.includes('endur') || g.includes('cardio') || g.includes('stamina')) return 'endurance';
+    if (g.includes('endur') || g.includes('cardio') || g.includes('stamina') || g.includes('athlet')) return 'endurance';
+    if (g.includes('longev') || g.includes('health')) return 'maintenance';
     if (['weight_loss', 'muscle_gain', 'maintenance', 'endurance'].includes(g)) return g;
     return 'maintenance';
   },
@@ -572,7 +624,7 @@ export const workoutService = {
     return [...new Set(logs.map((l) => l.day))];
   },
 
-  async getCompletedExercisesThisWeek(userId) {
+  async getCompletedExercisesThisWeek(userId, { workoutPlanId = null, planDay = null } = {}) {
     const now = new Date();
     const dayOfWeek = now.getDay();
     const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -583,17 +635,32 @@ export const workoutService = {
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
 
+    const where = {
+      userId,
+      status: 'completed',
+      date: { [Op.between]: [monday, sunday] },
+    };
+    if (workoutPlanId) {
+      where.workoutPlanId = workoutPlanId;
+    }
+
     const logs = await WorkoutLog.findAll({
-      where: {
-        userId,
-        status: 'completed',
-        date: { [Op.between]: [monday, sunday] }
-      },
-      attributes: ['exercises']
+      where,
+      attributes: ['exercises', 'sessionMeta', 'day'],
     });
 
+    const normalizedPlanDay = planDay ? String(planDay).trim().toLowerCase() : null;
     const names = new Set();
     for (const log of logs) {
+      if (normalizedPlanDay) {
+        const logDay = (log.sessionMeta?.planDay || log.day || '').trim().toLowerCase();
+        if (logDay !== normalizedPlanDay) continue;
+      }
+      const exerciseName = (log.sessionMeta?.exerciseName || '').trim();
+      if (exerciseName) {
+        names.add(exerciseName.toLowerCase());
+        continue;
+      }
       if (Array.isArray(log.exercises)) {
         for (const ex of log.exercises) {
           if (ex?.name) names.add(ex.name.toLowerCase());

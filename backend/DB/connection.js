@@ -64,6 +64,20 @@ export const connectDB = async () => {
       console.warn('Coach applicationStatus backfill:', e?.message || e);
     }
 
+    try {
+      const { CoachProfile } = await import('../SRC/Modules/Coach/coach.model.js');
+      const { subscriptionService } = await import('../SRC/Modules/Subscription/subscription.service.js');
+      const approved = await CoachProfile.findAll({
+        where: { isApproved: true, applicationStatus: 'approved' },
+        attributes: ['userId'],
+      });
+      for (const row of approved) {
+        await subscriptionService.ensureCoachProSubscription(row.userId);
+      }
+    } catch (e) {
+      console.warn('Coach ProCoach subscription backfill:', e?.message || e);
+    }
+
     console.log('✅ PostgreSQL Connected');
     return sequelize;
   } catch (error) {

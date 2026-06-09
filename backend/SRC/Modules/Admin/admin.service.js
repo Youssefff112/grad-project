@@ -3,6 +3,7 @@ import { Exercise } from '../Exercise/exercise.model.js';
 import { CoachProfile } from '../Coach/coach.model.js';
 import { ClientProfile } from '../Client/client.model.js';
 import { AppError } from '../../Utils/appError.utils.js';
+import { subscriptionService } from '../Subscription/subscription.service.js';
 import { Op, fn, col } from 'sequelize';
 
 export const adminService = {
@@ -311,6 +312,8 @@ export const adminService = {
     profile.approvedBy = adminId;
     profile.approvedAt = new Date();
     await profile.save();
+
+    await subscriptionService.ensureCoachProSubscription(userId);
 
     return profile;
   },

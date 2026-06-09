@@ -407,7 +407,7 @@ export const analyzeFrame = async (
   const body = await apiPost('/vision/analyze-frame', {
     image_base64: imageBase64,
     exercise_name: profile.slug,
-  }, { timeout: 12000 });
+  }, { timeout: 20000 });
   const data = unwrapApiData<Record<string, unknown>>(body) ?? {};
   const angles = (data.angles ?? {}) as FrameAngles;
   const targets = (data.targets ?? {}) as FrameTargetsRaw;
@@ -431,10 +431,12 @@ export const analyzeFrame = async (
   };
 };
 
-/** Health check — proxied through Node API (phone cannot reach :8000 directly). */
+/** Health check — proxied through Node API (phone cannot reach AI backend directly). */
 export const checkAIBackendHealth = async (): Promise<boolean> => {
   try {
-    await apiGet('/vision/health', { timeout: 5000 });
+    const body = await apiGet('/vision/health', { timeout: 8000 });
+    const data = unwrapApiData<Record<string, unknown>>(body) ?? {};
+    if (typeof data.ok === 'boolean') return data.ok;
     return true;
   } catch {
     return false;

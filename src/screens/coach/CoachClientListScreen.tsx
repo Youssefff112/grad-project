@@ -53,9 +53,11 @@ export const CoachClientListScreen = ({ navigation }: any) => {
   const [filter, setFilter] = useState<ClientStatus | 'all'>('all');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadClients = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const { clients: raw } = await coachService.getMyClients({ includeActivity: true });
       const mapped: Client[] = raw.map((c) => {
@@ -78,8 +80,13 @@ export const CoachClientListScreen = ({ navigation }: any) => {
       });
 
       setClients(mapped);
-    } catch {
+    } catch (err: any) {
       setClients([]);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not load clients. Pull to refresh or try again.';
+      setLoadError(msg);
     } finally {
       setLoading(false);
     }
@@ -168,7 +175,12 @@ export const CoachClientListScreen = ({ navigation }: any) => {
         {filtered.length === 0 && (
           <View style={tw`items-center py-16`}>
             <MaterialIcons name="group-off" size={48} color={isDark ? '#334155' : '#cbd5e1'} />
-            <Text style={[tw`mt-3 text-base font-bold`, { color: isDark ? '#475569' : '#94a3b8' }]}>No clients found</Text>
+            <Text style={[tw`mt-3 text-base font-bold`, { color: isDark ? '#475569' : '#94a3b8' }]}>
+              {loadError ? 'Could not load clients' : 'No clients found'}
+            </Text>
+            {loadError ? (
+              <Text style={[tw`mt-2 text-sm text-center px-6`, { color: subtextColor }]}>{loadError}</Text>
+            ) : null}
           </View>
         )}
 

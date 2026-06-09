@@ -72,6 +72,39 @@ def _matches_equipment(client_equipment: str, ex_equipment: str) -> bool:
     return True
 
 
+METABOLIC_KEYWORDS = (
+    "burpee", "jump", "mountain", "jack", "sprint", "rope", "climber",
+    "lunge", "squat", "push-up", "push up", "plank", "step-up", "step up",
+    "high knee", "skater", "thruster", "swing",
+)
+
+
+def _goal_score_boost(client_goal: str, ex_name: str, muscle_group: str) -> int:
+    goal = (client_goal or "").lower().replace(" ", "_")
+    if goal in ("fatloss", "fat_loss", "weight_loss"):
+        goal = "fat_loss"
+    elif goal == "hypertrophy":
+        goal = "muscle_gain"
+
+    name = (ex_name or "").lower()
+    if goal == "fat_loss":
+        if any(k in name for k in METABOLIC_KEYWORDS):
+            return 12
+        if muscle_group in ("legs", "core", "glutes", "posterior_chain"):
+            return 6
+        return 2
+    if goal == "muscle_gain":
+        if muscle_group in ("chest", "back", "legs", "shoulders", "posterior_chain"):
+            return 5
+        return 0
+    if goal in ("sports_performance", "endurance"):
+        if any(k in name for k in METABOLIC_KEYWORDS):
+            return 8
+        if muscle_group in ("legs", "core", "glutes"):
+            return 4
+    return 0
+
+
 def _difficulty_score(client_level: str, ex_difficulty: str) -> int:
     """Prefer exercises at or slightly above client level."""
     levels = ["beginner", "intermediate", "advanced"]
@@ -92,6 +125,7 @@ def select_exercises(
     client: Client,
     muscle_groups: Optional[List[str]] = None,
     num_exercises: int = 6,
+    rotation_offset: int = 0,
 ) -> List[Exercise]:
     """Select exercises suited to the client."""
     exercises = db.query(Exercise).all()
@@ -117,11 +151,16 @@ def select_exercises(
         if expanded_groups and ex.muscle_group not in expanded_groups:
             continue
         score = _difficulty_score(client.fitness_level, ex.difficulty)
+        score += _goal_score_boost(client.goal, ex.name, ex.muscle_group)
         if score > 0:
             scored.append((score, ex))
 
     scored.sort(key=lambda x: -x[0])
-    return [ex for _, ex in scored[:num_exercises]]
+    if not scored:
+        return []
+    offset = rotation_offset % len(scored)
+    rotated = scored[offset:] + scored[:offset]
+    return [ex for _, ex in rotated[:num_exercises]]
 
 
 def create_exercise_plan(

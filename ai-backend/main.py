@@ -283,6 +283,7 @@ def get_nutrition_plan(client_id: int, db: Session = Depends(get_db)):
 def generate_exercise_plan_endpoint(
     client_id: int,
     days_per_week: int = 4,
+    rotation: int = 0,
     db: Session = Depends(get_db),
 ):
     """Generate and assign exercise plan using rule-based program generator."""
@@ -290,7 +291,12 @@ def generate_exercise_plan_endpoint(
     if not client:
         raise HTTPException(404, "Client not found")
 
-    plans = generate_workout_plan(db, client, days_per_week=days_per_week)
+    plans = generate_workout_plan(
+        db,
+        client,
+        days_per_week=days_per_week,
+        rotation_offset=max(0, rotation),
+    )
 
     db.query(ExercisePlan).filter(ExercisePlan.client_id == client_id).delete()
     for p in plans:

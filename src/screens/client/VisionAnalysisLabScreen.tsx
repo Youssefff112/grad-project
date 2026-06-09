@@ -89,9 +89,10 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
       ) || plan?.weeklySchedule?.find((d: any) => !d.isRestDay);
 
       if (todaySchedule?.exercises?.length) {
+        const planDay = todaySchedule.day?.toLowerCase();
         setPlanName(`${prettyLabel(todaySchedule.day)}: ${prettyLabel(todaySchedule.focus) || 'Workout'}`);
         setActivePlanId(plan?.id);
-        setActivePlanDay(todaySchedule.day?.toLowerCase());
+        setActivePlanDay(planDay);
         setActivePlanFocus(todaySchedule.focus);
         setPlanExercises(
           todaySchedule.exercises.map((e: any) => ({
@@ -102,6 +103,8 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
             source: 'plan' as const,
           })),
         );
+        const completed = await workoutService.getCompletedExercises(plan?.id, planDay);
+        setCompletedExercises(completed);
       } else {
         // No active plan (or plan has no exercises) — wipe stale state so the
         // UI doesn't keep showing the previously-deleted plan.
@@ -110,6 +113,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
         setActivePlanDay(undefined);
         setActivePlanFocus(undefined);
         setPlanExercises([]);
+        setCompletedExercises([]);
       }
     } catch {
       setPlanName(null);
@@ -117,6 +121,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
       setActivePlanDay(undefined);
       setActivePlanFocus(undefined);
       setPlanExercises([]);
+      setCompletedExercises([]);
     } finally {
       setPlanLoading(false);
     }
@@ -128,8 +133,7 @@ export const VisionAnalysisLabScreen = ({ navigation, route }: any) => {
     useCallback(() => {
       loadActivePlanExercises();
       loadWorkoutHistory(); // always refresh history on screen focus
-      workoutService.getCompletedExercises().then(setCompletedExercises).catch(() => {});
-    }, [loadActivePlanExercises]),
+    }, [loadActivePlanExercises, route?.params?.refresh]),
   );
 
   useEffect(() => {

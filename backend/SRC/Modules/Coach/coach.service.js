@@ -351,12 +351,18 @@ export const coachService = {
         },
       }),
       DietPlan.findAll({
-        where: { userId: { [Op.in]: clientUserIds }, isActive: true },
-        order: [['updatedAt', 'DESC']],
+        where: {
+          userId: { [Op.in]: clientUserIds },
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+        order: [['createdAt', 'DESC']],
       }),
       WorkoutPlan.findAll({
-        where: { userId: { [Op.in]: clientUserIds }, isActive: true },
-        order: [['updatedAt', 'DESC']],
+        where: {
+          userId: { [Op.in]: clientUserIds },
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+        order: [['createdAt', 'DESC']],
       }),
     ]);
 
@@ -407,9 +413,10 @@ export const coachService = {
   async getClients(userId, page = 1, limit = 20, { includeActivity = false } = {}) {
     const offset = (page - 1) * limit;
 
+    const coachUserId = Number(userId);
     const { rows, count } = await ClientProfile.findAndCountAll({
-      where: { selectedCoachId: userId },
-      order: [['createdAt', 'DESC']],
+      where: { selectedCoachId: coachUserId },
+      order: [['updatedAt', 'DESC']],
       offset,
       limit
     });
@@ -623,13 +630,19 @@ export const coachService = {
     const [activeDiet, activeWorkout] = await Promise.all([
       // Fetch weeklyMealPlan so we know how many meals are assigned per day (correct denominator)
       DietPlan.findOne({
-        where: { userId: clientUserId, isActive: true },
-        order: [['updatedAt', 'DESC']],
+        where: {
+          userId: clientUserId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+        order: [['createdAt', 'DESC']],
         attributes: ['hydrationGoal', 'weeklyMealPlan'],
       }),
       WorkoutPlan.findOne({
-        where: { userId: clientUserId, isActive: true },
-        order: [['updatedAt', 'DESC']],
+        where: {
+          userId: clientUserId,
+          [Op.or]: [{ isActive: true }, { pendingCoachReview: true }],
+        },
+        order: [['createdAt', 'DESC']],
         attributes: ['weeklySchedule'],   // needed for training-day keys AND per-exercise scoring
       }),
     ]);

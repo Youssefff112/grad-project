@@ -17,10 +17,11 @@ export const visionController = {
 
   async checkAiHealth(req, res, next) {
     try {
-      const res_ai = await aiClient.get('/');
-      successResponse(res, 200, 'AI service reachable', { status: res_ai.status });
+      const res_ai = await aiClient.get('/', { timeout: 8000 });
+      successResponse(res, 200, 'AI service reachable', { status: res_ai.status, ok: true });
     } catch (error) {
-      next(error);
+      // Return 200 with ok:false so the app can show "Off" without treating it as an auth/subscription error.
+      successResponse(res, 200, 'AI service unreachable', { ok: false, error: error?.message || 'unreachable' });
     }
   },
   async startSession(req, res, next) {

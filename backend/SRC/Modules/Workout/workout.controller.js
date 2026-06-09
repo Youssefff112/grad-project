@@ -82,7 +82,12 @@ export const workoutController = {
 
   async getCompletedExercises(req, res, next) {
     try {
-      const completedExercises = await workoutService.getCompletedExercisesThisWeek(req.user.id);
+      const { workoutPlanId, planDay } = req.query || {};
+      const parsedPlanId = workoutPlanId ? parseInt(workoutPlanId, 10) : null;
+      const completedExercises = await workoutService.getCompletedExercisesThisWeek(req.user.id, {
+        workoutPlanId: Number.isFinite(parsedPlanId) ? parsedPlanId : null,
+        planDay: planDay ? String(planDay) : null,
+      });
       successResponse(res, 200, 'Completed exercises retrieved', { completedExercises });
     } catch (error) {
       next(error);

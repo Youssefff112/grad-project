@@ -156,8 +156,40 @@ export const subscriptionService = {
    * Requires an active subscription. Coach profile/onboarding routes intentionally
    * skip this middleware so coaches can subscribe after signing up.
    */
+  /**
+   * Ensure an approved coach has an active ProCoach subscription.
+   * In development/demo mode, auto-grants ProCoach so coaches can manage clients
+   * without going through the payment flow first.
+   */
+  async ensureCoachProSubscription(coachUserId) {
+    const existing = await this.getActiveSubscription(coachUserId, 'coach');
+    if (existing) return existing;
+
+    const allowDemo =
+      process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_PAYMENTS !== 'false';
+    if (!allowDemo) return null;
+
+    await Subscription.update(
+      { status: 'cancelled' },
+      { where: { userId: coachUserId, role: 'coach', status: ['active', 'pending'] } },
+    );
+
+    return Subscription.create({
+      userId: coachUserId,
+      role: 'coach',
+      planName: 'ProCoach',
+      price: resolvePlanPrice('ProCoach'),
+      currency: 'USD',
+      autoRenew: true,
+      startDate: new Date(),
+      endDate: null,
+      status: 'active',
+    });
+  },
+
   async requireActiveSubscription(userId, role) {
     if (role === 'coach') {
+      await this.ensureCoachProSubscription(userId);
       const subscription = await this.getActiveSubscription(userId, 'coach');
       if (!subscription) {
         throw new AppError('Active coach subscription (ProCoach) required', 403);

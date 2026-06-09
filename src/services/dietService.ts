@@ -121,15 +121,17 @@ export const generateDietPlan = async (): Promise<{ plan: DietPlan }> => {
  * Get the currently active diet plan for the current user.
  * Returns ``{ plan: null }`` if the user has no active plan.
  */
-export const getActiveDietPlan = async (): Promise<{ plan: DietPlan | null }> => {
+export const getActiveDietPlan = async (options?: { allowCache?: boolean }): Promise<{ plan: DietPlan | null }> => {
   try {
     const response: any = await apiGet('/diet/active');
     const plan = response.data?.plan ?? null;
     await saveDietPlanLocally(plan);
     return { plan };
   } catch (err) {
-    const cached = await loadDietPlanLocally();
-    if (cached) return { plan: cached };
+    if (options?.allowCache) {
+      const cached = await loadDietPlanLocally();
+      if (cached) return { plan: cached };
+    }
     throw err;
   }
 };

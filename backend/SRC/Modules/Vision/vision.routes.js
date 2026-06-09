@@ -15,7 +15,7 @@ const router = Router();
 
 router.use(authenticate, restrictTo('client'));
 
-router.get('/health', requireActiveSubscription('client'), visionController.checkAiHealth);
+router.get('/health', requireAIPlan('client'), visionController.checkAiHealth);
 router.post('/analyze-frame', requireAIPlan('client'), validate(analyzeFrameSchema), visionController.analyzeFrame);
 router.post('/sessions', requireAIPlan('client'), validate(startVisionSessionSchema), visionController.startSession);
 router.patch('/sessions/:id', requireAIPlan('client'), validate(updateVisionSessionSchema), visionController.updateSession);

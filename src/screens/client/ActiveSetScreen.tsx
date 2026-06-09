@@ -11,7 +11,7 @@ import * as workoutService from '../../services/workoutService';
 import type { RepRecord, SessionSummaryData } from '../../services/aiVisionService';
 
 // ~2.5 fps of analysis (fast enough to catch both ends of a movement)
-const ANALYSIS_INTERVAL_MS = 450;
+const ANALYSIS_INTERVAL_MS = 650;
 const SCAN_LOST_GRACE_MS = 1500;
 // How long a feedback message stays visible before cycling
 const FEEDBACK_DISPLAY_MS = 2800;
@@ -88,7 +88,7 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
   const [poseDetected, setPoseDetected] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const consecutiveErrorsRef = useRef(0);
-  const CONSECUTIVE_ERROR_THRESHOLD = 5;
+  const CONSECUTIVE_ERROR_THRESHOLD = 8;
 
   // ── Live feedback (rotating display) ─────────────────────────────────────
   const [feedbackMessages, setFeedbackMessages] = useState<string[]>([]);
@@ -270,7 +270,8 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
       consecutiveErrorsRef.current += 1;
       if (consecutiveErrorsRef.current >= CONSECUTIVE_ERROR_THRESHOLD) {
         setAnalysisError(err?.message ?? 'Analysis failed');
-        setAiBackendOk(false);
+        // Do not flip the AI badge to Off on transient frame errors — only the
+        // dedicated health check reflects whether the AI backend is reachable.
       }
     } finally {
       inFlightRef.current = false;
@@ -687,11 +688,15 @@ export const ActiveSetScreen = ({ navigation, route }: any) => {
           </View>
         </View>
 
-        {/* AI offline banner */}
-        {analysisError && aiBackendOk === false && (
+        {/* Analysis issues — keep AI badge separate from transient frame errors */}
+        {analysisError && (
           <View style={tw`bg-red-500/15 border border-red-500/30 rounded-lg px-2.5 py-1.5 mb-2 flex-row items-center gap-1.5`}>
             <MaterialIcons name="error-outline" size={14} color="#ef4444" />
-            <Text style={tw`text-red-300 text-[11px] flex-1`}>AI server unreachable — timer still works.</Text>
+            <Text style={tw`text-red-300 text-[11px] flex-1`}>
+              {aiBackendOk === false
+                ? 'AI server unreachable — timer still works.'
+                : 'Pose analysis paused — adjust your position or retry.'}
+            </Text>
           </View>
         )}
 
